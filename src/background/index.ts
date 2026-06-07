@@ -1,5 +1,6 @@
 import { sendContentMessage } from "@/background/inject";
 import { generateMacroSuggestion } from "@/background/llm";
+import { generateMacro } from "@/background/worker";
 import type {
   BackgroundMessage,
   BackgroundResponse,
@@ -85,6 +86,15 @@ async function handleMessage(
     case "RUN_MACRO":
       await handleRunMacro();
       return { ok: true };
+    case "GENERATE_MACRO": {
+      const macro = await generateMacro(
+        message.intent,
+        message.elements,
+        message.url,
+      );
+      console.info("[Patch] Generated macro:", macro);
+      return { ok: true, macro };
+    }
     default: {
       const _exhaustive: never = message;
       return { ok: false, error: `Unhandled message: ${String(_exhaustive)}` };

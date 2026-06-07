@@ -7,6 +7,7 @@ import {
 } from "@/shared/tab";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
+const GENERATE_INTENT = "Go to Files changed";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -19,11 +20,12 @@ function requireElement<T extends HTMLElement>(id: string): T {
 const recordBtn = requireElement<HTMLButtonElement>("record-btn");
 const runBtn = requireElement<HTMLButtonElement>("run-btn");
 const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
+const generateBtn = requireElement<HTMLButtonElement>("generate-btn");
 const statusEl = requireElement<HTMLParagraphElement>("status");
 const captureOutputEl = requireElement<HTMLPreElement>("capture-output");
 const optionsLink = requireElement<HTMLAnchorElement>("options-link");
 
-const actionButtons = [recordBtn, runBtn, captureBtn];
+const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
@@ -40,6 +42,40 @@ async function sendBackgroundMessage(
   message: BackgroundMessage,
 ): Promise<BackgroundResponse> {
   return chrome.runtime.sendMessage(message);
+}
+
+async function captureDomOnActiveTab(): Promise<{
+  elements: DomElement[];
+  url: string;
+}> {
+  const tab = await getActiveTab();
+  const tabId = tab.id;
+  if (tabId === undefined) {
+    throw new Error("No active tab found.");
+  }
+  if (!isInjectableUrl(tab.url)) {
+    throw new Error(getRestrictedPageMessage(tab.url));
+  }
+
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: [DOM_CAPTURE_SCRIPT],
+  });
+
+  const [result] = await chrome.scripting.executeScript({
+    target: { tabId },
+    func: () => {
+      const capture = (
+        globalThis as { __patchCaptureDom?: () => DomElement[] }
+      ).__patchCaptureDom;
+      return capture?.() ?? [];
+    },
+  });
+
+  return {
+    elements: (result?.result ?? []) as DomElement[],
+    url: tab.url ?? "",
+  };
 }
 
 async function handleAction(
@@ -69,37 +105,43 @@ async function handleCaptureDom(): Promise<void> {
   captureOutputEl.textContent = "";
 
   try {
-    const tab = await getActiveTab();
-    const tabId = tab.id;
-    if (tabId === undefined) {
-      throw new Error("No active tab found.");
-    }
-    if (!isInjectableUrl(tab.url)) {
-      throw new Error(getRestrictedPageMessage(tab.url));
-    }
-
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: [DOM_CAPTURE_SCRIPT],
-    });
-
-    const [result] = await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        const capture = (
-          globalThis as { __patchCaptureDom?: () => DomElement[] }
-        ).__patchCaptureDom;
-        return capture?.() ?? [];
-      },
-    });
-
-    const elements = (result?.result ?? []) as DomElement[];
+    const { elements } = await captureDomOnActiveTab();
     captureOutputEl.textContent = JSON.stringify(elements, null, 2);
     captureOutputEl.hidden = false;
     setStatus(`Captured ${elements.length} elements`);
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to capture DOM";
+    setStatus(errorMessage, true);
+  } finally {
+    setButtonsDisabled(false);
+  }
+}
+
+async function handleGenerateMacro(): Promise<void> {
+  setButtonsDisabled(true);
+
+  try {
+    setStatus("Capturing DOM…");
+    const { elements, url } = await captureDomOnActiveTab();
+
+    setStatus("Generating macro…");
+    const response = await sendBackgroundMessage({
+      type: "GENERATE_MACRO",
+      intent: GENERATE_INTENT,
+      elements,
+      url,
+    });
+
+    if (!response.ok) {
+      throw new Error(response.error);
+    }
+
+    console.info("[Patch] Generated macro:", response.macro);
+    setStatus("Macro generated — see console");
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to generate macro";
     setStatus(errorMessage, true);
   } finally {
     setButtonsDisabled(false);
@@ -116,6 +158,10 @@ runBtn.addEventListener("click", () => {
 
 captureBtn.addEventListener("click", () => {
   void handleCaptureDom();
+});
+
+generateBtn.addEventListener("click", () => {
+  void handleGenerateMacro();
 });
 
 optionsLink.addEventListener("click", (event) => {

@@ -1,9 +1,11 @@
+import type { DomElement } from "@/content/dom-capture";
 import type { Macro } from "@/shared/types/macro";
 import type { Settings } from "@/shared/types/settings";
 
 export type BackgroundMessage =
   | { type: "RECORD_MACRO" }
   | { type: "RUN_MACRO" }
+  | { type: "GENERATE_MACRO"; intent: string; elements: DomElement[]; url: string }
   | { type: "GET_SETTINGS" }
   | { type: "SAVE_SETTINGS"; settings: Settings }
   | { type: "GET_MACROS" }
@@ -11,7 +13,7 @@ export type BackgroundMessage =
   | { type: "DELETE_MACRO"; macroId: string };
 
 export type BackgroundResponse =
-  | { ok: true; settings?: Settings; macros?: Macro[] }
+  | { ok: true; settings?: Settings; macros?: Macro[]; macro?: Macro }
   | { ok: false; error: string };
 
 export type ContentMessage =
