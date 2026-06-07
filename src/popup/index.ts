@@ -1,5 +1,10 @@
 import type { DomElement } from "@/content/dom-capture";
-import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
+import type {
+  BackgroundMessage,
+  BackgroundResponse,
+  ContentResponse,
+} from "@/shared/types/messages";
+import { findMacroForUrl } from "@/shared/macro-match";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -7,6 +12,7 @@ import {
 } from "@/shared/tab";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
+const CONTENT_SCRIPT = "src/content/index.js";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -91,25 +97,22 @@ async function captureDomOnActiveTab(): Promise<{
   };
 }
 
-async function handleAction(
-  message: BackgroundMessage,
-  successMessage: string,
-): Promise<void> {
-  setBusy(true);
-
+async function ensureContentScript(tabId: number): Promise<void> {
   try {
-    const response = await sendBackgroundMessage(message);
-    if (!response.ok) {
-      throw new Error(response.error);
+    const response = (await chrome.tabs.sendMessage(tabId, {
+      type: "PING",
+    })) as ContentResponse | undefined;
+    if (response?.ok) {
+      return;
     }
-    setStatus(successMessage);
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Something went wrong";
-    setStatus(errorMessage, true);
-  } finally {
-    setBusy(false);
+  } catch {
+    // Content script not injected yet.
   }
+
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: [CONTENT_SCRIPT],
+  });
 }
 
 async function handleCaptureDom(): Promise<void> {
@@ -211,12 +214,60 @@ async function handleGenerateMacro(): Promise<void> {
   }
 }
 
+async function handleRunMacro(): Promise<void> {
+  setBusy(true);
+
+  try {
+    const tab = await getActiveTab();
+    const tabId = tab.id;
+    const url = tab.url;
+
+    if (tabId === undefined) {
+      throw new Error("No active tab found.");
+    }
+    if (!url || !isInjectableUrl(url)) {
+      throw new Error(getRestrictedPageMessage(url));
+    }
+
+    setStatus("Finding macro…");
+    const macrosResponse = await sendBackgroundMessage({ type: "GET_MACROS" });
+    if (!macrosResponse.ok) {
+      throw new Error(macrosResponse.error);
+    }
+
+    const macro = findMacroForUrl(macrosResponse.macros ?? [], url);
+    if (!macro) {
+      throw new Error("No macro matches this page. Record one on this URL first.");
+    }
+
+    setStatus(`Running "${macro.name}"…`);
+    await ensureContentScript(tabId);
+
+    const response = (await chrome.tabs.sendMessage(tabId, {
+      type: "EXECUTE_STEPS",
+      steps: macro.steps,
+    })) as ContentResponse | undefined;
+
+    if (!response?.ok) {
+      throw new Error(response?.error ?? "Failed to run macro.");
+    }
+
+    setStatus(`Ran macro "${macro.name}"`);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to run macro";
+    setStatus(errorMessage, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
 recordBtn.addEventListener("click", () => {
   void handleRecordMacro();
 });
 
 runBtn.addEventListener("click", () => {
-  void handleAction({ type: "RUN_MACRO" }, "Run macro dispatched");
+  void handleRunMacro();
 });
 
 captureBtn.addEventListener("click", () => {

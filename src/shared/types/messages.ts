@@ -1,5 +1,5 @@
 import type { DomElement } from "@/content/dom-capture";
-import type { Macro } from "@/shared/types/macro";
+import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { Settings } from "@/shared/types/settings";
 
 export type BackgroundMessage =
@@ -17,8 +17,7 @@ export type BackgroundResponse =
   | { ok: false; error: string };
 
 export type ContentMessage =
-  | { type: "START_RECORDING" }
-  | { type: "STOP_RECORDING" }
+  | { type: "EXECUTE_STEPS"; steps: MacroStep[] }
   | { type: "RUN_MACRO"; macro: Macro }
   | { type: "PING" };
 

@@ -1,8 +1,12 @@
 import { z } from "zod";
 
+import { deriveUrlPattern } from "@/shared/macro-match";
+
 export const MacroStepTypeSchema = z.enum([
   "click",
   "type",
+  "fill",
+  "confirm",
   "navigate",
   "wait",
   "scroll",
@@ -20,6 +24,7 @@ export const MacroSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
+  urlPattern: z.string().min(1).optional(),
   steps: z.array(MacroStepSchema),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),
@@ -45,12 +50,13 @@ export const MacroGenerationSchema = z.object({
 
 export type MacroGeneration = z.infer<typeof MacroGenerationSchema>;
 
-export function toMacro(generated: MacroGeneration): Macro {
+export function toMacro(generated: MacroGeneration, url: string): Macro {
   const now = Date.now();
   return MacroSchema.parse({
     id: crypto.randomUUID(),
     name: generated.name,
     description: generated.description,
+    urlPattern: deriveUrlPattern(url),
     createdAt: now,
     updatedAt: now,
     steps: generated.steps.map((step) => ({

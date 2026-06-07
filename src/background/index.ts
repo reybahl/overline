@@ -1,10 +1,10 @@
 import { sendContentMessage } from "@/background/inject";
-import { generateMacroSuggestion } from "@/background/llm";
 import { generateMacro } from "@/background/worker";
 import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
+import { findMacroForUrl } from "@/shared/macro-match";
 import { getMacros, getSettings, saveMacros, saveSettings } from "@/shared/storage";
 import {
   getActiveTab,
@@ -20,7 +20,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   try {
     switch (command) {
       case "record-macro":
-        await handleRecordMacro();
+        console.warn("[Patch] Use the popup to record macros.");
         break;
       case "run-macro":
         await handleRunMacro();
@@ -81,8 +81,7 @@ async function handleMessage(
       return { ok: true, macros };
     }
     case "RECORD_MACRO":
-      await handleRecordMacro();
-      return { ok: true };
+      throw new Error("Use the popup to record macros.");
     case "RUN_MACRO":
       await handleRunMacro();
       return { ok: true };
@@ -110,35 +109,25 @@ async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
   return tab;
 }
 
-async function handleRecordMacro(): Promise<void> {
-  const tab = await requireInjectableActiveTab();
-  const response = await sendContentMessage(tab.id!, { type: "START_RECORDING" });
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-  console.info("[Patch] Record macro command dispatched");
-}
-
 async function handleRunMacro(): Promise<void> {
   const tab = await requireInjectableActiveTab();
-  const settings = await getSettings();
-  const macros = await getMacros();
-  const currentMacro = macros.find((macro) => macro.id === settings.currentMacroId);
+  const url = tab.url;
+  if (!url) {
+    throw new Error("No active tab URL found.");
+  }
 
-  if (!currentMacro) {
-    const suggestion = await generateMacroSuggestion(
-      "No macro is selected. Describe what Patch should do next.",
-    );
-    console.info("[Patch] LLM placeholder response:", suggestion);
-    return;
+  const macros = await getMacros();
+  const macro = findMacroForUrl(macros, url);
+  if (!macro) {
+    throw new Error("No macro matches this page. Record one on this URL first.");
   }
 
   const response = await sendContentMessage(tab.id!, {
-    type: "RUN_MACRO",
-    macro: currentMacro,
+    type: "EXECUTE_STEPS",
+    steps: macro.steps,
   });
   if (!response.ok) {
     throw new Error(response.error);
   }
-  console.info("[Patch] Run macro command dispatched");
+  console.info(`[Patch] Ran macro "${macro.name}"`);
 }

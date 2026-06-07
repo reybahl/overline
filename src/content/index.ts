@@ -1,13 +1,11 @@
+import { executeSteps } from "@/content/executor";
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
-import type { Macro } from "@/shared/types/macro";
 
 declare global {
   interface Window {
     __patchContentScriptLoaded?: boolean;
   }
 }
-
-let isRecording = false;
 
 function initializeContentScript(): void {
   if (window.__patchContentScriptLoaded) return;
@@ -23,20 +21,28 @@ function initializeContentScript(): void {
         case "PING":
           sendResponse({ ok: true });
           return false;
-        case "START_RECORDING":
-          isRecording = true;
-          console.info("[Patch] Recording started (placeholder)");
-          sendResponse({ ok: true });
-          return false;
-        case "STOP_RECORDING":
-          isRecording = false;
-          console.info("[Patch] Recording stopped (placeholder)");
-          sendResponse({ ok: true });
-          return false;
+        case "EXECUTE_STEPS":
+          void executeSteps(message.steps)
+            .then(() => {
+              sendResponse({ ok: true });
+            })
+            .catch((error: unknown) => {
+              const errorMessage =
+                error instanceof Error ? error.message : "Failed to run macro";
+              sendResponse({ ok: false, error: errorMessage });
+            });
+          return true;
         case "RUN_MACRO":
-          runMacroPlaceholder(message.macro);
-          sendResponse({ ok: true });
-          return false;
+          void executeSteps(message.macro.steps)
+            .then(() => {
+              sendResponse({ ok: true });
+            })
+            .catch((error: unknown) => {
+              const errorMessage =
+                error instanceof Error ? error.message : "Failed to run macro";
+              sendResponse({ ok: false, error: errorMessage });
+            });
+          return true;
         default: {
           const _exhaustive: never = message;
           sendResponse({
@@ -47,13 +53,6 @@ function initializeContentScript(): void {
         }
       }
     },
-  );
-}
-
-function runMacroPlaceholder(macro: Macro): void {
-  console.info(
-    `[Patch] Running macro "${macro.name}" with ${macro.steps.length} steps (placeholder)`,
-    { isRecording },
   );
 }
 

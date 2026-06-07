@@ -38,6 +38,7 @@ async function generateWithModel(
   apiKey: string,
   model: string,
   prompt: string,
+  url: string,
 ): Promise<Macro> {
   const groq = createGroq({ apiKey });
   const result = await generateObject({
@@ -46,7 +47,7 @@ async function generateWithModel(
     prompt,
   });
 
-  return toMacro(result.object);
+  return toMacro(result.object, url);
 }
 
 export async function generateMacro(
@@ -71,7 +72,7 @@ export async function generateMacro(
 
   for (const model of models) {
     try {
-      return await generateWithModel(env.apiKey, model, prompt);
+      return await generateWithModel(env.apiKey, model, prompt, url);
     } catch (error) {
       lastError = error;
       console.warn(`[Patch] Model ${model} failed, trying next…`, error);

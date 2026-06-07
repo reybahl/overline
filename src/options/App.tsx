@@ -6,7 +6,11 @@ import type { Macro, MacroStep } from "@/shared/types/macro";
 function formatStep(step: MacroStep, index: number): string {
   const parts = [`${index + 1}. ${step.type}`];
   if (step.selector) parts.push(step.selector);
-  if (step.value) parts.push(`"${step.value}"`);
+  if (step.value) {
+    parts.push(
+      step.type === "confirm" ? `confirm: "${step.value}"` : `"${step.value}"`,
+    );
+  }
   return parts.join(" · ");
 }
 
