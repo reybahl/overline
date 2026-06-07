@@ -4,7 +4,9 @@ import type { Settings } from "@/shared/types/settings";
 
 export type BackgroundMessage =
   | { type: "RECORD_MACRO" }
+  | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
   | { type: "RUN_MACRO" }
+  | { type: "EXECUTE_MACRO"; tabId: number; steps: MacroStep[] }
   | { type: "GENERATE_MACRO"; intent: string; elements: DomElement[]; url: string }
   | { type: "GET_SETTINGS" }
   | { type: "SAVE_SETTINGS"; settings: Settings }
@@ -13,7 +15,13 @@ export type BackgroundMessage =
   | { type: "DELETE_MACRO"; macroId: string };
 
 export type BackgroundResponse =
-  | { ok: true; settings?: Settings; macros?: Macro[]; macro?: Macro }
+  | {
+      ok: true;
+      settings?: Settings;
+      macros?: Macro[];
+      macro?: Macro;
+      reasoning?: string[];
+    }
   | { ok: false; error: string };
 
 export type ContentMessage =

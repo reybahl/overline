@@ -5,22 +5,37 @@ export function deriveUrlPattern(url: string): string {
   return `${parsed.origin}${parsed.pathname}`;
 }
 
-export function findMacroForUrl(macros: Macro[], url: string): Macro | null {
-  const matches = macros.filter((macro) => {
+export function getMacrosForUrl(macros: Macro[], url: string): Macro[] {
+  return macros.filter((macro) => {
     if (!macro.urlPattern) return false;
     return url.includes(macro.urlPattern);
   });
+}
+
+export function findMacroForUrl(
+  macros: Macro[],
+  url: string,
+  preferredMacroId?: string | null,
+): Macro | null {
+  const matches = getMacrosForUrl(macros, url);
 
   if (matches.length === 0) {
     return null;
   }
 
-  if (matches.length === 1) {
-    return matches[0];
+  if (preferredMacroId) {
+    const preferred = matches.find((macro) => macro.id === preferredMacroId);
+    if (preferred) {
+      return preferred;
+    }
   }
 
-  return matches.sort(
-    (left, right) =>
-      (right.urlPattern?.length ?? 0) - (left.urlPattern?.length ?? 0),
-  )[0];
+  return matches.sort((left, right) => {
+    const patternLengthDelta =
+      (right.urlPattern?.length ?? 0) - (left.urlPattern?.length ?? 0);
+    if (patternLengthDelta !== 0) {
+      return patternLengthDelta;
+    }
+    return right.createdAt - left.createdAt;
+  })[0];
 }

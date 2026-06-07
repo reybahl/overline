@@ -21,6 +21,11 @@
       />
     </label>
 
+    <label class="intent-field" for="macro-select">
+      <span class="intent-label">Macro to run</span>
+      <select id="macro-select" class="intent-input"></select>
+    </label>
+
     <div class="actions">
       <button id="record-btn" type="button" class="btn btn-primary">
         Record macro
@@ -40,6 +45,21 @@
       Open a regular website, then click the Patch icon to grant access.
     </p>
     <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <section id="review-panel" class="review-panel" hidden>
+      <h2 class="review-title">Does this look right?</h2>
+      <p id="review-summary" class="review-summary"></p>
+      <ol id="review-steps" class="review-steps"></ol>
+      <div class="review-actions">
+        <button id="confirm-save-btn" type="button" class="btn btn-primary">
+          Save macro
+        </button>
+        <button id="discard-btn" type="button" class="btn btn-secondary">
+          Discard
+        </button>
+      </div>
+    </section>
+
     <pre id="capture-output" class="capture-output" hidden></pre>
 
     <footer class="footer">

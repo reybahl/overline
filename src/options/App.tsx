@@ -7,9 +7,13 @@ function formatStep(step: MacroStep, index: number): string {
   const parts = [`${index + 1}. ${step.type}`];
   if (step.selector) parts.push(step.selector);
   if (step.value) {
-    parts.push(
-      step.type === "confirm" ? `confirm: "${step.value}"` : `"${step.value}"`,
-    );
+    if (step.type === "confirm") {
+      parts.push(`confirm: "${step.value}"`);
+    } else if (step.type === "waitFor") {
+      parts.push(`timeout: ${step.value}ms`);
+    } else {
+      parts.push(`"${step.value}"`);
+    }
   }
   return parts.join(" · ");
 }
@@ -22,19 +26,27 @@ async function sendBackgroundMessage(
 
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
+  const [activeMacroId, setActiveMacroId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
       try {
-        const response = await sendBackgroundMessage({ type: "GET_MACROS" });
+        const [macrosResponse, settingsResponse] = await Promise.all([
+          sendBackgroundMessage({ type: "GET_MACROS" }),
+          sendBackgroundMessage({ type: "GET_SETTINGS" }),
+        ]);
 
-        if (!response.ok) {
-          throw new Error(response.error);
+        if (!macrosResponse.ok) {
+          throw new Error(macrosResponse.error);
+        }
+        if (!settingsResponse.ok) {
+          throw new Error(settingsResponse.error);
         }
 
-        setMacros(response.macros ?? []);
+        setMacros(macrosResponse.macros ?? []);
+        setActiveMacroId(settingsResponse.settings?.currentMacroId ?? null);
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to load macros";
@@ -82,7 +94,14 @@ export default function App() {
                 key={macro.id}
                 className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3"
               >
-                <p className="font-medium">{macro.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium">{macro.name}</p>
+                  {macro.id === activeMacroId ? (
+                    <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+                      Active
+                    </span>
+                  ) : null}
+                </div>
                 {macro.description ? (
                   <p className="mt-1 text-sm text-slate-400">
                     {macro.description}

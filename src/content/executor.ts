@@ -33,10 +33,24 @@ function fillElement(element: HTMLElement, value: string): void {
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
-function wait(ms: number): Promise<void> {
+function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+async function waitForSelector(selector: string, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const element = document.querySelector(selector);
+    if (element instanceof HTMLElement) {
+      return;
+    }
+    await delay(100);
+  }
+
+  throw new Error(ELEMENT_NOT_FOUND);
 }
 
 async function executeStep(step: MacroStep): Promise<void> {
@@ -58,7 +72,15 @@ async function executeStep(step: MacroStep): Promise<void> {
     }
     case "wait": {
       const ms = Number.parseInt(step.value ?? "0", 10);
-      await wait(Number.isNaN(ms) ? 0 : ms);
+      await delay(Number.isNaN(ms) ? 0 : ms);
+      return;
+    }
+    case "waitFor": {
+      const timeout = Number.parseInt(step.value ?? "5000", 10);
+      await waitForSelector(
+        requireSelector(step.selector),
+        Number.isNaN(timeout) ? 5000 : timeout,
+      );
       return;
     }
     case "navigate": {
