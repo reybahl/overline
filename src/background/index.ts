@@ -1,4 +1,5 @@
-import { sendContentMessage } from "@/background/inject";
+import { runMacroSteps } from "@/background/play";
+import { runAgenticRecord } from "@/background/record";
 import { generateMacro } from "@/background/worker";
 import type {
   BackgroundMessage,
@@ -71,6 +72,13 @@ async function handleMessage(
         macros.push(message.macro);
       }
       await saveMacros(macros);
+
+      const settings = await getSettings();
+      await saveSettings({
+        ...settings,
+        currentMacroId: message.macro.id,
+      });
+
       return { ok: true, macros };
     }
     case "DELETE_MACRO": {
@@ -85,6 +93,9 @@ async function handleMessage(
     case "RUN_MACRO":
       await handleRunMacro();
       return { ok: true };
+    case "EXECUTE_MACRO":
+      await runMacroSteps(message.tabId, message.steps);
+      return { ok: true };
     case "GENERATE_MACRO": {
       const macro = await generateMacro(
         message.intent,
@@ -93,6 +104,19 @@ async function handleMessage(
       );
       console.info("[Patch] Generated macro:", macro);
       return { ok: true, macro };
+    }
+    case "AGENTIC_RECORD": {
+      const result = await runAgenticRecord(
+        message.intent,
+        message.tabId,
+        message.startUrl,
+      );
+      console.info("[Patch] Agentic record complete:", result.macro);
+      return {
+        ok: true,
+        macro: result.macro,
+        reasoning: result.reasoning,
+      };
     }
     default: {
       const _exhaustive: never = message;
@@ -116,18 +140,12 @@ async function handleRunMacro(): Promise<void> {
     throw new Error("No active tab URL found.");
   }
 
-  const macros = await getMacros();
-  const macro = findMacroForUrl(macros, url);
+  const [macros, settings] = await Promise.all([getMacros(), getSettings()]);
+  const macro = findMacroForUrl(macros, url, settings.currentMacroId);
   if (!macro) {
     throw new Error("No macro matches this page. Record one on this URL first.");
   }
 
-  const response = await sendContentMessage(tab.id!, {
-    type: "EXECUTE_STEPS",
-    steps: macro.steps,
-  });
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
+  await runMacroSteps(tab.id!, macro.steps);
   console.info(`[Patch] Ran macro "${macro.name}"`);
 }

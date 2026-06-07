@@ -78,6 +78,14 @@ function hasMeaningfulLabel(
   return text.length > 0 || ariaLabel.length > 0 || placeholder.length > 0;
 }
 
+function getStableHref(anchor: HTMLAnchorElement): string | null {
+  const href = anchor.getAttribute("href")?.trim();
+  if (!href || href === "#" || href.startsWith("javascript:")) {
+    return null;
+  }
+  return href;
+}
+
 function buildSelector(el: Element): string | null {
   if (el.id) {
     return `#${CSS.escape(el.id)}`;
@@ -91,6 +99,13 @@ function buildSelector(el: Element): string | null {
   const ariaLabel = el.getAttribute("aria-label");
   if (ariaLabel) {
     return `[aria-label="${escapeAttr(ariaLabel)}"]`;
+  }
+
+  if (el instanceof HTMLAnchorElement) {
+    const href = getStableHref(el);
+    if (href) {
+      return `a[href="${escapeAttr(href)}"]`;
+    }
   }
 
   return null;

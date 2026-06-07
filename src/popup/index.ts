@@ -1,10 +1,10 @@
 import type { DomElement } from "@/content/dom-capture";
+import type { Macro, MacroStep } from "@/shared/types/macro";
 import type {
   BackgroundMessage,
   BackgroundResponse,
-  ContentResponse,
 } from "@/shared/types/messages";
-import { findMacroForUrl } from "@/shared/macro-match";
+import { getMacrosForUrl } from "@/shared/macro-match";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -12,7 +12,6 @@ import {
 } from "@/shared/tab";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
-const CONTENT_SCRIPT = "src/content/index.js";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -23,15 +22,24 @@ function requireElement<T extends HTMLElement>(id: string): T {
 }
 
 const intentInput = requireElement<HTMLInputElement>("intent-input");
+const macroSelect = requireElement<HTMLSelectElement>("macro-select");
 const recordBtn = requireElement<HTMLButtonElement>("record-btn");
 const runBtn = requireElement<HTMLButtonElement>("run-btn");
 const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
 const generateBtn = requireElement<HTMLButtonElement>("generate-btn");
 const statusEl = requireElement<HTMLParagraphElement>("status");
 const captureOutputEl = requireElement<HTMLPreElement>("capture-output");
+const reviewPanelEl = requireElement<HTMLElement>("review-panel");
+const reviewSummaryEl = requireElement<HTMLParagraphElement>("review-summary");
+const reviewStepsEl = requireElement<HTMLOListElement>("review-steps");
+const confirmSaveBtn = requireElement<HTMLButtonElement>("confirm-save-btn");
+const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 const optionsLink = requireElement<HTMLAnchorElement>("options-link");
 
 const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
+
+let savedMacros: Macro[] = [];
+let pendingMacro: Macro | null = null;
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
@@ -43,6 +51,40 @@ function setBusy(disabled: boolean): void {
     button.toggleAttribute("disabled", disabled);
   }
   intentInput.toggleAttribute("disabled", disabled);
+  macroSelect.toggleAttribute("disabled", disabled);
+  confirmSaveBtn.toggleAttribute("disabled", disabled);
+  discardBtn.toggleAttribute("disabled", disabled);
+}
+
+function formatStep(step: MacroStep, index: number): string {
+  const parts = [`${index + 1}. ${step.type}`];
+  if (step.selector) parts.push(step.selector);
+  if (step.value) parts.push(`"${step.value}"`);
+  return parts.join(" · ");
+}
+
+function hideReview(): void {
+  pendingMacro = null;
+  reviewPanelEl.hidden = true;
+  reviewSummaryEl.textContent = "";
+  reviewStepsEl.replaceChildren();
+}
+
+function showReview(macro: Macro, reasoning: string[] = []): void {
+  pendingMacro = macro;
+  reviewSummaryEl.textContent = `"${macro.name}" — ${macro.steps.length} ${
+    macro.steps.length === 1 ? "step" : "steps"
+  }${reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""}`;
+
+  reviewStepsEl.replaceChildren(
+    ...macro.steps.map((step, index) => {
+      const item = document.createElement("li");
+      item.textContent = formatStep(step, index);
+      return item;
+    }),
+  );
+
+  reviewPanelEl.hidden = false;
 }
 
 function getIntent(): string {
@@ -57,10 +99,67 @@ function requireIntent(): string {
   return intent;
 }
 
+function getSelectedMacro(): Macro | null {
+  const macroId = macroSelect.value;
+  if (!macroId) return null;
+  return savedMacros.find((macro) => macro.id === macroId) ?? null;
+}
+
 async function sendBackgroundMessage(
   message: BackgroundMessage,
 ): Promise<BackgroundResponse> {
   return chrome.runtime.sendMessage(message);
+}
+
+async function refreshMacroSelect(preferredMacroId?: string): Promise<void> {
+  const tab = await getActiveTab();
+  const url = tab.url ?? "";
+
+  const [macrosResponse, settingsResponse] = await Promise.all([
+    sendBackgroundMessage({ type: "GET_MACROS" }),
+    sendBackgroundMessage({ type: "GET_SETTINGS" }),
+  ]);
+
+  if (!macrosResponse.ok) {
+    throw new Error(macrosResponse.error);
+  }
+
+  savedMacros = macrosResponse.macros ?? [];
+  const matching = url ? getMacrosForUrl(savedMacros, url) : [];
+  const options =
+    matching.length > 0
+      ? matching
+      : [...savedMacros].sort((left, right) => right.createdAt - left.createdAt);
+
+  macroSelect.replaceChildren();
+
+  if (options.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No macros saved";
+    macroSelect.appendChild(option);
+    runBtn.toggleAttribute("disabled", true);
+    return;
+  }
+
+  runBtn.toggleAttribute("disabled", false);
+
+  for (const macro of options) {
+    const option = document.createElement("option");
+    option.value = macro.id;
+    option.textContent = `${macro.name} (${macro.steps.length} steps)`;
+    macroSelect.appendChild(option);
+  }
+
+  const preferredId =
+    preferredMacroId ??
+    (settingsResponse.ok
+      ? settingsResponse.settings?.currentMacroId ?? undefined
+      : undefined);
+
+  if (preferredId && options.some((macro) => macro.id === preferredId)) {
+    macroSelect.value = preferredId;
+  }
 }
 
 async function captureDomOnActiveTab(): Promise<{
@@ -97,24 +196,6 @@ async function captureDomOnActiveTab(): Promise<{
   };
 }
 
-async function ensureContentScript(tabId: number): Promise<void> {
-  try {
-    const response = (await chrome.tabs.sendMessage(tabId, {
-      type: "PING",
-    })) as ContentResponse | undefined;
-    if (response?.ok) {
-      return;
-    }
-  } catch {
-    // Content script not injected yet.
-  }
-
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    files: [CONTENT_SCRIPT],
-  });
-}
-
 async function handleCaptureDom(): Promise<void> {
   setBusy(true);
   captureOutputEl.hidden = true;
@@ -135,38 +216,39 @@ async function handleCaptureDom(): Promise<void> {
 }
 
 async function handleRecordMacro(): Promise<void> {
+  hideReview();
   setBusy(true);
 
   try {
     const intent = requireIntent();
+    const tab = await getActiveTab();
+    const tabId = tab.id;
+    const startUrl = tab.url;
 
-    setStatus("Capturing DOM…");
-    const { elements, url } = await captureDomOnActiveTab();
+    if (tabId === undefined) {
+      throw new Error("No active tab found.");
+    }
+    if (!startUrl || !isInjectableUrl(startUrl)) {
+      throw new Error(getRestrictedPageMessage(startUrl));
+    }
 
-    setStatus("Generating macro…");
-    const generateResponse = await sendBackgroundMessage({
-      type: "GENERATE_MACRO",
+    setStatus("Recording… keep this tab open.");
+    const response = await sendBackgroundMessage({
+      type: "AGENTIC_RECORD",
       intent,
-      elements,
-      url,
+      tabId,
+      startUrl,
     });
-    if (!generateResponse.ok) {
-      throw new Error(generateResponse.error);
+
+    if (!response.ok) {
+      throw new Error(response.error);
     }
-    if (!generateResponse.macro) {
-      throw new Error("Failed to generate macro.");
+    if (!response.macro) {
+      throw new Error("Recording finished without a macro.");
     }
 
-    setStatus("Saving macro…");
-    const saveResponse = await sendBackgroundMessage({
-      type: "SAVE_MACRO",
-      macro: generateResponse.macro,
-    });
-    if (!saveResponse.ok) {
-      throw new Error(saveResponse.error);
-    }
-
-    setStatus(`Saved macro "${generateResponse.macro.name}"`);
+    showReview(response.macro, response.reasoning);
+    setStatus("Review the recorded steps below.");
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to record macro";
@@ -177,6 +259,39 @@ async function handleRecordMacro(): Promise<void> {
   } finally {
     setBusy(false);
   }
+}
+
+async function handleConfirmSave(): Promise<void> {
+  if (!pendingMacro) return;
+
+  setBusy(true);
+
+  try {
+    const saveResponse = await sendBackgroundMessage({
+      type: "SAVE_MACRO",
+      macro: pendingMacro,
+    });
+    if (!saveResponse.ok) {
+      throw new Error(saveResponse.error);
+    }
+
+    const macroId = pendingMacro.id;
+    const macroName = pendingMacro.name;
+    hideReview();
+    await refreshMacroSelect(macroId);
+    setStatus(`Saved macro "${macroName}"`);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to save macro";
+    setStatus(errorMessage, true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+function handleDiscard(): void {
+  hideReview();
+  setStatus("Recording discarded.");
 }
 
 async function handleGenerateMacro(): Promise<void> {
@@ -218,6 +333,11 @@ async function handleRunMacro(): Promise<void> {
   setBusy(true);
 
   try {
+    const macro = getSelectedMacro();
+    if (!macro) {
+      throw new Error("Select a macro to run.");
+    }
+
     const tab = await getActiveTab();
     const tabId = tab.id;
     const url = tab.url;
@@ -229,24 +349,13 @@ async function handleRunMacro(): Promise<void> {
       throw new Error(getRestrictedPageMessage(url));
     }
 
-    setStatus("Finding macro…");
-    const macrosResponse = await sendBackgroundMessage({ type: "GET_MACROS" });
-    if (!macrosResponse.ok) {
-      throw new Error(macrosResponse.error);
-    }
-
-    const macro = findMacroForUrl(macrosResponse.macros ?? [], url);
-    if (!macro) {
-      throw new Error("No macro matches this page. Record one on this URL first.");
-    }
-
     setStatus(`Running "${macro.name}"…`);
-    await ensureContentScript(tabId);
 
-    const response = (await chrome.tabs.sendMessage(tabId, {
-      type: "EXECUTE_STEPS",
+    const response = await sendBackgroundMessage({
+      type: "EXECUTE_MACRO",
+      tabId,
       steps: macro.steps,
-    })) as ContentResponse | undefined;
+    });
 
     if (!response?.ok) {
       throw new Error(response?.error ?? "Failed to run macro.");
@@ -278,7 +387,21 @@ generateBtn.addEventListener("click", () => {
   void handleGenerateMacro();
 });
 
+confirmSaveBtn.addEventListener("click", () => {
+  void handleConfirmSave();
+});
+
+discardBtn.addEventListener("click", () => {
+  handleDiscard();
+});
+
 optionsLink.addEventListener("click", (event) => {
   event.preventDefault();
   void chrome.runtime.openOptionsPage();
+});
+
+void refreshMacroSelect().catch((error: unknown) => {
+  const message =
+    error instanceof Error ? error.message : "Failed to load macros";
+  setStatus(message, true);
 });

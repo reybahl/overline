@@ -9,6 +9,7 @@ export const MacroStepTypeSchema = z.enum([
   "confirm",
   "navigate",
   "wait",
+  "waitFor",
   "scroll",
 ]);
 
@@ -48,7 +49,43 @@ export const MacroGenerationSchema = z.object({
   steps: z.array(MacroGenerationStepSchema).min(1),
 });
 
+export type MacroGenerationStep = z.infer<typeof MacroGenerationStepSchema>;
 export type MacroGeneration = z.infer<typeof MacroGenerationSchema>;
+
+export const AgentTurnSchema = z.object({
+  step: MacroGenerationStepSchema,
+  done: z.boolean(),
+  reasoning: z.string().optional(),
+  macroName: z.string().optional(),
+});
+
+export type AgentTurn = z.infer<typeof AgentTurnSchema>;
+
+export function toRecordedStep(step: MacroGenerationStep): MacroStep {
+  return MacroStepSchema.parse({
+    ...step,
+    id: crypto.randomUUID(),
+    timestamp: Date.now(),
+  });
+}
+
+export function createMacroPreview(
+  name: string,
+  steps: MacroStep[],
+  url: string,
+  description?: string,
+): Macro {
+  const now = Date.now();
+  return MacroSchema.parse({
+    id: crypto.randomUUID(),
+    name,
+    description,
+    urlPattern: deriveUrlPattern(url),
+    createdAt: now,
+    updatedAt: now,
+    steps,
+  });
+}
 
 export function toMacro(generated: MacroGeneration, url: string): Macro {
   const now = Date.now();
