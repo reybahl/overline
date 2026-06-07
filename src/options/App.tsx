@@ -63,8 +63,8 @@ export default function App() {
         <h2 className="text-lg font-medium">Macros</h2>
         {macros.length === 0 ? (
           <p className="text-sm text-slate-400">
-            No macros yet. Use <kbd className="rounded bg-slate-800 px-1">⌘⇧Y</kbd> to
-            record one.
+            No macros yet. Click the Patch icon and choose{" "}
+            <span className="font-medium text-slate-300">Record macro</span>.
           </p>
         ) : (
           <ul className="space-y-2">

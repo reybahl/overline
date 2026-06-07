@@ -1,24 +1,34 @@
+import { sendContentMessage } from "@/background/inject";
 import { generateMacroSuggestion } from "@/background/llm";
 import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
 import { getMacros, getSettings, saveMacros, saveSettings } from "@/shared/storage";
+import {
+  getActiveTab,
+  getRestrictedPageMessage,
+  isInjectableUrl,
+} from "@/shared/tab";
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info("[Patch] Extension installed");
 });
 
 chrome.commands.onCommand.addListener(async (command) => {
-  switch (command) {
-    case "record-macro":
-      await handleRecordMacro();
-      break;
-    case "run-macro":
-      await handleRunMacro();
-      break;
-    default:
-      console.warn(`[Patch] Unknown command: ${command}`);
+  try {
+    switch (command) {
+      case "record-macro":
+        await handleRecordMacro();
+        break;
+      case "run-macro":
+        await handleRunMacro();
+        break;
+      default:
+        console.warn(`[Patch] Unknown command: ${command}`);
+    }
+  } catch (error) {
+    console.error("[Patch] Command failed:", error);
   }
 });
 
@@ -82,27 +92,28 @@ async function handleMessage(
   }
 }
 
-async function handleRecordMacro(): Promise<void> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    console.warn("[Patch] No active tab for recording");
-    return;
+async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
+  const tab = await getActiveTab();
+  if (!isInjectableUrl(tab.url)) {
+    throw new Error(getRestrictedPageMessage(tab.url));
   }
+  return tab;
+}
 
-  await chrome.tabs.sendMessage(tab.id, { type: "START_RECORDING" });
+async function handleRecordMacro(): Promise<void> {
+  const tab = await requireInjectableActiveTab();
+  const response = await sendContentMessage(tab.id!, { type: "START_RECORDING" });
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
   console.info("[Patch] Record macro command dispatched");
 }
 
 async function handleRunMacro(): Promise<void> {
+  const tab = await requireInjectableActiveTab();
   const settings = await getSettings();
   const macros = await getMacros();
   const currentMacro = macros.find((macro) => macro.id === settings.currentMacroId);
-
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id) {
-    console.warn("[Patch] No active tab for running macro");
-    return;
-  }
 
   if (!currentMacro) {
     const suggestion = await generateMacroSuggestion(
@@ -112,9 +123,12 @@ async function handleRunMacro(): Promise<void> {
     return;
   }
 
-  await chrome.tabs.sendMessage(tab.id, {
+  const response = await sendContentMessage(tab.id!, {
     type: "RUN_MACRO",
     macro: currentMacro,
   });
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
   console.info("[Patch] Run macro command dispatched");
 }

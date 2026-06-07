@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patch</title>
+    <link rel="stylesheet" href="./popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <h1>Patch</h1>
+    </header>
+
+    <div class="actions">
+      <button id="record-btn" type="button" class="btn btn-primary">
+        Record macro
+      </button>
+      <button id="run-btn" type="button" class="btn btn-secondary">
+        Run macro
+      </button>
+    </div>
+
+    <p id="hint" class="hint">
+      Open a regular website, then click the Patch icon to grant access.
+    </p>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <footer class="footer">
+      <a id="options-link" href="#">Manage macros</a>
+    </footer>
+
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>

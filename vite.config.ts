@@ -22,6 +22,7 @@ export default defineConfig({
     react(),
     webExtension({
       manifest: generateManifest,
+      additionalInputs: ["src/content/index.ts"],
       watchFilePaths: ["package.json", "src/manifest.json"],
     }),
   ],
