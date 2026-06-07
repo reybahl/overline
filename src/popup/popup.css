@@ -4,7 +4,9 @@
 
 body {
   margin: 0;
-  width: 280px;
+  width: 360px;
+  max-height: 560px;
+  overflow-y: auto;
   padding: 16px;
   font-family:
     system-ui,
@@ -93,4 +95,19 @@ body {
 
 .footer a:hover {
   text-decoration: underline;
+}
+
+.capture-output {
+  margin: 12px 0 0;
+  padding: 10px;
+  max-height: 240px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #020617;
+  color: #cbd5e1;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

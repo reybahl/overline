@@ -1,4 +1,12 @@
+import type { DomElement } from "@/content/dom-capture";
 import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
+import {
+  getActiveTab,
+  getRestrictedPageMessage,
+  isInjectableUrl,
+} from "@/shared/tab";
+
+const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -10,12 +18,22 @@ function requireElement<T extends HTMLElement>(id: string): T {
 
 const recordBtn = requireElement<HTMLButtonElement>("record-btn");
 const runBtn = requireElement<HTMLButtonElement>("run-btn");
+const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
 const statusEl = requireElement<HTMLParagraphElement>("status");
+const captureOutputEl = requireElement<HTMLPreElement>("capture-output");
 const optionsLink = requireElement<HTMLAnchorElement>("options-link");
+
+const actionButtons = [recordBtn, runBtn, captureBtn];
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
   statusEl.classList.toggle("error", isError);
+}
+
+function setButtonsDisabled(disabled: boolean): void {
+  for (const button of actionButtons) {
+    button.toggleAttribute("disabled", disabled);
+  }
 }
 
 async function sendBackgroundMessage(
@@ -28,8 +46,7 @@ async function handleAction(
   message: BackgroundMessage,
   successMessage: string,
 ): Promise<void> {
-  recordBtn.toggleAttribute("disabled", true);
-  runBtn.toggleAttribute("disabled", true);
+  setButtonsDisabled(true);
 
   try {
     const response = await sendBackgroundMessage(message);
@@ -42,8 +59,50 @@ async function handleAction(
       error instanceof Error ? error.message : "Something went wrong";
     setStatus(errorMessage, true);
   } finally {
-    recordBtn.toggleAttribute("disabled", false);
-    runBtn.toggleAttribute("disabled", false);
+    setButtonsDisabled(false);
+  }
+}
+
+async function handleCaptureDom(): Promise<void> {
+  setButtonsDisabled(true);
+  captureOutputEl.hidden = true;
+  captureOutputEl.textContent = "";
+
+  try {
+    const tab = await getActiveTab();
+    const tabId = tab.id;
+    if (tabId === undefined) {
+      throw new Error("No active tab found.");
+    }
+    if (!isInjectableUrl(tab.url)) {
+      throw new Error(getRestrictedPageMessage(tab.url));
+    }
+
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: [DOM_CAPTURE_SCRIPT],
+    });
+
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const capture = (
+          globalThis as { __patchCaptureDom?: () => DomElement[] }
+        ).__patchCaptureDom;
+        return capture?.() ?? [];
+      },
+    });
+
+    const elements = (result?.result ?? []) as DomElement[];
+    captureOutputEl.textContent = JSON.stringify(elements, null, 2);
+    captureOutputEl.hidden = false;
+    setStatus(`Captured ${elements.length} elements`);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to capture DOM";
+    setStatus(errorMessage, true);
+  } finally {
+    setButtonsDisabled(false);
   }
 }
 
@@ -53,6 +112,10 @@ recordBtn.addEventListener("click", () => {
 
 runBtn.addEventListener("click", () => {
   void handleAction({ type: "RUN_MACRO" }, "Run macro dispatched");
+});
+
+captureBtn.addEventListener("click", () => {
+  void handleCaptureDom();
 });
 
 optionsLink.addEventListener("click", (event) => {
