@@ -7,7 +7,6 @@ import {
 } from "@/shared/tab";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
-const GENERATE_INTENT = "Go to Files changed";
 
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
@@ -17,6 +16,7 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+const intentInput = requireElement<HTMLInputElement>("intent-input");
 const recordBtn = requireElement<HTMLButtonElement>("record-btn");
 const runBtn = requireElement<HTMLButtonElement>("run-btn");
 const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
@@ -32,10 +32,23 @@ function setStatus(message: string, isError = false): void {
   statusEl.classList.toggle("error", isError);
 }
 
-function setButtonsDisabled(disabled: boolean): void {
+function setBusy(disabled: boolean): void {
   for (const button of actionButtons) {
     button.toggleAttribute("disabled", disabled);
   }
+  intentInput.toggleAttribute("disabled", disabled);
+}
+
+function getIntent(): string {
+  return intentInput.value.trim();
+}
+
+function requireIntent(): string {
+  const intent = getIntent();
+  if (!intent) {
+    throw new Error("Enter an intent first.");
+  }
+  return intent;
 }
 
 async function sendBackgroundMessage(
@@ -82,7 +95,7 @@ async function handleAction(
   message: BackgroundMessage,
   successMessage: string,
 ): Promise<void> {
-  setButtonsDisabled(true);
+  setBusy(true);
 
   try {
     const response = await sendBackgroundMessage(message);
@@ -95,12 +108,12 @@ async function handleAction(
       error instanceof Error ? error.message : "Something went wrong";
     setStatus(errorMessage, true);
   } finally {
-    setButtonsDisabled(false);
+    setBusy(false);
   }
 }
 
 async function handleCaptureDom(): Promise<void> {
-  setButtonsDisabled(true);
+  setBusy(true);
   captureOutputEl.hidden = true;
   captureOutputEl.textContent = "";
 
@@ -114,21 +127,68 @@ async function handleCaptureDom(): Promise<void> {
       error instanceof Error ? error.message : "Failed to capture DOM";
     setStatus(errorMessage, true);
   } finally {
-    setButtonsDisabled(false);
+    setBusy(false);
+  }
+}
+
+async function handleRecordMacro(): Promise<void> {
+  setBusy(true);
+
+  try {
+    const intent = requireIntent();
+
+    setStatus("Capturing DOM…");
+    const { elements, url } = await captureDomOnActiveTab();
+
+    setStatus("Generating macro…");
+    const generateResponse = await sendBackgroundMessage({
+      type: "GENERATE_MACRO",
+      intent,
+      elements,
+      url,
+    });
+    if (!generateResponse.ok) {
+      throw new Error(generateResponse.error);
+    }
+    if (!generateResponse.macro) {
+      throw new Error("Failed to generate macro.");
+    }
+
+    setStatus("Saving macro…");
+    const saveResponse = await sendBackgroundMessage({
+      type: "SAVE_MACRO",
+      macro: generateResponse.macro,
+    });
+    if (!saveResponse.ok) {
+      throw new Error(saveResponse.error);
+    }
+
+    setStatus(`Saved macro "${generateResponse.macro.name}"`);
+  } catch (error) {
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to record macro";
+    setStatus(errorMessage, true);
+    if (errorMessage === "Enter an intent first.") {
+      intentInput.focus();
+    }
+  } finally {
+    setBusy(false);
   }
 }
 
 async function handleGenerateMacro(): Promise<void> {
-  setButtonsDisabled(true);
+  setBusy(true);
 
   try {
+    const intent = requireIntent();
+
     setStatus("Capturing DOM…");
     const { elements, url } = await captureDomOnActiveTab();
 
     setStatus("Generating macro…");
     const response = await sendBackgroundMessage({
       type: "GENERATE_MACRO",
-      intent: GENERATE_INTENT,
+      intent,
       elements,
       url,
     });
@@ -143,13 +203,16 @@ async function handleGenerateMacro(): Promise<void> {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to generate macro";
     setStatus(errorMessage, true);
+    if (errorMessage === "Enter an intent first.") {
+      intentInput.focus();
+    }
   } finally {
-    setButtonsDisabled(false);
+    setBusy(false);
   }
 }
 
 recordBtn.addEventListener("click", () => {
-  void handleAction({ type: "RECORD_MACRO" }, "Recording started on this tab");
+  void handleRecordMacro();
 });
 
 runBtn.addEventListener("click", () => {

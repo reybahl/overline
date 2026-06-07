@@ -24,6 +24,37 @@ body {
   font-weight: 600;
 }
 
+.intent-field {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.intent-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.intent-input {
+  width: 100%;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #f1f5f9;
+  background: #020617;
+}
+
+.intent-input:focus {
+  outline: 2px solid #6366f1;
+  outline-offset: 1px;
+}
+
+.intent-input:disabled {
+  opacity: 0.6;
+}
+
 .actions {
   display: flex;
   flex-direction: column;
