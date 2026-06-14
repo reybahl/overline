@@ -8,7 +8,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
-import { findMacroForUrl } from "@/shared/macro-match";
+import { findMacroForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut } from "@/shared/shortcut";
 import {
   getMacros,
@@ -180,10 +180,22 @@ async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
 
 async function handleRunMacroById(macroId: string): Promise<void> {
   const tab = await requireInjectableActiveTab();
+  const url = tab.url;
+  if (!url) {
+    throw new Error("No active tab URL found.");
+  }
+
   const macros = await getMacros();
   const macro = macros.find((entry) => entry.id === macroId);
   if (!macro) {
     throw new Error("Macro not found.");
+  }
+
+  if (!macroMatchesUrl(macro, url)) {
+    console.info(
+      `[Patch] Shortcut ignored: "${macro.name}" does not match this page.`,
+    );
+    return;
   }
 
   await runMacroSteps(tab.id!, macro.steps);

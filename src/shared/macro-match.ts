@@ -5,11 +5,16 @@ export function deriveUrlPattern(url: string): string {
   return `${parsed.origin}${parsed.pathname}`;
 }
 
+export function macroMatchesUrl(macro: Macro, url: string): boolean {
+  if (!macro.urlPattern) {
+    return false;
+  }
+
+  return url.includes(macro.urlPattern);
+}
+
 export function getMacrosForUrl(macros: Macro[], url: string): Macro[] {
-  return macros.filter((macro) => {
-    if (!macro.urlPattern) return false;
-    return url.includes(macro.urlPattern);
-  });
+  return macros.filter((macro) => macroMatchesUrl(macro, url));
 }
 
 export function findMacroForUrl(
