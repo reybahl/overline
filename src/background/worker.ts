@@ -7,10 +7,13 @@ import { getLlmEnv } from "@/shared/env";
 import {
   AgentTurnSchema,
   MacroGenerationSchema,
+  RunScopeSchema,
   toMacro,
   type AgentTurn,
   type Macro,
   type MacroGenerationStep,
+  type MacroStep,
+  type RunScope,
 } from "@/shared/types/macro";
 
 const PRIMARY_MODEL = "gpt-oss-20b";
@@ -148,6 +151,51 @@ export async function getNextStep(
   );
 
   return generateObjectWithModels<AgentTurn>(AgentTurnSchema, prompt);
+}
+
+function buildRunScopePrompt(
+  intent: string,
+  startUrl: string,
+  endUrl: string,
+  steps: MacroStep[],
+): string {
+  return [
+    "You decide where a browser automation macro should be allowed to run.",
+    "",
+    `User intent: "${intent}"`,
+    `Recording started on: ${startUrl}`,
+    `Recording ended on: ${endUrl}`,
+    `Recorded steps: ${JSON.stringify(
+      steps.map((step) => ({
+        type: step.type,
+        selector: step.selector,
+        value: step.value,
+      })),
+    )}`,
+    "",
+    "Return a JavaScript RegExp pattern (as a string) tested against the full page URL.",
+    "Also return a short plain-English description for the user.",
+    "",
+    "Rules:",
+    "- Generalize when the intent is site navigation (e.g. GitHub Issues tab → any repo, not one repo)",
+    "- Keep narrow when the intent is page-specific (e.g. fill this form on this page)",
+    "- Escape regex metacharacters in literal URL segments (., ?, etc.)",
+    "- Prefer anchoring with ^ and $",
+    "- Generalize path segments that vary (owners, ids, slugs) with [^/]+ when intent is not page-specific",
+    "- Example for a dynamic section: ^https://example\\.com/accounts/[^/]+(?:/.*)?$",
+    "- Example for one exact page: ^https://example\\.com/path(?:[/?#].*)?$",
+    "- Do not match unrelated sites",
+  ].join("\n");
+}
+
+export async function inferRunScope(
+  intent: string,
+  startUrl: string,
+  endUrl: string,
+  steps: MacroStep[],
+): Promise<RunScope> {
+  const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps);
+  return generateObjectWithModels(RunScopeSchema, prompt);
 }
 
 export async function generateMacro(

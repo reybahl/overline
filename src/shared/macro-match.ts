@@ -1,11 +1,20 @@
 import type { Macro } from "@/shared/types/macro";
+import { runScopeMatchesUrl } from "@/shared/run-scope";
 
 export function deriveUrlPattern(url: string): string {
   const parsed = new URL(url);
   return `${parsed.origin}${parsed.pathname}`;
 }
 
+function scopePatternLength(macro: Macro): number {
+  return macro.runScope?.pattern.length ?? macro.urlPattern?.length ?? 0;
+}
+
 export function macroMatchesUrl(macro: Macro, url: string): boolean {
+  if (macro.runScope) {
+    return runScopeMatchesUrl(macro.runScope, url);
+  }
+
   if (!macro.urlPattern) {
     return false;
   }
@@ -36,8 +45,7 @@ export function findMacroForUrl(
   }
 
   return matches.sort((left, right) => {
-    const patternLengthDelta =
-      (right.urlPattern?.length ?? 0) - (left.urlPattern?.length ?? 0);
+    const patternLengthDelta = scopePatternLength(right) - scopePatternLength(left);
     if (patternLengthDelta !== 0) {
       return patternLengthDelta;
     }

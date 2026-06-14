@@ -143,9 +143,14 @@ function hideReview(): void {
 
 function showReview(macro: Macro, reasoning: string[] = []): void {
   pendingMacro = macro;
+  const scopeSummary = macro.runScope
+    ? ` · Runs on: ${macro.runScope.description}`
+    : "";
   reviewSummaryEl.textContent = `"${macro.name}" — ${macro.steps.length} ${
     macro.steps.length === 1 ? "step" : "steps"
-  }${reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""}`;
+  }${scopeSummary}${
+    reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""
+  }`;
 
   reviewStepsEl.replaceChildren(
     ...macro.steps.map((step, index) => {

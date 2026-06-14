@@ -1,9 +1,12 @@
+import { getTabUrl } from "@/background/capture";
 import { runAgenticRecord } from "@/background/record";
+import { inferRunScope } from "@/background/worker";
 import {
   clearPendingRecord,
   getPendingRecord,
   savePendingRecord,
 } from "@/shared/storage";
+import type { Macro } from "@/shared/types/macro";
 
 export async function startAgenticRecordSession(
   intent: string,
@@ -49,10 +52,26 @@ async function finishAgenticRecordSession(
       },
     );
 
+    const endUrl = await getTabUrl(tabId);
+    const current = await getPendingRecord();
+    if (current?.status === "recording") {
+      await savePendingRecord({
+        ...current,
+        progress: "Deciding where this macro should run…",
+      });
+    }
+
+    const macro = await attachRunScope(
+      result.macro,
+      intent,
+      startUrl,
+      endUrl,
+    );
+
     await savePendingRecord({
       status: "complete",
       intent,
-      macro: result.macro,
+      macro,
       reasoning: result.reasoning,
       completedAt: Date.now(),
     });
@@ -68,4 +87,14 @@ async function finishAgenticRecordSession(
 
 export async function discardPendingRecordSession(): Promise<void> {
   await clearPendingRecord();
+}
+
+async function attachRunScope(
+  macro: Macro,
+  intent: string,
+  startUrl: string,
+  endUrl: string,
+): Promise<Macro> {
+  const runScope = await inferRunScope(intent, startUrl, endUrl, macro.steps);
+  return { ...macro, runScope };
 }

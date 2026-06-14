@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 
 import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
-import type { Macro, MacroStep } from "@/shared/types/macro";
+import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
 import {
   eventToShortcut,
   formatShortcutForDisplay,
 } from "@/shared/shortcut";
+import { validateRunScopePattern } from "@/shared/run-scope";
 
 function formatStep(step: MacroStep, index: number): string {
   const parts = [`${index + 1}. ${step.type}`];
@@ -137,6 +138,103 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
   );
 }
 
+type RunScopeEditorProps = {
+  macro: Macro;
+  onSaved: (macros: Macro[]) => void;
+  onError: (message: string | null) => void;
+};
+
+function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
+  const [description, setDescription] = useState(macro.runScope?.description ?? "");
+  const [pattern, setPattern] = useState(macro.runScope?.pattern ?? "");
+  const [dirty, setDirty] = useState(false);
+
+  async function saveRunScope(): Promise<void> {
+    const patternError = validateRunScopePattern(pattern);
+    if (patternError) {
+      onError(`Invalid regex: ${patternError}`);
+      return;
+    }
+
+    if (!description.trim()) {
+      onError("Description is required.");
+      return;
+    }
+
+    const runScope: RunScope = {
+      description: description.trim(),
+      pattern: pattern.trim(),
+    };
+
+    const response = await sendBackgroundMessage({
+      type: "SAVE_MACRO",
+      macro: {
+        ...macro,
+        runScope,
+        updatedAt: Date.now(),
+      },
+    });
+
+    if (!response.ok) {
+      onError(response.error);
+      return;
+    }
+
+    onError(null);
+    onSaved(response.macros ?? []);
+    setDirty(false);
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Run on
+      </p>
+      <label className="block space-y-1">
+        <span className="text-xs text-slate-500">Description</span>
+        <input
+          type="text"
+          className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200"
+          placeholder="e.g. Any repository page on this site"
+          value={description}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            setDirty(true);
+          }}
+        />
+      </label>
+      <label className="block space-y-1">
+        <span className="text-xs text-slate-500">URL regex</span>
+        <input
+          type="text"
+          className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-xs text-slate-200"
+          placeholder="^https://…"
+          value={pattern}
+          onChange={(event) => {
+            setPattern(event.target.value);
+            setDirty(true);
+          }}
+        />
+      </label>
+      {dirty ? (
+        <button
+          type="button"
+          className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300 transition hover:border-slate-500 hover:text-white"
+          onClick={() => {
+            void saveRunScope();
+          }}
+        >
+          Save run scope
+        </button>
+      ) : macro.runScope ? null : (
+        <p className="text-xs text-slate-500">
+          No run scope yet. Record a new macro or fill in both fields above.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
   const [activeMacroId, setActiveMacroId] = useState<string | null>(null);
@@ -213,8 +311,8 @@ export default function App() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Patch</h1>
         <p className="text-slate-400">
-          Manage saved macros. Assign keyboard shortcuts to run a macro on any
-          page.
+          Manage saved macros. Configure where each macro runs and assign
+          keyboard shortcuts.
         </p>
       </header>
 
@@ -262,6 +360,12 @@ export default function App() {
                     {macro.description}
                   </p>
                 ) : null}
+                <RunScopeEditor
+                  key={`${macro.id}-${macro.updatedAt}`}
+                  macro={macro}
+                  onSaved={setMacros}
+                  onError={setShortcutError}
+                />
                 <ShortcutEditor
                   macro={macro}
                   onSaved={setMacros}

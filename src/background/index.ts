@@ -10,6 +10,7 @@ import type {
 } from "@/shared/types/messages";
 import { findMacroForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut } from "@/shared/shortcut";
+import { validateRunScopePattern } from "@/shared/run-scope";
 import {
   getMacros,
   getPendingRecord,
@@ -79,6 +80,13 @@ async function handleMessage(
       const macros = await getMacros();
       const index = macros.findIndex((macro) => macro.id === message.macro.id);
       const isNew = index < 0;
+
+      if (message.macro.runScope) {
+        const patternError = validateRunScopePattern(message.macro.runScope.pattern);
+        if (patternError) {
+          throw new Error(`Invalid run scope regex: ${patternError}`);
+        }
+      }
 
       if (message.macro.shortcut) {
         const normalized = normalizeShortcut(message.macro.shortcut);

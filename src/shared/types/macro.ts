@@ -21,11 +21,17 @@ export const MacroStepSchema = z.object({
   timestamp: z.number().int().nonnegative(),
 });
 
+export const RunScopeSchema = z.object({
+  pattern: z.string().min(1),
+  description: z.string().min(1),
+});
+
 export const MacroSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
   urlPattern: z.string().min(1).optional(),
+  runScope: RunScopeSchema.optional(),
   shortcut: z.string().min(1).optional(),
   steps: z.array(MacroStepSchema),
   createdAt: z.number().int().nonnegative(),
@@ -34,6 +40,7 @@ export const MacroSchema = z.object({
 
 export type MacroStepType = z.infer<typeof MacroStepTypeSchema>;
 export type MacroStep = z.infer<typeof MacroStepSchema>;
+export type RunScope = z.infer<typeof RunScopeSchema>;
 export type Macro = z.infer<typeof MacroSchema>;
 
 export const MacrosSchema = z.array(MacroSchema);
