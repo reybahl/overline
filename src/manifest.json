@@ -16,6 +16,13 @@
     }
   },
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["src/content/shortcuts.js"],
+      "run_at": "document_end"
+    }
+  ],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"

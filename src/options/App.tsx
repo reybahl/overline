@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 
 import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import {
+  eventToShortcut,
+  formatShortcutForDisplay,
+} from "@/shared/shortcut";
 
 function formatStep(step: MacroStep, index: number): string {
   const parts = [`${index + 1}. ${step.type}`];
@@ -24,11 +28,121 @@ async function sendBackgroundMessage(
   return chrome.runtime.sendMessage(message);
 }
 
+type ShortcutEditorProps = {
+  macro: Macro;
+  onSaved: (macros: Macro[]) => void;
+  onError: (message: string | null) => void;
+};
+
+function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
+  const [listening, setListening] = useState(false);
+
+  useEffect(() => {
+    if (!listening) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+
+      if (event.key === "Escape") {
+        setListening(false);
+        return;
+      }
+
+      const shortcut = eventToShortcut(event);
+      if (!shortcut) {
+        return;
+      }
+
+      void (async () => {
+        const response = await sendBackgroundMessage({
+          type: "SAVE_MACRO",
+          macro: {
+            ...macro,
+            shortcut,
+            updatedAt: Date.now(),
+          },
+        });
+
+        if (!response.ok) {
+          onError(response.error);
+          setListening(false);
+          return;
+        }
+
+        onSaved(response.macros ?? []);
+        setListening(false);
+      })();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [listening, macro, onError, onSaved]);
+
+  async function clearShortcut(): Promise<void> {
+    const { shortcut: _removed, ...macroWithoutShortcut } = macro;
+    const response = await sendBackgroundMessage({
+      type: "SAVE_MACRO",
+      macro: {
+        ...macroWithoutShortcut,
+        updatedAt: Date.now(),
+      },
+    });
+
+    if (!response.ok) {
+      onError(response.error);
+      return;
+    }
+
+    onSaved(response.macros ?? []);
+  }
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
+      <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+        Shortcut
+      </span>
+      {macro.shortcut ? (
+        <kbd className="rounded-md border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-xs text-slate-200">
+          {formatShortcutForDisplay(macro.shortcut)}
+        </kbd>
+      ) : (
+        <span className="text-xs text-slate-500">None</span>
+      )}
+      <button
+        type="button"
+        className="rounded-md border border-slate-700 px-2 py-1 text-xs text-slate-300 transition hover:border-slate-500 hover:text-white"
+        onClick={() => {
+          onError(null);
+          setListening(true);
+        }}
+      >
+        {listening ? "Press keys… (Esc to cancel)" : macro.shortcut ? "Change" : "Set shortcut"}
+      </button>
+      {macro.shortcut ? (
+        <button
+          type="button"
+          className="rounded-md border border-slate-800 px-2 py-1 text-xs text-slate-500 transition hover:border-slate-600 hover:text-slate-300"
+          onClick={() => {
+            void clearShortcut();
+          }}
+        >
+          Clear
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
   const [activeMacroId, setActiveMacroId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -57,6 +171,27 @@ export default function App() {
     })();
   }, []);
 
+  async function deleteMacro(macro: Macro): Promise<void> {
+    if (!window.confirm(`Delete "${macro.name}"?`)) {
+      return;
+    }
+
+    const response = await sendBackgroundMessage({
+      type: "DELETE_MACRO",
+      macroId: macro.id,
+    });
+
+    if (!response.ok) {
+      setShortcutError(response.error);
+      return;
+    }
+
+    setMacros(response.macros ?? []);
+    if (activeMacroId === macro.id) {
+      setActiveMacroId(null);
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto max-w-3xl p-8">
@@ -77,8 +212,17 @@ export default function App() {
     <main className="mx-auto max-w-3xl space-y-8 p-8">
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">Patch</h1>
-        <p className="text-slate-400">Manage saved macros.</p>
+        <p className="text-slate-400">
+          Manage saved macros. Assign keyboard shortcuts to run a macro on any
+          page.
+        </p>
       </header>
+
+      {shortcutError ? (
+        <p className="rounded-lg border border-red-900/50 bg-red-950/40 px-4 py-3 text-sm text-red-300">
+          {shortcutError}
+        </p>
+      ) : null}
 
       <section className="space-y-4 rounded-xl border border-slate-800 bg-slate-900 p-6">
         <h2 className="text-lg font-medium">Macros</h2>
@@ -94,19 +238,35 @@ export default function App() {
                 key={macro.id}
                 className="rounded-lg border border-slate-800 bg-slate-950 px-4 py-3"
               >
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{macro.name}</p>
-                  {macro.id === activeMacroId ? (
-                    <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
-                      Active
-                    </span>
-                  ) : null}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{macro.name}</p>
+                    {macro.id === activeMacroId ? (
+                      <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-xs font-medium text-indigo-300">
+                        Active
+                      </span>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-slate-500 transition hover:text-red-400"
+                    onClick={() => {
+                      void deleteMacro(macro);
+                    }}
+                  >
+                    Delete
+                  </button>
                 </div>
                 {macro.description ? (
                   <p className="mt-1 text-sm text-slate-400">
                     {macro.description}
                   </p>
                 ) : null}
+                <ShortcutEditor
+                  macro={macro}
+                  onSaved={setMacros}
+                  onError={setShortcutError}
+                />
                 <details className="mt-2">
                   <summary className="cursor-pointer text-sm text-slate-400 hover:text-slate-300">
                     {macro.steps.length}{" "}

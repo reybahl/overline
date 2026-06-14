@@ -22,7 +22,11 @@ export default defineConfig({
     react(),
     webExtension({
       manifest: generateManifest,
-      additionalInputs: ["src/content/index.ts", "src/content/dom-capture.ts"],
+      additionalInputs: [
+        "src/content/index.ts",
+        "src/content/dom-capture.ts",
+        "src/content/shortcuts.ts",
+      ],
       watchFilePaths: ["package.json", "src/manifest.json"],
     }),
   ],

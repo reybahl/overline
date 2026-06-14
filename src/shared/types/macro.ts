@@ -26,6 +26,7 @@ export const MacroSchema = z.object({
   name: z.string().min(1),
   description: z.string().optional(),
   urlPattern: z.string().min(1).optional(),
+  shortcut: z.string().min(1).optional(),
   steps: z.array(MacroStepSchema),
   createdAt: z.number().int().nonnegative(),
   updatedAt: z.number().int().nonnegative(),

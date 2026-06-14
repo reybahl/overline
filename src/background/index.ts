@@ -1,12 +1,22 @@
 import { runMacroSteps } from "@/background/play";
-import { runAgenticRecord } from "@/background/record";
+import {
+  discardPendingRecordSession,
+  startAgenticRecordSession,
+} from "@/background/record-session";
 import { generateMacro } from "@/background/worker";
 import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
 import { findMacroForUrl } from "@/shared/macro-match";
-import { getMacros, getSettings, saveMacros, saveSettings } from "@/shared/storage";
+import { normalizeShortcut } from "@/shared/shortcut";
+import {
+  getMacros,
+  getPendingRecord,
+  getSettings,
+  saveMacros,
+  saveSettings,
+} from "@/shared/storage";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -55,7 +65,9 @@ chrome.runtime.onMessage.addListener(
 async function handleMessage(
   message: BackgroundMessage,
 ): Promise<BackgroundResponse> {
-  switch (message.type) {
+  const messageType = message.type;
+
+  switch (messageType) {
     case "GET_SETTINGS":
       return { ok: true, settings: await getSettings() };
     case "SAVE_SETTINGS":
@@ -66,6 +78,23 @@ async function handleMessage(
     case "SAVE_MACRO": {
       const macros = await getMacros();
       const index = macros.findIndex((macro) => macro.id === message.macro.id);
+      const isNew = index < 0;
+
+      if (message.macro.shortcut) {
+        const normalized = normalizeShortcut(message.macro.shortcut);
+        const conflict = macros.find(
+          (macro) =>
+            macro.id !== message.macro.id &&
+            macro.shortcut &&
+            normalizeShortcut(macro.shortcut) === normalized,
+        );
+        if (conflict) {
+          throw new Error(
+            `Shortcut already used by "${conflict.name}". Choose a different one.`,
+          );
+        }
+      }
+
       if (index >= 0) {
         macros[index] = message.macro;
       } else {
@@ -73,11 +102,13 @@ async function handleMessage(
       }
       await saveMacros(macros);
 
-      const settings = await getSettings();
-      await saveSettings({
-        ...settings,
-        currentMacroId: message.macro.id,
-      });
+      if (isNew) {
+        const settings = await getSettings();
+        await saveSettings({
+          ...settings,
+          currentMacroId: message.macro.id,
+        });
+      }
 
       return { ok: true, macros };
     }
@@ -86,12 +117,24 @@ async function handleMessage(
         (macro) => macro.id !== message.macroId,
       );
       await saveMacros(macros);
+
+      const settings = await getSettings();
+      if (settings.currentMacroId === message.macroId) {
+        await saveSettings({
+          ...settings,
+          currentMacroId: null,
+        });
+      }
+
       return { ok: true, macros };
     }
     case "RECORD_MACRO":
       throw new Error("Use the popup to record macros.");
     case "RUN_MACRO":
       await handleRunMacro();
+      return { ok: true };
+    case "RUN_MACRO_BY_ID":
+      await handleRunMacroById(message.macroId);
       return { ok: true };
     case "EXECUTE_MACRO":
       await runMacroSteps(message.tabId, message.steps);
@@ -105,23 +148,25 @@ async function handleMessage(
       console.info("[Patch] Generated macro:", macro);
       return { ok: true, macro };
     }
-    case "AGENTIC_RECORD": {
-      const result = await runAgenticRecord(
+    case "AGENTIC_RECORD":
+    case "START_AGENTIC_RECORD": {
+      await startAgenticRecordSession(
         message.intent,
         message.tabId,
         message.startUrl,
       );
-      console.info("[Patch] Agentic record complete:", result.macro);
+      return { ok: true };
+    }
+    case "GET_PENDING_RECORD":
+      return { ok: true, pendingRecord: await getPendingRecord() };
+    case "CLEAR_PENDING_RECORD":
+      await discardPendingRecordSession();
+      return { ok: true, pendingRecord: null };
+    default:
       return {
-        ok: true,
-        macro: result.macro,
-        reasoning: result.reasoning,
+        ok: false,
+        error: `Unknown message type "${messageType}". Reload Patch at chrome://extensions and try again.`,
       };
-    }
-    default: {
-      const _exhaustive: never = message;
-      return { ok: false, error: `Unhandled message: ${String(_exhaustive)}` };
-    }
   }
 }
 
@@ -131,6 +176,18 @@ async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
     throw new Error(getRestrictedPageMessage(tab.url));
   }
   return tab;
+}
+
+async function handleRunMacroById(macroId: string): Promise<void> {
+  const tab = await requireInjectableActiveTab();
+  const macros = await getMacros();
+  const macro = macros.find((entry) => entry.id === macroId);
+  if (!macro) {
+    throw new Error("Macro not found.");
+  }
+
+  await runMacroSteps(tab.id!, macro.steps);
+  console.info(`[Patch] Ran macro "${macro.name}" via shortcut`);
 }
 
 async function handleRunMacro(): Promise<void> {

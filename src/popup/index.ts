@@ -1,10 +1,12 @@
 import type { DomElement } from "@/content/dom-capture";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import type { PendingRecord } from "@/shared/types/pending-record";
 import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
 import { getMacrosForUrl } from "@/shared/macro-match";
+import { clearPendingRecord, getPendingRecord } from "@/shared/storage";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -40,6 +42,75 @@ const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
 
 let savedMacros: Macro[] = [];
 let pendingMacro: Macro | null = null;
+let pendingRecordPoll: number | undefined;
+
+function stopPendingRecordPoll(): void {
+  if (pendingRecordPoll !== undefined) {
+    window.clearInterval(pendingRecordPoll);
+    pendingRecordPoll = undefined;
+  }
+}
+
+function startPendingRecordPoll(): void {
+  stopPendingRecordPoll();
+  pendingRecordPoll = window.setInterval(() => {
+    void syncPendingRecord();
+  }, 1000);
+}
+
+async function syncPendingRecord(): Promise<void> {
+  try {
+    applyPendingRecord(await getPendingRecord());
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load recording";
+    setStatus(message, true);
+    setBusy(false);
+  }
+}
+
+function isRecordingChannelError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("message port closed") ||
+    message.includes("Receiving end does not exist") ||
+    message.includes("Could not establish connection")
+  );
+}
+
+function applyPendingRecord(record: PendingRecord | null): void {
+  if (!record) {
+    stopPendingRecordPoll();
+    return;
+  }
+
+  switch (record.status) {
+    case "recording":
+      setBusy(true);
+      setStatus(
+        record.progress ??
+          "Recording… the popup can close while Patch keeps working.",
+      );
+      startPendingRecordPoll();
+      return;
+    case "complete":
+      stopPendingRecordPoll();
+      setBusy(false);
+      showReview(record.macro, record.reasoning);
+      setStatus("Review the recorded steps below.");
+      return;
+    case "error":
+      stopPendingRecordPoll();
+      setBusy(false);
+      hideReview();
+      setStatus(record.error, true);
+      return;
+    default: {
+      const _exhaustive: never = record;
+      throw new Error(`Unhandled pending record: ${String(_exhaustive)}`);
+    }
+  }
+}
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
@@ -232,32 +303,48 @@ async function handleRecordMacro(): Promise<void> {
       throw new Error(getRestrictedPageMessage(startUrl));
     }
 
-    setStatus("Recording… keep this tab open.");
-    const response = await sendBackgroundMessage({
+    setStatus("Recording… the popup can close while Patch keeps working.");
+    startPendingRecordPoll();
+
+    void sendBackgroundMessage({
       type: "AGENTIC_RECORD",
       intent,
       tabId,
       startUrl,
-    });
+    })
+      .then(async (response) => {
+        if (!response?.ok) {
+          stopPendingRecordPoll();
+          setBusy(false);
+          setStatus(response?.error ?? "Recording failed.", true);
+          return;
+        }
 
-    if (!response.ok) {
-      throw new Error(response.error);
-    }
-    if (!response.macro) {
-      throw new Error("Recording finished without a macro.");
-    }
+        await syncPendingRecord();
+      })
+      .catch(async (error: unknown) => {
+        if (isRecordingChannelError(error)) {
+          await syncPendingRecord();
+          return;
+        }
 
-    showReview(response.macro, response.reasoning);
-    setStatus("Review the recorded steps below.");
+        stopPendingRecordPoll();
+        setBusy(false);
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to record macro";
+        setStatus(errorMessage, true);
+      });
+
+    await syncPendingRecord();
   } catch (error) {
+    stopPendingRecordPoll();
     const errorMessage =
       error instanceof Error ? error.message : "Failed to record macro";
     setStatus(errorMessage, true);
+    setBusy(false);
     if (errorMessage === "Enter an intent first.") {
       intentInput.focus();
     }
-  } finally {
-    setBusy(false);
   }
 }
 
@@ -278,6 +365,7 @@ async function handleConfirmSave(): Promise<void> {
     const macroId = pendingMacro.id;
     const macroName = pendingMacro.name;
     hideReview();
+    await clearPendingRecord();
     await refreshMacroSelect(macroId);
     setStatus(`Saved macro "${macroName}"`);
   } catch (error) {
@@ -291,7 +379,9 @@ async function handleConfirmSave(): Promise<void> {
 
 function handleDiscard(): void {
   hideReview();
-  setStatus("Recording discarded.");
+  void clearPendingRecord().then(() => {
+    setStatus("Recording discarded.");
+  });
 }
 
 async function handleGenerateMacro(): Promise<void> {
@@ -400,8 +490,18 @@ optionsLink.addEventListener("click", (event) => {
   void chrome.runtime.openOptionsPage();
 });
 
-void refreshMacroSelect().catch((error: unknown) => {
-  const message =
-    error instanceof Error ? error.message : "Failed to load macros";
-  setStatus(message, true);
+void refreshMacroSelect()
+  .then(() => syncPendingRecord())
+  .catch((error: unknown) => {
+    const message =
+      error instanceof Error ? error.message : "Failed to load macros";
+    setStatus(message, true);
+  });
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName !== "local" || !("patch:pendingRecord" in changes)) {
+    return;
+  }
+
+  void syncPendingRecord();
 });

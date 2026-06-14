@@ -1,11 +1,16 @@
 import type { DomElement } from "@/content/dom-capture";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import type { PendingRecord } from "@/shared/types/pending-record";
 import type { Settings } from "@/shared/types/settings";
 
 export type BackgroundMessage =
   | { type: "RECORD_MACRO" }
   | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
+  | { type: "START_AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
+  | { type: "GET_PENDING_RECORD" }
+  | { type: "CLEAR_PENDING_RECORD" }
   | { type: "RUN_MACRO" }
+  | { type: "RUN_MACRO_BY_ID"; macroId: string }
   | { type: "EXECUTE_MACRO"; tabId: number; steps: MacroStep[] }
   | { type: "GENERATE_MACRO"; intent: string; elements: DomElement[]; url: string }
   | { type: "GET_SETTINGS" }
@@ -21,6 +26,7 @@ export type BackgroundResponse =
       macros?: Macro[];
       macro?: Macro;
       reasoning?: string[];
+      pendingRecord?: PendingRecord | null;
     }
   | { ok: false; error: string };
 
