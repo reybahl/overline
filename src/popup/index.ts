@@ -5,7 +5,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
-import { getMacrosForUrl } from "@/shared/macro-match";
+import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { clearPendingRecord, getPendingRecord } from "@/shared/storage";
 import {
   getActiveTab,
@@ -201,18 +201,16 @@ async function refreshMacroSelect(preferredMacroId?: string): Promise<void> {
   }
 
   savedMacros = macrosResponse.macros ?? [];
-  const matching = url ? getMacrosForUrl(savedMacros, url) : [];
-  const options =
-    matching.length > 0
-      ? matching
-      : [...savedMacros].sort((left, right) => right.createdAt - left.createdAt);
+  const options = url ? getMacrosForUrl(savedMacros, url) : [];
 
   macroSelect.replaceChildren();
 
   if (options.length === 0) {
     const option = document.createElement("option");
     option.value = "";
-    option.textContent = "No macros saved";
+    option.textContent = url
+      ? "No macros for this page"
+      : "No macros saved";
     macroSelect.appendChild(option);
     runBtn.toggleAttribute("disabled", true);
     return;
@@ -443,12 +441,16 @@ async function handleRunMacro(): Promise<void> {
     if (!url || !isInjectableUrl(url)) {
       throw new Error(getRestrictedPageMessage(url));
     }
+    if (!macroMatchesUrl(macro, url)) {
+      throw new Error(`"${macro.name}" does not run on this page.`);
+    }
 
     setStatus(`Running "${macro.name}"…`);
 
     const response = await sendBackgroundMessage({
       type: "EXECUTE_MACRO",
       tabId,
+      macroId: macro.id,
       steps: macro.steps,
     });
 

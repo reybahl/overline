@@ -48,10 +48,10 @@ chrome.commands.onCommand.addListener(async (command) => {
 chrome.runtime.onMessage.addListener(
   (
     message: BackgroundMessage,
-    _sender,
+    sender,
     sendResponse: (response: BackgroundResponse) => void,
   ) => {
-    void handleMessage(message)
+    void handleMessage(message, sender)
       .then(sendResponse)
       .catch((error: unknown) => {
         const errorMessage =
@@ -65,6 +65,7 @@ chrome.runtime.onMessage.addListener(
 
 async function handleMessage(
   message: BackgroundMessage,
+  sender?: chrome.runtime.MessageSender,
 ): Promise<BackgroundResponse> {
   const messageType = message.type;
 
@@ -142,11 +143,27 @@ async function handleMessage(
       await handleRunMacro();
       return { ok: true };
     case "RUN_MACRO_BY_ID":
-      await handleRunMacroById(message.macroId);
+      await handleRunMacroById(message.macroId, sender?.tab?.id);
       return { ok: true };
-    case "EXECUTE_MACRO":
+    case "EXECUTE_MACRO": {
+      const tab = await chrome.tabs.get(message.tabId);
+      const url = tab.url;
+      if (!url) {
+        throw new Error("No active tab URL found.");
+      }
+
+      const macros = await getMacros();
+      const macro = macros.find((entry) => entry.id === message.macroId);
+      if (!macro) {
+        throw new Error("Macro not found.");
+      }
+      if (!macroMatchesUrl(macro, url)) {
+        throw new Error(`"${macro.name}" does not run on this page.`);
+      }
+
       await runMacroSteps(message.tabId, message.steps);
       return { ok: true };
+    }
     case "GENERATE_MACRO": {
       const macro = await generateMacro(
         message.intent,
@@ -186,11 +203,22 @@ async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
   return tab;
 }
 
-async function handleRunMacroById(macroId: string): Promise<void> {
-  const tab = await requireInjectableActiveTab();
+async function handleRunMacroById(
+  macroId: string,
+  tabId?: number,
+): Promise<void> {
+  const tab =
+    tabId !== undefined
+      ? await chrome.tabs.get(tabId)
+      : await requireInjectableActiveTab();
+  const resolvedTabId = tab.id;
   const url = tab.url;
-  if (!url) {
-    throw new Error("No active tab URL found.");
+
+  if (resolvedTabId === undefined) {
+    throw new Error("No active tab found.");
+  }
+  if (!url || !isInjectableUrl(url)) {
+    throw new Error(getRestrictedPageMessage(url));
   }
 
   const macros = await getMacros();
@@ -201,12 +229,12 @@ async function handleRunMacroById(macroId: string): Promise<void> {
 
   if (!macroMatchesUrl(macro, url)) {
     console.info(
-      `[Patch] Shortcut ignored: "${macro.name}" does not match this page.`,
+      `[Patch] Shortcut ignored: "${macro.name}" does not match ${url}`,
     );
     return;
   }
 
-  await runMacroSteps(tab.id!, macro.steps);
+  await runMacroSteps(resolvedTabId, macro.steps);
   console.info(`[Patch] Ran macro "${macro.name}" via shortcut`);
 }
 

@@ -11,7 +11,7 @@ export type BackgroundMessage =
   | { type: "CLEAR_PENDING_RECORD" }
   | { type: "RUN_MACRO" }
   | { type: "RUN_MACRO_BY_ID"; macroId: string }
-  | { type: "EXECUTE_MACRO"; tabId: number; steps: MacroStep[] }
+  | { type: "EXECUTE_MACRO"; tabId: number; macroId: string; steps: MacroStep[] }
   | { type: "GENERATE_MACRO"; intent: string; elements: DomElement[]; url: string }
   | { type: "GET_SETTINGS" }
   | { type: "SAVE_SETTINGS"; settings: Settings }

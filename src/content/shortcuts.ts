@@ -11,6 +11,12 @@ type StoredMacro = {
   shortcut?: string;
 };
 
+declare global {
+  interface Window {
+    __patchShortcutsLoaded?: boolean;
+  }
+}
+
 let shortcutToMacroId = new Map<string, string>();
 
 function loadShortcutMap(raw: unknown): void {
@@ -37,40 +43,75 @@ async function refreshShortcutMap(): Promise<void> {
   loadShortcutMap(result[MACROS_STORAGE_KEY]);
 }
 
-void refreshShortcutMap();
+async function triggerMacroByShortcut(macroId: string): Promise<void> {
+  const message = { type: "RUN_MACRO_BY_ID", macroId };
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !(MACROS_STORAGE_KEY in changes)) {
+  try {
+    await chrome.runtime.sendMessage(message);
     return;
+  } catch {
+    // Service worker may still be waking on a cold tab.
   }
 
-  loadShortcutMap(changes[MACROS_STORAGE_KEY]?.newValue);
-});
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, 50);
+  });
 
-document.addEventListener(
-  "keydown",
-  (event) => {
-    if (event.repeat || isEditableTarget(event.target)) {
+  await chrome.runtime.sendMessage(message);
+}
+
+async function resolveMacroId(shortcut: string): Promise<string | undefined> {
+  let macroId = shortcutToMacroId.get(normalizeShortcut(shortcut));
+  if (macroId) {
+    return macroId;
+  }
+
+  await refreshShortcutMap();
+  return shortcutToMacroId.get(normalizeShortcut(shortcut));
+}
+
+function initializeShortcutsContentScript(): void {
+  if (window.__patchShortcutsLoaded) {
+    return;
+  }
+  window.__patchShortcutsLoaded = true;
+
+  void refreshShortcutMap().then(() => {
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        void (async () => {
+          if (event.repeat || isEditableTarget(event.target)) {
+            return;
+          }
+
+          const shortcut = eventToShortcut(event);
+          if (!shortcut) {
+            return;
+          }
+
+          const macroId = await resolveMacroId(shortcut);
+          if (!macroId) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopImmediatePropagation();
+
+          void triggerMacroByShortcut(macroId);
+        })();
+      },
+      true,
+    );
+  });
+
+  chrome.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local" || !(MACROS_STORAGE_KEY in changes)) {
       return;
     }
 
-    const shortcut = eventToShortcut(event);
-    if (!shortcut) {
-      return;
-    }
+    loadShortcutMap(changes[MACROS_STORAGE_KEY]?.newValue);
+  });
+}
 
-    const macroId = shortcutToMacroId.get(normalizeShortcut(shortcut));
-    if (!macroId) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopImmediatePropagation();
-
-    void chrome.runtime.sendMessage({
-      type: "RUN_MACRO_BY_ID",
-      macroId,
-    });
-  },
-  true,
-);
+initializeShortcutsContentScript();

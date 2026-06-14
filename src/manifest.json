@@ -16,6 +16,7 @@
     }
   },
   "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
