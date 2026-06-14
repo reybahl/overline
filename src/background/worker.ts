@@ -4,6 +4,7 @@ import type { z } from "zod";
 
 import type { DomElement } from "@/content/dom-capture";
 import { getLlmEnv } from "@/shared/env";
+import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
 import {
   AgentTurnSchema,
   MacroGenerationSchema,
@@ -18,6 +19,18 @@ import {
 
 const PRIMARY_MODEL = "gpt-oss-20b";
 const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+
+const RECORD_AGENT_RULES = [
+  "- Only use selectors from the current page state",
+  "- Do not invent selectors",
+  "- Use step types: click, type, fill, confirm, wait, waitFor, scroll",
+  "- Never use the navigate step type — click links and buttons instead",
+  "- For wait, put milliseconds in value",
+  "- For waitFor, put selector and timeout ms in value",
+  "- Never navigate backwards — do not click a link that returns to a page you already visited",
+  "- If the intent is already complete, return done: true and do not emit another step",
+  "- If the intent cannot be completed, set done: true and explain in reasoning",
+];
 
 function buildSingleShotPrompt(
   intent: string,
@@ -67,18 +80,62 @@ function buildAgentTurnPrompt(
     "What is the single next step to take? Check Current URL first — set done: true if the intent is already satisfied.",
     "Rules:",
     "- For multi-step intents (e.g. \"go to X then Y\"), set done: true once the final destination is reached",
-    "- Only use selectors from the current page state",
-    "- Do not invent selectors",
-    "- Use step types: click, type, fill, confirm, navigate, wait, waitFor, scroll",
-    "- For wait, put milliseconds in value",
-    "- For waitFor, put selector and timeout ms in value",
-    "- Never navigate backwards — do not click a link that returns to a page you already visited",
-    "- If the intent is already complete, return done: true and do not emit another step",
-    "- If the intent cannot be completed, set done: true and explain in reasoning",
+    ...RECORD_AGENT_RULES,
     "- When done: true, optionally set macroName to a short name for the macro",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildCompileScriptPrompt(
+  intent: string,
+  startUrl: string,
+  endUrl: string,
+  demoSteps: MacroStep[],
+): string {
+  return [
+    "You compile a browser automation demo into a generalized click-based script that runs deterministically on similar pages.",
+    "",
+    `User intent: "${intent}"`,
+    `Recording started on: ${startUrl}`,
+    `Recording ended on: ${endUrl}`,
+    `Demo steps (brittle — do not copy ids or instance-specific selectors): ${JSON.stringify(
+      demoSteps.map((step) => ({
+        type: step.type,
+        selector: step.selector,
+        value: step.value,
+      })),
+    )}`,
+    "",
+    "Return a script with version 1 and an ordered steps array.",
+    "",
+    "Critical: the script must implement EVERY part of the user intent, in order.",
+    "If the intent says \"go to issues, then click the latest issue\", the script must have:",
+    "  1) a step that opens the Issues section/tab,",
+    "  2) a step that clicks the first/top issue in that list (index 0), using a match for issue rows — not nav links.",
+    "Add a short label on each step describing which part of the intent it fulfills.",
+    "",
+    "Allowed step types (clicks only — no navigate steps):",
+    '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
+    "  · index 0 = first matching element (use for latest/first/top item in a list after reaching the list page).",
+    "  · id: stable element id when demo used #issues-tab → id \"issues-tab\" (same across repos on a site).",
+    "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",
+    "  · testId: data-testid when stable in the demo (e.g. issue-pr-title-link).",
+    "  · For repo/section tabs, prefer match.id (from demo #issues-tab), then ariaLabel, then text",
+    '- fill: { type: "fill", label?, match: {...}, value: "..." }',
+    '- wait: { type: "wait", label?, ms: 500 }',
+    '- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: 5000 }',
+    "",
+    "Rules:",
+    "- Never emit navigate steps — click links and buttons instead",
+    "- One script step per logical intent clause (\"go to X\" then \"click Y\" → at least 2 steps)",
+    "- Generalize: strip instance-specific issue/PR numbers unless the intent names them",
+    "- For latest/first/top item: navigate to the list first, then click with index 0 and hrefPattern or testId that matches list rows only",
+    "- Never use hrefContains \"/issues/\" alone for the final click — it matches nav and sidebar. Use hrefPattern \"/issues/\\\\d+\" or a stable testId from the demo",
+    "- Labels must describe the intent part (e.g. \"Open Issues tab\", \"Click first issue in list\")",
+    "- Keep the script minimal",
+    "- Each match object must include at least one matching criterion",
+  ].join("\n");
 }
 
 async function generateObjectWithModels<T>(
@@ -151,6 +208,16 @@ export async function getNextStep(
   );
 
   return generateObjectWithModels<AgentTurn>(AgentTurnSchema, prompt);
+}
+
+export async function compileMacroScript(
+  intent: string,
+  startUrl: string,
+  endUrl: string,
+  demoSteps: MacroStep[],
+): Promise<MacroScript> {
+  const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
+  return generateObjectWithModels<MacroScript>(MacroScriptSchema, prompt);
 }
 
 function buildRunScopePrompt(

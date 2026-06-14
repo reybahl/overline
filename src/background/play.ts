@@ -1,6 +1,7 @@
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep } from "@/background/tab-settle";
-import type { MacroStep } from "@/shared/types/macro";
+import type { Macro, MacroStep } from "@/shared/types/macro";
+import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 
 const STEP_WAIT_FOR_MS = 8000;
 
@@ -12,6 +13,10 @@ function stepNeedsElement(step: MacroStep): boolean {
       step.type === "scroll") &&
     Boolean(step.selector)
   );
+}
+
+function scriptStepNeedsSettle(step: ScriptStep): boolean {
+  return step.type === "click";
 }
 
 async function waitForSelectorInTab(
@@ -59,4 +64,58 @@ export async function runMacroSteps(
       await settleAfterStep(tabId);
     }
   }
+}
+
+async function waitForScriptMatchInTab(
+  tabId: number,
+  match: ElementMatch,
+  timeoutMs = STEP_WAIT_FOR_MS,
+): Promise<void> {
+  const response = await sendContentMessage(tabId, {
+    type: "EXECUTE_SCRIPT",
+    steps: [
+      {
+        type: "waitFor",
+        match,
+        timeoutMs,
+      },
+    ],
+  });
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+}
+
+export async function runMacroScript(
+  tabId: number,
+  script: MacroScript,
+): Promise<void> {
+  for (let i = 0; i < script.steps.length; i++) {
+    const step = script.steps[i];
+
+    if (i > 0 && step.type === "click") {
+      await waitForScriptMatchInTab(tabId, step.match);
+    }
+
+    const response = await sendContentMessage(tabId, {
+      type: "EXECUTE_SCRIPT",
+      steps: [step],
+    });
+    if (!response.ok) {
+      throw new Error(response.error);
+    }
+
+    if (scriptStepNeedsSettle(step)) {
+      await settleAfterStep(tabId);
+    }
+  }
+}
+
+export async function runMacro(tabId: number, macro: Macro): Promise<void> {
+  if (macro.script) {
+    await runMacroScript(tabId, macro.script);
+    return;
+  }
+
+  await runMacroSteps(tabId, macro.steps);
 }

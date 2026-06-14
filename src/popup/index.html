@@ -39,6 +39,9 @@
       <button id="generate-btn" type="button" class="btn btn-secondary">
         Generate Macro
       </button>
+      <button id="cancel-record-btn" type="button" class="btn btn-secondary" hidden>
+        Cancel recording
+      </button>
     </div>
 
     <p id="hint" class="hint">
@@ -50,6 +53,7 @@
       <h2 class="review-title">Does this look right?</h2>
       <p id="review-summary" class="review-summary"></p>
       <ol id="review-steps" class="review-steps"></ol>
+      <pre id="review-script-json" class="review-script-json" hidden></pre>
       <div class="review-actions">
         <button id="confirm-save-btn" type="button" class="btn btn-primary">
           Save macro

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { deriveUrlPattern } from "@/shared/macro-match";
+import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
 
 export const MacroStepTypeSchema = z.enum([
   "click",
@@ -30,6 +31,8 @@ export const MacroSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   description: z.string().optional(),
+  intent: z.string().min(1).optional(),
+  script: MacroScriptSchema.optional(),
   urlPattern: z.string().min(1).optional(),
   runScope: RunScopeSchema.optional(),
   shortcut: z.string().min(1).optional(),
@@ -81,13 +84,15 @@ export function createMacroPreview(
   name: string,
   steps: MacroStep[],
   url: string,
-  description?: string,
+  options?: { description?: string; intent?: string; script?: MacroScript },
 ): Macro {
   const now = Date.now();
   return MacroSchema.parse({
     id: crypto.randomUUID(),
     name,
-    description,
+    description: options?.description,
+    intent: options?.intent,
+    script: options?.script,
     urlPattern: deriveUrlPattern(url),
     createdAt: now,
     updatedAt: now,

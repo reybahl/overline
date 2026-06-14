@@ -1,6 +1,10 @@
 import { getTabUrl } from "@/background/capture";
 import { runAgenticRecord } from "@/background/record";
-import { inferRunScope } from "@/background/worker";
+import {
+  assertRecordingSessionActive,
+  isRecordingCancelledError,
+} from "@/background/recording-session";
+import { compileMacroScript, inferRunScope } from "@/background/worker";
 import {
   clearPendingRecord,
   getPendingRecord,
@@ -52,8 +56,29 @@ async function finishAgenticRecordSession(
       },
     );
 
+    await assertRecordingSessionActive();
+
     const endUrl = await getTabUrl(tabId);
-    const current = await getPendingRecord();
+    let current = await getPendingRecord();
+    if (current?.status === "recording") {
+      await savePendingRecord({
+        ...current,
+        progress: "Compiling generalized script…",
+      });
+    }
+
+    await assertRecordingSessionActive();
+
+    const script = await compileMacroScript(
+      intent,
+      startUrl,
+      endUrl,
+      result.macro.steps,
+    );
+
+    await assertRecordingSessionActive();
+
+    current = await getPendingRecord();
     if (current?.status === "recording") {
       await savePendingRecord({
         ...current,
@@ -61,12 +86,16 @@ async function finishAgenticRecordSession(
       });
     }
 
+    await assertRecordingSessionActive();
+
     const macro = await attachRunScope(
-      result.macro,
+      { ...result.macro, script, intent },
       intent,
       startUrl,
       endUrl,
     );
+
+    await assertRecordingSessionActive();
 
     await savePendingRecord({
       status: "complete",
@@ -76,6 +105,10 @@ async function finishAgenticRecordSession(
       completedAt: Date.now(),
     });
   } catch (error) {
+    if (isRecordingCancelledError(error)) {
+      return;
+    }
+
     await savePendingRecord({
       status: "error",
       intent,

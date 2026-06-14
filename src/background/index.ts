@@ -1,8 +1,9 @@
-import { runMacroSteps } from "@/background/play";
+import { runMacro } from "@/background/play";
 import {
   discardPendingRecordSession,
   startAgenticRecordSession,
 } from "@/background/record-session";
+import { cancelPendingRecordSession } from "@/background/recording-session";
 import { generateMacro } from "@/background/worker";
 import type {
   BackgroundMessage,
@@ -161,7 +162,7 @@ async function handleMessage(
         throw new Error(`"${macro.name}" does not run on this page.`);
       }
 
-      await runMacroSteps(message.tabId, message.steps);
+      await runMacro(message.tabId, macro);
       return { ok: true };
     }
     case "GENERATE_MACRO": {
@@ -187,6 +188,9 @@ async function handleMessage(
     case "CLEAR_PENDING_RECORD":
       await discardPendingRecordSession();
       return { ok: true, pendingRecord: null };
+    case "CANCEL_PENDING_RECORD":
+      await cancelPendingRecordSession();
+      return { ok: true, pendingRecord: await getPendingRecord() };
     default:
       return {
         ok: false,
@@ -234,7 +238,7 @@ async function handleRunMacroById(
     return;
   }
 
-  await runMacroSteps(resolvedTabId, macro.steps);
+  await runMacro(resolvedTabId, macro);
   console.info(`[Patch] Ran macro "${macro.name}" via shortcut`);
 }
 
@@ -251,6 +255,6 @@ async function handleRunMacro(): Promise<void> {
     throw new Error("No macro matches this page. Record one on this URL first.");
   }
 
-  await runMacroSteps(tab.id!, macro.steps);
+  await runMacro(tab.id!, macro);
   console.info(`[Patch] Ran macro "${macro.name}"`);
 }

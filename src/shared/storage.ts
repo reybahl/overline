@@ -1,3 +1,7 @@
+import {
+  migrateMacrosFromStorage,
+  migratePendingRecordRaw,
+} from "@/shared/macro-migrate";
 import { MacrosSchema, type Macro } from "@/shared/types/macro";
 import {
   PendingRecordSchema,
@@ -27,7 +31,13 @@ export async function saveSettings(settings: Settings): Promise<void> {
 export async function getMacros(): Promise<Macro[]> {
   const result = await chrome.storage.local.get(STORAGE_KEYS.macros);
   const raw = result[STORAGE_KEYS.macros];
-  return MacrosSchema.parse(raw ?? []);
+  const { macros, changed } = migrateMacrosFromStorage(raw ?? []);
+
+  if (changed) {
+    await chrome.storage.local.set({ [STORAGE_KEYS.macros]: macros });
+  }
+
+  return MacrosSchema.parse(macros);
 }
 
 export async function saveMacros(macros: Macro[]): Promise<void> {
@@ -42,7 +52,20 @@ export async function getPendingRecord(): Promise<PendingRecord | null> {
     return null;
   }
 
-  return PendingRecordSchema.parse(raw);
+  const { record, changed } = migratePendingRecordRaw(raw);
+  if (changed) {
+    if (record) {
+      await chrome.storage.local.set({ [STORAGE_KEYS.pendingRecord]: record });
+    } else {
+      await chrome.storage.local.remove(STORAGE_KEYS.pendingRecord);
+    }
+  }
+
+  if (!record) {
+    return null;
+  }
+
+  return PendingRecordSchema.parse(record);
 }
 
 export async function savePendingRecord(record: PendingRecord): Promise<void> {

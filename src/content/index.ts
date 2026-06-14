@@ -1,5 +1,7 @@
 import { executeSteps } from "@/content/executor";
+import { executeScript } from "@/content/script-executor";
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
+import { MacroScriptSchema } from "@/shared/types/script";
 
 declare global {
   interface Window {
@@ -32,8 +34,30 @@ function initializeContentScript(): void {
               sendResponse({ ok: false, error: errorMessage });
             });
           return true;
+        case "EXECUTE_SCRIPT": {
+          const script = MacroScriptSchema.parse({
+            version: 1,
+            steps: message.steps,
+          });
+          void executeScript(script)
+            .then(() => {
+              sendResponse({ ok: true });
+            })
+            .catch((error: unknown) => {
+              const errorMessage =
+                error instanceof Error ? error.message : "Failed to run macro";
+              sendResponse({ ok: false, error: errorMessage });
+            });
+          return true;
+        }
         case "RUN_MACRO":
-          void executeSteps(message.macro.steps)
+          void (async () => {
+            if (message.macro.script) {
+              await executeScript(message.macro.script);
+              return;
+            }
+            await executeSteps(message.macro.steps);
+          })()
             .then(() => {
               sendResponse({ ok: true });
             })

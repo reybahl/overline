@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
+import { formatScriptStep } from "@/shared/script-format";
 import {
   eventToShortcut,
   formatShortcutForDisplay,
@@ -355,6 +356,11 @@ export default function App() {
                     Delete
                   </button>
                 </div>
+                {macro.intent ? (
+                  <p className="mt-1 text-sm text-slate-400">
+                    Intent: <span className="text-slate-300">"{macro.intent}"</span>
+                  </p>
+                ) : null}
                 {macro.description ? (
                   <p className="mt-1 text-sm text-slate-400">
                     {macro.description}
@@ -371,10 +377,41 @@ export default function App() {
                   onSaved={setMacros}
                   onError={setShortcutError}
                 />
+                {macro.script ? (
+                  <details className="mt-2" open>
+                    <summary className="cursor-pointer text-sm text-slate-400 hover:text-slate-300">
+                      {macro.script.steps.length} compiled script step
+                      {macro.script.steps.length === 1 ? "" : "s"}
+                    </summary>
+                    <ol className="mt-3 space-y-2 border-t border-slate-800 pt-3">
+                      {macro.script.steps.map((step, index) => (
+                        <li
+                          key={`${macro.id}-script-${index}`}
+                          className="rounded-md bg-indigo-950/40 px-3 py-2 font-mono text-xs text-indigo-100"
+                        >
+                          {formatScriptStep(step, index)}
+                        </li>
+                      ))}
+                    </ol>
+                    <details className="mt-3 border-t border-slate-800 pt-3">
+                      <summary className="cursor-pointer text-xs text-slate-500 hover:text-slate-300">
+                        Raw script JSON
+                      </summary>
+                      <pre className="mt-2 overflow-x-auto rounded-md bg-slate-900 p-3 font-mono text-xs text-slate-300">
+                        {JSON.stringify(macro.script, null, 2)}
+                      </pre>
+                    </details>
+                  </details>
+                ) : null}
                 <details className="mt-2">
                   <summary className="cursor-pointer text-sm text-slate-400 hover:text-slate-300">
-                    {macro.steps.length}{" "}
-                    {macro.steps.length === 1 ? "step" : "steps"}
+                    {macro.script
+                      ? `${macro.steps.length} demo ${
+                          macro.steps.length === 1 ? "step" : "steps"
+                        } (reference)`
+                      : `${macro.steps.length} ${
+                          macro.steps.length === 1 ? "step" : "steps"
+                        }`}
                   </summary>
                   <ol className="mt-3 space-y-2 border-t border-slate-800 pt-3">
                     {macro.steps.map((step, index) => (

@@ -5,6 +5,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
+import { formatScriptStep } from "@/shared/script-format";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { clearPendingRecord, getPendingRecord } from "@/shared/storage";
 import {
@@ -34,8 +35,10 @@ const captureOutputEl = requireElement<HTMLPreElement>("capture-output");
 const reviewPanelEl = requireElement<HTMLElement>("review-panel");
 const reviewSummaryEl = requireElement<HTMLParagraphElement>("review-summary");
 const reviewStepsEl = requireElement<HTMLOListElement>("review-steps");
+const reviewScriptJsonEl = requireElement<HTMLPreElement>("review-script-json");
 const confirmSaveBtn = requireElement<HTMLButtonElement>("confirm-save-btn");
 const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
+const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
 const optionsLink = requireElement<HTMLAnchorElement>("options-link");
 
 const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
@@ -81,12 +84,14 @@ function isRecordingChannelError(error: unknown): boolean {
 function applyPendingRecord(record: PendingRecord | null): void {
   if (!record) {
     stopPendingRecordPoll();
+    setRecordingUi(false);
     return;
   }
 
   switch (record.status) {
     case "recording":
       setBusy(true);
+      setRecordingUi(true);
       setStatus(
         record.progress ??
           "Recording… the popup can close while Patch keeps working.",
@@ -96,12 +101,14 @@ function applyPendingRecord(record: PendingRecord | null): void {
     case "complete":
       stopPendingRecordPoll();
       setBusy(false);
+      setRecordingUi(false);
       showReview(record.macro, record.reasoning);
       setStatus("Review the recorded steps below.");
       return;
     case "error":
       stopPendingRecordPoll();
       setBusy(false);
+      setRecordingUi(false);
       hideReview();
       setStatus(record.error, true);
       return;
@@ -127,6 +134,10 @@ function setBusy(disabled: boolean): void {
   discardBtn.toggleAttribute("disabled", disabled);
 }
 
+function setRecordingUi(isRecording: boolean): void {
+  cancelRecordBtn.hidden = !isRecording;
+}
+
 function formatStep(step: MacroStep, index: number): string {
   const parts = [`${index + 1}. ${step.type}`];
   if (step.selector) parts.push(step.selector);
@@ -139,6 +150,8 @@ function hideReview(): void {
   reviewPanelEl.hidden = true;
   reviewSummaryEl.textContent = "";
   reviewStepsEl.replaceChildren();
+  reviewScriptJsonEl.hidden = true;
+  reviewScriptJsonEl.textContent = "";
 }
 
 function showReview(macro: Macro, reasoning: string[] = []): void {
@@ -146,19 +159,55 @@ function showReview(macro: Macro, reasoning: string[] = []): void {
   const scopeSummary = macro.runScope
     ? ` · Runs on: ${macro.runScope.description}`
     : "";
-  reviewSummaryEl.textContent = `"${macro.name}" — ${macro.steps.length} ${
-    macro.steps.length === 1 ? "step" : "steps"
-  }${scopeSummary}${
+  const scriptSummary = macro.script
+    ? ` · ${macro.script.steps.length} compiled step${
+        macro.script.steps.length === 1 ? "" : "s"
+      }`
+    : "";
+  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${scopeSummary}${
     reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""
   }`;
 
-  reviewStepsEl.replaceChildren(
-    ...macro.steps.map((step, index) => {
-      const item = document.createElement("li");
-      item.textContent = formatStep(step, index);
-      return item;
-    }),
-  );
+  reviewStepsEl.replaceChildren();
+
+  if (macro.intent) {
+    const intentItem = document.createElement("li");
+    intentItem.textContent = `Intent: "${macro.intent}"`;
+    reviewStepsEl.appendChild(intentItem);
+  }
+
+  if (macro.script) {
+    const scriptLabel = document.createElement("li");
+    scriptLabel.textContent = "Compiled script (runs on play):";
+    reviewStepsEl.appendChild(scriptLabel);
+
+    reviewStepsEl.append(
+      ...macro.script.steps.map((step, index) => {
+        const item = document.createElement("li");
+        item.textContent = formatScriptStep(step, index);
+        return item;
+      }),
+    );
+  }
+
+  if (macro.script) {
+    reviewScriptJsonEl.textContent = JSON.stringify(macro.script, null, 2);
+    reviewScriptJsonEl.hidden = false;
+  }
+
+  if (macro.steps.length > 0) {
+    const demoLabel = document.createElement("li");
+    demoLabel.textContent = "Demo path (reference):";
+    reviewStepsEl.appendChild(demoLabel);
+
+    reviewStepsEl.append(
+      ...macro.steps.map((step, index) => {
+        const item = document.createElement("li");
+        item.textContent = formatStep(step, index);
+        return item;
+      }),
+    );
+  }
 
   reviewPanelEl.hidden = false;
 }
@@ -221,7 +270,13 @@ async function refreshMacroSelect(preferredMacroId?: string): Promise<void> {
   for (const macro of options) {
     const option = document.createElement("option");
     option.value = macro.id;
-    option.textContent = `${macro.name} (${macro.steps.length} steps)`;
+    option.textContent = `${macro.name}${
+      macro.script
+        ? ` · ${macro.script.steps.length} script step${
+            macro.script.steps.length === 1 ? "" : "s"
+          }`
+        : ` (${macro.steps.length} steps)`
+    }`;
     macroSelect.appendChild(option);
   }
 
@@ -387,6 +442,27 @@ function handleDiscard(): void {
   });
 }
 
+async function handleCancelRecording(): Promise<void> {
+  stopPendingRecordPoll();
+  setBusy(false);
+  setRecordingUi(false);
+
+  try {
+    const response = await sendBackgroundMessage({
+      type: "CANCEL_PENDING_RECORD",
+    });
+    if (!response.ok) {
+      throw new Error(response.error);
+    }
+    applyPendingRecord(response.pendingRecord ?? null);
+    setStatus("Recording cancelled.");
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to cancel recording";
+    setStatus(message, true);
+  }
+}
+
 async function handleGenerateMacro(): Promise<void> {
   setBusy(true);
 
@@ -451,7 +527,6 @@ async function handleRunMacro(): Promise<void> {
       type: "EXECUTE_MACRO",
       tabId,
       macroId: macro.id,
-      steps: macro.steps,
     });
 
     if (!response?.ok) {
@@ -490,6 +565,10 @@ confirmSaveBtn.addEventListener("click", () => {
 
 discardBtn.addEventListener("click", () => {
   handleDiscard();
+});
+
+cancelRecordBtn.addEventListener("click", () => {
+  void handleCancelRecording();
 });
 
 optionsLink.addEventListener("click", (event) => {
