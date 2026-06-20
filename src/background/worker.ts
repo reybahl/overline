@@ -3,6 +3,10 @@ import { generateObject } from "ai";
 import type { z } from "zod";
 
 import type { DomElement } from "@/content/dom-capture";
+import {
+  buildDemoElementHints,
+  sanitizeCompiledScript,
+} from "@/shared/script-sanitize";
 import { getLlmEnv } from "@/shared/env";
 import { createLogger } from "@/shared/logger";
 import { DEFAULT_SCRIPT_WAIT_FOR_MS } from "@/shared/timing";
@@ -19,8 +23,10 @@ import {
   type RunScope,
 } from "@/shared/types/macro";
 
-const PRIMARY_MODEL = "gpt-oss-20b";
-const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+const FALLBACK_MODEL = "llama-3.1-8b-instant";
+
+/** Models tried after VITE_GROQ_MODEL; invalid ids are skipped. */
+const EXTRA_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] as const;
 
 const log = createLogger("llm");
 
@@ -105,14 +111,17 @@ function buildCompileScriptPrompt(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
+  referenceElements: DomElement[],
 ): string {
+  const demoHints = buildDemoElementHints(demoSteps, referenceElements);
+
   return [
     "You compile a browser automation demo into a generalized click-based script that runs deterministically on similar pages.",
     "",
     `User intent: "${intent}"`,
     `Recording started on: ${startUrl}`,
     `Recording ended on: ${endUrl}`,
-    `Demo steps (brittle — do not copy ids or instance-specific selectors): ${JSON.stringify(
+    `Demo steps (brittle — do not copy unstable ids): ${JSON.stringify(
       demoSteps.map((step) => ({
         type: step.type,
         selector: step.selector,
@@ -120,7 +129,22 @@ function buildCompileScriptPrompt(
       })),
     )}`,
     "",
+    "Demo steps resolved against reference DOM (USE THIS — do not invent fields):",
+    JSON.stringify(demoHints, null, 2),
+    "",
+    "Reference DOM at compile time (only use values that appear here):",
+    JSON.stringify(referenceElements, null, 2),
+    "",
     "Return a script with version 1 and an ordered steps array.",
+    "",
+    "Anti-hallucination rules (critical):",
+    "- NEVER put ariaLabel in a match unless resolvedElement.ariaLabel or reference DOM ariaLabel is non-empty for that control",
+    "- If a control only has text (ariaLabel empty), use match.text — NOT match.ariaLabel",
+    "- NEVER invent id, testId, ariaLabel, or text that is not shown in reference DOM or demo hints",
+    "- Duplicate visible labels (e.g. two \"Code\" controls): use tag + text + controlKind — nav-tab is role link on #code-tab, dropdown is tag button with controlKind dropdown-trigger",
+    "- For dropdown/menu intents: click tag button with text, NOT #code-tab and NOT ariaLabel unless present in DOM",
+    "- waitFor must target the NEXT menu item or panel content you will click — NOT the same match as the dropdown trigger you just clicked",
+    "- Only add script steps that correspond to demo actions or intent clauses you can ground in reference DOM",
     "",
     "Critical: the script must implement EVERY part of the user intent, in order.",
     "If the intent says \"go to issues, then click the latest issue\", the script must have:",
@@ -131,30 +155,28 @@ function buildCompileScriptPrompt(
     "Allowed step types (clicks only — no navigate steps):",
     '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
     "  · index 0 = first matching element (use for latest/first/top item in a list after reaching the list page).",
-    "  · id: stable element id when demo used #issues-tab → id \"issues-tab\" (same across repos on a site).",
+    "  · id: ONLY when idStable is true in reference DOM (e.g. issues-tab). Never use unstable React ids (_R_…).",
     "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",
-    "  · testId: data-testid when stable in the demo (e.g. issue-pr-title-link).",
-    "  · For repo/section tabs, prefer match.id (from demo #issues-tab), then ariaLabel, then text",
-    "  · For dropdown/menu intents, prefer tag button + text or ariaLabel, not nav-tab ids like code-tab",
-    "  · Use controlKind from the demo when generalizing: dropdown-trigger → button with hasPopup/expanded, nav-tab → tab link",
+    "  · testId: data-testid when present in reference DOM.",
+    "  · Match priority: stable id > testId > ariaLabel (if non-empty in DOM) > text > hrefPattern",
+    "  · For repo section tabs: match.id from stable ids like issues-tab",
+    "  · For dropdown triggers: match.tag \"button\" + match.text from reference DOM",
     '- fill: { type: "fill", label?, match: {...}, value: "..." }',
     '- wait: { type: "wait", label?, ms: 500 }',
     `- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: ${DEFAULT_SCRIPT_WAIT_FOR_MS} }`,
     "",
     "Reliability (required for multi-step flows):",
-    "- After any click that navigates to a new page or section, insert a waitFor before the next click",
-    "- Use the same match as the upcoming click (or a distinctive element on the target page)",
-    `- Prefer click → waitFor → click rather than back-to-back clicks; use timeoutMs ${DEFAULT_SCRIPT_WAIT_FOR_MS} on slow networks`,
+    "- After opening a dropdown or panel, insert waitFor for the NEXT click target (e.g. CLI tab), not the trigger button",
+    `- Prefer click → waitFor → click; use timeoutMs ${DEFAULT_SCRIPT_WAIT_FOR_MS}`,
     "",
     "Rules:",
     "- Never emit navigate steps — click links and buttons instead",
-    "- One script step per logical intent clause (\"go to X\" then \"click Y\" → at least 2 steps)",
+    "- One script step per logical intent clause",
     "- Generalize: strip instance-specific issue/PR numbers unless the intent names them",
-    "- For latest/first/top item: navigate to the list first, then click with index 0 and hrefPattern or testId that matches list rows only",
-    "- Never use hrefContains \"/issues/\" alone for the final click — it matches nav and sidebar. Use hrefPattern \"/issues/\\\\d+\" or a stable testId from the demo",
-    "- Labels must describe the intent part (e.g. \"Open Issues tab\", \"Click first issue in list\")",
+    "- Never use hrefContains \"/issues/\" alone for the final click — use hrefPattern \"/issues/\\\\d+\"",
+    "- Labels must describe the intent part",
     "- Keep the script minimal",
-    "- Each match object must include at least one matching criterion",
+    "- Each match object must include at least one matching criterion that exists in reference DOM",
   ].join("\n");
 }
 
@@ -169,7 +191,7 @@ async function generateObjectWithModels<T>(
     );
   }
 
-  const models = [...new Set([env.model, PRIMARY_MODEL, FALLBACK_MODEL])];
+  const models = [...new Set([env.model, ...EXTRA_MODELS, FALLBACK_MODEL])];
   let lastError: unknown;
 
   for (const model of models) {
@@ -238,9 +260,20 @@ export async function compileMacroScript(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
+  referenceElements: DomElement[],
 ): Promise<MacroScript> {
-  const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
-  return generateObjectWithModels<MacroScript>(MacroScriptSchema, prompt);
+  const prompt = buildCompileScriptPrompt(
+    intent,
+    startUrl,
+    endUrl,
+    demoSteps,
+    referenceElements,
+  );
+  const script = await generateObjectWithModels<MacroScript>(
+    MacroScriptSchema,
+    prompt,
+  );
+  return sanitizeCompiledScript(script, referenceElements, demoSteps);
 }
 
 function buildRunScopePrompt(
@@ -309,7 +342,7 @@ export async function generateMacro(
   }
 
   const prompt = buildSingleShotPrompt(intent, elements, url);
-  const models = [...new Set([env.model, PRIMARY_MODEL, FALLBACK_MODEL])];
+  const models = [...new Set([env.model, ...EXTRA_MODELS, FALLBACK_MODEL])];
   let lastError: unknown;
 
   for (const model of models) {
