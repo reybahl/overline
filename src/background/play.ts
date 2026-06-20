@@ -7,6 +7,26 @@ import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/scrip
 
 const log = createLogger("play");
 
+/**
+ * Bring the target tab to the foreground before playback. Many interactions
+ * (clipboard writes, focus-dependent widgets) only work when the tab is the
+ * active tab in a focused window, mirroring what a real user would have.
+ */
+async function focusTabForPlayback(tabId: number): Promise<void> {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    await chrome.tabs.update(tabId, { active: true });
+    if (typeof tab.windowId === "number") {
+      await chrome.windows.update(tab.windowId, { focused: true });
+    }
+  } catch (error) {
+    log.warn("failed to focus tab before playback", {
+      tabId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 function stepNeedsElement(step: MacroStep): boolean {
   return (
     (step.type === "click" ||
@@ -142,6 +162,8 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
   });
 
   try {
+    await focusTabForPlayback(tabId);
+
     if (macro.script) {
       await runMacroScript(tabId, macro.script);
     } else {

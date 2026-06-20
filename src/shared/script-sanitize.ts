@@ -2,8 +2,6 @@ import type { DomElement } from "@/content/dom-capture";
 import type { MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 import {
-  findCopyControl,
-  isCopyIntentLabel,
   normalizeElementId,
   normalizeElementMatch,
 } from "@/shared/script-match";
@@ -196,13 +194,6 @@ export function sanitizeCompiledScript(
 
     let match = sanitizeMatch(elements, step.match);
 
-    if (step.type === "click" && isCopyIntentLabel(step.label)) {
-      const copyEl = findCopyControl(elements);
-      if (copyEl) {
-        match = deriveMatchFromElement(copyEl);
-      }
-    }
-
     if (step.type === "click" && demoClickIndex < demoSteps.length) {
       const demo = demoSteps[demoClickIndex];
       demoClickIndex += 1;
@@ -219,30 +210,16 @@ export function sanitizeCompiledScript(
     }
 
     if (step.type === "waitFor" && index > 0) {
-      const nextClick = script.steps
-        .slice(index + 1)
-        .find(
-          (entry): entry is Extract<ScriptStep, { type: "click" }> =>
-            entry.type === "click",
-        );
-
-      if (nextClick && isCopyIntentLabel(nextClick.label)) {
-        const copyEl = findCopyControl(elements);
-        if (copyEl) {
-          match = deriveMatchFromElement(copyEl);
-        }
-      }
-
       const previous = script.steps[index - 1];
       if (previous.type === "click" && matchesEqual(previous.match, match)) {
+        const nextClick = script.steps
+          .slice(index + 1)
+          .find(
+            (entry): entry is Extract<ScriptStep, { type: "click" }> =>
+              entry.type === "click",
+          );
         if (nextClick) {
           match = sanitizeMatch(elements, nextClick.match);
-          if (isCopyIntentLabel(nextClick.label)) {
-            const copyEl = findCopyControl(elements);
-            if (copyEl) {
-              match = deriveMatchFromElement(copyEl);
-            }
-          }
         }
       }
     }

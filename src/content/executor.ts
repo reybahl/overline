@@ -1,5 +1,4 @@
 import type { MacroStep } from "@/shared/types/macro";
-import { performCopyAction } from "@/content/clipboard";
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
@@ -58,11 +57,6 @@ async function executeStep(step: MacroStep): Promise<void> {
   switch (step.type) {
     case "click": {
       const element = requireElement(requireSelector(step.selector));
-      const tag = element.tagName.toLowerCase();
-      if (tag === "clipboard-copy" || element.hasAttribute("data-copy")) {
-        await performCopyAction(element);
-        return;
-      }
       element.click();
       return;
     }

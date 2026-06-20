@@ -1,14 +1,6 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
-import {
-  isVisible,
-  performCopyAction,
-  pickBestCopyCandidate,
-  scoreCopyCandidate,
-} from "@/content/clipboard";
-import {
-  isCopyIntentLabel,
-  normalizeElementMatch,
-} from "@/shared/script-match";
+import { isVisible } from "@/content/visibility";
+import { normalizeElementMatch } from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
 import {
   DEFAULT_SCRIPT_WAIT_FOR_MS,
@@ -179,11 +171,6 @@ function findMatchingElements(match: ElementMatch): HTMLElement[] {
     }
   }
 
-  if (criteria.tag === "clipboard-copy" || criteria.ariaLabel?.match(/\bcopy\b/i)) {
-    const best = pickBestCopyCandidate(matches);
-    return best ? [best] : matches.filter(isVisible);
-  }
-
   return matches.filter(isVisible);
 }
 
@@ -232,120 +219,10 @@ async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<voi
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
-function deriveRuntimeCopyMatch(): ElementMatch | null {
-  const ghCliCopy = document.querySelector(
-    'clipboard-copy[for="clone-with-gh-cli"]',
-  );
-  if (ghCliCopy instanceof HTMLElement && isVisible(ghCliCopy)) {
-    const ariaLabel = ghCliCopy.getAttribute("aria-label")?.trim();
-    return ariaLabel
-      ? { tag: "clipboard-copy", ariaLabel }
-      : { tag: "clipboard-copy", text: "Copy" };
-  }
-
-  const candidates = document.querySelectorAll(
-    "clipboard-copy, [data-copy], button[aria-label], [title]",
-  );
-  const copyControls: HTMLElement[] = [];
-
-  for (const candidate of candidates) {
-    if (!(candidate instanceof HTMLElement) || !isVisible(candidate)) {
-      continue;
-    }
-
-    const ariaLabel = candidate.getAttribute("aria-label")?.trim() ?? "";
-    const title = candidate.getAttribute("title")?.trim() ?? "";
-    const label = ariaLabel || title;
-
-    if (!/\b(copy|clipboard)\b/i.test(`${label} ${getVisibleText(candidate)}`)) {
-      continue;
-    }
-
-    copyControls.push(candidate);
-  }
-
-  const best = pickBestCopyCandidate(copyControls);
-  if (!best) {
-    return null;
-  }
-
-  const tag = best.tagName.toLowerCase();
-  const ariaLabel = best.getAttribute("aria-label")?.trim() ?? "";
-  if (tag === "clipboard-copy") {
-    return ariaLabel
-      ? { tag: "clipboard-copy", ariaLabel }
-      : { tag: "clipboard-copy", text: getVisibleText(best) || "Copy" };
-  }
-
-  return ariaLabel
-    ? { tag: "button", ariaLabel }
-    : { tag: "button", text: best.getAttribute("title")?.trim() ?? "Copy" };
-}
-
-function looksLikeCloneInputMatch(match: ElementMatch): boolean {
-  const normalized = normalizeElementMatch(match);
-  return (
-    normalized.tag === "input" ||
-    normalized.id?.includes("clone") === true ||
-    normalized.id?.includes("gh-cli") === true
-  );
-}
-
-function resolveStepMatch(step: ScriptStep, nextStep?: ScriptStep): ElementMatch {
-  if (step.type !== "click" && step.type !== "waitFor") {
-    throw new Error("resolveStepMatch called for non-interactive step");
-  }
-
-  const match = normalizeElementMatch(step.match);
-  const copyLabel =
-    step.label ?? (nextStep?.type === "click" ? nextStep.label : undefined);
-  const shouldPreferCopyButton =
-    isCopyIntentLabel(copyLabel) || step.type === "waitFor";
-
-  if (shouldPreferCopyButton && looksLikeCloneInputMatch(match)) {
-    const runtimeCopy = deriveRuntimeCopyMatch();
-    if (runtimeCopy) {
-      return runtimeCopy;
-    }
-  }
-
-  return match;
-}
-
-function shouldUseCopyAction(step: ScriptStep, match: ElementMatch): boolean {
-  if (step.type !== "click") {
-    return false;
-  }
-
-  return (
-    isCopyIntentLabel(step.label) ||
-    match.tag === "clipboard-copy" ||
-    looksLikeCloneInputMatch(match)
-  );
-}
-
-async function executeScriptStep(
-  step: ScriptStep,
-  nextStep?: ScriptStep,
-): Promise<void> {
+async function executeScriptStep(step: ScriptStep): Promise<void> {
   switch (step.type) {
     case "click": {
-      const match = resolveStepMatch(step, nextStep);
-      const element = requireElement(match, step.index ?? 0);
-      log.info("click step", {
-        label: step.label,
-        tag: element.tagName.toLowerCase(),
-        ariaLabel: element.getAttribute("aria-label"),
-        forAttr: element.getAttribute("for"),
-        score: scoreCopyCandidate(element),
-      });
-
-      if (shouldUseCopyAction(step, match)) {
-        await performCopyAction(element);
-        return;
-      }
-
-      element.click();
+      requireElement(normalizeElementMatch(step.match), step.index ?? 0).click();
       return;
     }
     case "fill": {
@@ -358,7 +235,7 @@ async function executeScriptStep(
     }
     case "waitFor": {
       await waitForMatch(
-        resolveStepMatch(step, nextStep),
+        normalizeElementMatch(step.match),
         step.timeoutMs ?? DEFAULT_SCRIPT_WAIT_FOR_MS,
       );
       return;
@@ -373,9 +250,8 @@ async function executeScriptStep(
 export async function executeScript(script: MacroScript): Promise<void> {
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
-    const nextStep = script.steps[i + 1];
     try {
-      await executeScriptStep(step, nextStep);
+      await executeScriptStep(step);
     } catch (error) {
       log.error("step failed", {
         step: `${i + 1}/${script.steps.length}`,

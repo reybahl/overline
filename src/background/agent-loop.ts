@@ -11,6 +11,9 @@ import {
 
 const DEFAULT_MAX_TURNS = 15;
 
+/** How many times the agent may re-propose the same step before we stop. */
+const MAX_CONSECUTIVE_REPEATS = 2;
+
 export type AgentLoopOptions = {
   intent: string;
   tabId: number;
@@ -76,6 +79,7 @@ export async function runAgentLoop(
   const reasoning: string[] = [];
   let lastError: string | undefined;
   let macroName: string | undefined;
+  let consecutiveRepeats = 0;
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
     await assertRecordingSessionActive();
@@ -126,10 +130,23 @@ export async function runAgentLoop(
     }
 
     if (isRepeatedStep(stepsTaken, turnResult.step)) {
-      throw new Error(
-        "Recording got stuck repeating the same step. Try a simpler intent.",
-      );
+      consecutiveRepeats += 1;
+
+      if (consecutiveRepeats >= MAX_CONSECUTIVE_REPEATS) {
+        reasoning.push(
+          "Stopped recording: the same step was proposed repeatedly with no visible effect.",
+        );
+        break;
+      }
+
+      lastError =
+        "That step matches the one you just took and the page state is unchanged. " +
+        "Check the state fields (selected/pressed/checked/expanded) — if the target is already active, " +
+        "move on to the next part of the intent or set done: true. Otherwise pick a different element.";
+      continue;
     }
+
+    consecutiveRepeats = 0;
 
     const step = toRecordedStep(turnResult.step);
     stepsTaken.push(step);

@@ -1,4 +1,4 @@
-import { isVisible } from "@/content/clipboard";
+import { isVisible } from "@/content/visibility";
 
 const INTERACTIVE_SELECTOR = [
   "button",
@@ -7,7 +7,6 @@ const INTERACTIVE_SELECTOR = [
   "select",
   "textarea",
   "clipboard-copy",
-  '[data-copy]',
   '[role="button"]',
   '[role="tab"]',
   '[role="menuitem"]',
@@ -73,6 +72,12 @@ export type DomElement = {
   controlKind?: string;
   expanded?: boolean;
   hasPopup?: string;
+  /** aria-selected — true once a tab/option is active. */
+  selected?: boolean;
+  /** aria-pressed — true for an engaged toggle button. */
+  pressed?: boolean;
+  /** checked state for checkboxes/radios/aria-checked. */
+  checked?: boolean;
 };
 
 function escapeAttr(value: string): string {
@@ -125,14 +130,6 @@ function getPlaceholder(el: Element): string {
     return el.placeholder?.trim() ?? "";
   }
   return "";
-}
-
-function isCopyControl(text: string, ariaLabel: string, tag: string): boolean {
-  if (tag === "clipboard-copy") {
-    return true;
-  }
-  const combined = `${text} ${ariaLabel}`.toLowerCase();
-  return /\b(copy|clipboard)\b/.test(combined);
 }
 
 function hasMeaningfulLabel(
@@ -196,17 +193,7 @@ function getRole(el: Element): string {
   return tag;
 }
 
-function inferControlKind(
-  el: Element,
-  role: string,
-  text: string,
-  ariaLabel: string,
-): string | undefined {
-  const tag = el.tagName.toLowerCase();
-
-  if (isCopyControl(text, ariaLabel, tag) || el.hasAttribute("data-copy")) {
-    return "copy-button";
-  }
+function inferControlKind(el: Element, role: string): string | undefined {
   const hasPopup = el.getAttribute("aria-haspopup");
   const expanded = el.getAttribute("aria-expanded");
 
@@ -304,8 +291,8 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
   return null;
 }
 
-function readExpanded(el: Element): boolean | undefined {
-  const value = el.getAttribute("aria-expanded");
+function readAriaBoolean(el: Element, attr: string): boolean | undefined {
+  const value = el.getAttribute(attr);
   if (value === "true") {
     return true;
   }
@@ -315,9 +302,31 @@ function readExpanded(el: Element): boolean | undefined {
   return undefined;
 }
 
+function readExpanded(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-expanded");
+}
+
 function readHasPopup(el: Element): string | undefined {
   const value = el.getAttribute("aria-haspopup")?.trim();
   return value || undefined;
+}
+
+function readSelected(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-selected");
+}
+
+function readPressed(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-pressed");
+}
+
+function readChecked(el: Element): boolean | undefined {
+  if (
+    el instanceof HTMLInputElement &&
+    (el.type === "checkbox" || el.type === "radio")
+  ) {
+    return el.checked;
+  }
+  return readAriaBoolean(el, "aria-checked");
 }
 
 export function captureDom(): DomElement[] {
@@ -353,9 +362,12 @@ export function captureDom(): DomElement[] {
       continue;
     }
 
-    const controlKind = inferControlKind(element, role, text, ariaLabel);
+    const controlKind = inferControlKind(element, role);
     const expanded = readExpanded(element);
     const hasPopup = readHasPopup(element);
+    const selected = readSelected(element);
+    const pressed = readPressed(element);
+    const checked = readChecked(element);
 
     results.push({
       tag,
@@ -368,6 +380,9 @@ export function captureDom(): DomElement[] {
       ...(controlKind ? { controlKind } : {}),
       ...(expanded !== undefined ? { expanded } : {}),
       ...(hasPopup ? { hasPopup } : {}),
+      ...(selected !== undefined ? { selected } : {}),
+      ...(pressed !== undefined ? { pressed } : {}),
+      ...(checked !== undefined ? { checked } : {}),
     });
   }
 
