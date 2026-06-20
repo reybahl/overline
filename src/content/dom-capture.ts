@@ -1,9 +1,13 @@
+import { isVisible } from "@/content/clipboard";
+
 const INTERACTIVE_SELECTOR = [
   "button",
   "a",
   "input",
   "select",
   "textarea",
+  "clipboard-copy",
+  '[data-copy]',
   '[role="button"]',
   '[role="tab"]',
   '[role="menuitem"]',
@@ -21,6 +25,7 @@ const INTERACTIVE_TAGS = new Set([
   "input",
   "select",
   "textarea",
+  "clipboard-copy",
 ]);
 
 const INTERACTIVE_ROLES = new Set([
@@ -75,38 +80,44 @@ function escapeAttr(value: string): string {
 }
 
 function isHidden(el: Element): boolean {
-  if (!(el instanceof HTMLElement)) {
-    return true;
-  }
-
-  if (el.hidden) {
-    return true;
-  }
-
   if (el instanceof HTMLInputElement && el.type === "hidden") {
     return true;
   }
 
-  if (el.getAttribute("aria-hidden") === "true") {
-    return true;
-  }
-
-  const style = window.getComputedStyle(el);
-  if (
-    style.display === "none" ||
-    style.visibility === "hidden" ||
-    Number.parseFloat(style.opacity) === 0
-  ) {
-    return true;
-  }
-
-  const rect = el.getBoundingClientRect();
-  return rect.width === 0 && rect.height === 0;
+  return !isVisible(el);
 }
 
 function getText(el: Element): string {
   const text = (el as HTMLElement).innerText ?? el.textContent ?? "";
   return text.trim().replace(/\s+/g, " ").slice(0, 200);
+}
+
+function getAccessibleName(el: Element): string {
+  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
+  if (ariaLabel) {
+    return ariaLabel;
+  }
+
+  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
+  if (labelledBy) {
+    const labelText = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+      .filter(Boolean)
+      .join(" ");
+    if (labelText) {
+      return labelText;
+    }
+  }
+
+  return el.getAttribute("title")?.trim() ?? "";
+}
+
+function getFieldValue(el: Element): string {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.value?.trim() ?? "";
+  }
+  return "";
 }
 
 function getPlaceholder(el: Element): string {
@@ -116,12 +127,26 @@ function getPlaceholder(el: Element): string {
   return "";
 }
 
+function isCopyControl(text: string, ariaLabel: string, tag: string): boolean {
+  if (tag === "clipboard-copy") {
+    return true;
+  }
+  const combined = `${text} ${ariaLabel}`.toLowerCase();
+  return /\b(copy|clipboard)\b/.test(combined);
+}
+
 function hasMeaningfulLabel(
   text: string,
   ariaLabel: string,
   placeholder: string,
+  fieldValue = "",
 ): boolean {
-  return text.length > 0 || ariaLabel.length > 0 || placeholder.length > 0;
+  return (
+    text.length > 0 ||
+    ariaLabel.length > 0 ||
+    placeholder.length > 0 ||
+    fieldValue.length > 0
+  );
 }
 
 function getStableHref(anchor: HTMLAnchorElement): string | null {
@@ -164,11 +189,24 @@ function getRole(el: Element): string {
     }
     return "textbox";
   }
+  if (tag === "clipboard-copy") {
+    return "button";
+  }
 
   return tag;
 }
 
-function inferControlKind(el: Element, role: string): string | undefined {
+function inferControlKind(
+  el: Element,
+  role: string,
+  text: string,
+  ariaLabel: string,
+): string | undefined {
+  const tag = el.tagName.toLowerCase();
+
+  if (isCopyControl(text, ariaLabel, tag) || el.hasAttribute("data-copy")) {
+    return "copy-button";
+  }
   const hasPopup = el.getAttribute("aria-haspopup");
   const expanded = el.getAttribute("aria-expanded");
 
@@ -220,6 +258,33 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
       selector: `[aria-label="${escapeAttr(ariaLabel)}"]`,
       idStable: true,
     };
+  }
+
+  const title = el.getAttribute("title")?.trim();
+  if (title) {
+    const tag = el.tagName.toLowerCase();
+    return {
+      selector: `${tag}[title="${escapeAttr(title)}"]`,
+      idStable: true,
+    };
+  }
+
+  const tag = el.tagName.toLowerCase();
+  if (tag === "clipboard-copy") {
+    const forAttr = el.getAttribute("for")?.trim();
+    if (forAttr) {
+      return {
+        selector: `clipboard-copy[for="${escapeAttr(forAttr)}"]`,
+        idStable: isStableId(forAttr),
+      };
+    }
+    const value = el.getAttribute("value")?.trim();
+    if (value) {
+      return {
+        selector: `clipboard-copy[value="${escapeAttr(value.slice(0, 80))}"]`,
+        idStable: false,
+      };
+    }
   }
 
   if (el instanceof HTMLAnchorElement) {
@@ -279,15 +344,16 @@ export function captureDom(): DomElement[] {
     }
 
     const tag = element.tagName.toLowerCase();
-    const text = getText(element);
-    const ariaLabel = element.getAttribute("aria-label")?.trim() ?? "";
+    const fieldValue = getFieldValue(element);
+    const text = getText(element) || fieldValue.slice(0, 200);
+    const ariaLabel = getAccessibleName(element);
     const placeholder = getPlaceholder(element);
 
-    if (!hasMeaningfulLabel(text, ariaLabel, placeholder)) {
+    if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue)) {
       continue;
     }
 
-    const controlKind = inferControlKind(element, role);
+    const controlKind = inferControlKind(element, role, text, ariaLabel);
     const expanded = readExpanded(element);
     const hasPopup = readHasPopup(element);
 

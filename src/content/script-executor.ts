@@ -1,4 +1,14 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import {
+  isVisible,
+  performCopyAction,
+  pickBestCopyCandidate,
+  scoreCopyCandidate,
+} from "@/content/clipboard";
+import {
+  isCopyIntentLabel,
+  normalizeElementMatch,
+} from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
 import {
   DEFAULT_SCRIPT_WAIT_FOR_MS,
@@ -10,7 +20,8 @@ const log = createLogger("script");
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
-const INTERACTIVE_SELECTOR = "a, button, input, select, textarea";
+const INTERACTIVE_SELECTOR =
+  "a, button, input, select, textarea, clipboard-copy";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -19,25 +30,7 @@ function delay(ms: number): Promise<void> {
 }
 
 function isHidden(el: Element): boolean {
-  if (!(el instanceof HTMLElement)) {
-    return true;
-  }
-
-  if (el.hidden || el.getAttribute("aria-hidden") === "true") {
-    return true;
-  }
-
-  const style = window.getComputedStyle(el);
-  if (
-    style.display === "none" ||
-    style.visibility === "hidden" ||
-    Number.parseFloat(style.opacity) === 0
-  ) {
-    return true;
-  }
-
-  const rect = el.getBoundingClientRect();
-  return rect.width === 0 && rect.height === 0;
+  return !isVisible(el);
 }
 
 function getVisibleText(el: Element): string {
@@ -101,73 +94,77 @@ function matchesText(el: Element, expected: string): boolean {
 }
 
 function matchesElement(el: Element, match: ElementMatch): boolean {
+  const criteria = normalizeElementMatch(match);
+
   if (!(el instanceof HTMLElement) || isHidden(el)) {
     return false;
   }
 
-  if (match.id && el.id !== match.id) {
+  if (criteria.id && el.id !== criteria.id) {
     return false;
   }
 
-  if (match.tag && el.tagName.toLowerCase() !== match.tag) {
+  if (criteria.tag && el.tagName.toLowerCase() !== criteria.tag) {
     return false;
   }
 
-  if (match.ariaLabel) {
+  if (criteria.ariaLabel) {
     const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-    if (ariaLabel !== match.ariaLabel) {
+    if (ariaLabel !== criteria.ariaLabel) {
       return false;
     }
   }
 
-  if (match.text && !matchesText(el, match.text)) {
+  if (criteria.text && !matchesText(el, criteria.text)) {
     return false;
   }
 
-  if (match.textContains && !getVisibleText(el).includes(match.textContains)) {
+  if (criteria.textContains && !getVisibleText(el).includes(criteria.textContains)) {
     return false;
   }
 
-  if (match.testId && getTestId(el) !== match.testId) {
+  if (criteria.testId && getTestId(el) !== criteria.testId) {
     return false;
   }
 
   const href = getHref(el);
   const resolvedHref = getResolvedHref(el);
 
-  if (match.hrefSuffix && !href.endsWith(match.hrefSuffix)) {
+  if (criteria.hrefSuffix && !href.endsWith(criteria.hrefSuffix)) {
     return false;
   }
 
-  if (match.hrefContains && !href.includes(match.hrefContains)) {
+  if (criteria.hrefContains && !href.includes(criteria.hrefContains)) {
     return false;
   }
 
   if (
-    match.hrefPattern &&
-    !matchesHrefPattern(href, resolvedHref, match.hrefPattern)
+    criteria.hrefPattern &&
+    !matchesHrefPattern(href, resolvedHref, criteria.hrefPattern)
   ) {
     return false;
   }
 
   const hasCriteria =
-    match.id ||
-    match.tag ||
-    match.ariaLabel ||
-    match.text ||
-    match.textContains ||
-    match.hrefSuffix ||
-    match.hrefContains ||
-    match.hrefPattern ||
-    match.testId;
+    criteria.id ||
+    criteria.tag ||
+    criteria.ariaLabel ||
+    criteria.text ||
+    criteria.textContains ||
+    criteria.hrefSuffix ||
+    criteria.hrefContains ||
+    criteria.hrefPattern ||
+    criteria.testId;
 
   return Boolean(hasCriteria);
 }
 
 function findMatchingElements(match: ElementMatch): HTMLElement[] {
-  if (match.id) {
-    const byId = document.getElementById(match.id);
-    if (byId instanceof HTMLElement && matchesElement(byId, match)) {
+  const criteria = normalizeElementMatch(match);
+
+  if (criteria.id) {
+    const byId = document.getElementById(criteria.id);
+    if (byId instanceof HTMLElement && matchesElement(byId, criteria)) {
       return [byId];
     }
     return [];
@@ -177,12 +174,17 @@ function findMatchingElements(match: ElementMatch): HTMLElement[] {
   const matches: HTMLElement[] = [];
 
   for (const candidate of candidates) {
-    if (matchesElement(candidate, match)) {
+    if (matchesElement(candidate, criteria)) {
       matches.push(candidate as HTMLElement);
     }
   }
 
-  return matches;
+  if (criteria.tag === "clipboard-copy" || criteria.ariaLabel?.match(/\bcopy\b/i)) {
+    const best = pickBestCopyCandidate(matches);
+    return best ? [best] : matches.filter(isVisible);
+  }
+
+  return matches.filter(isVisible);
 }
 
 function requireElement(match: ElementMatch, index = 0): HTMLElement {
@@ -230,14 +232,124 @@ async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<voi
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
-async function executeScriptStep(step: ScriptStep): Promise<void> {
+function deriveRuntimeCopyMatch(): ElementMatch | null {
+  const ghCliCopy = document.querySelector(
+    'clipboard-copy[for="clone-with-gh-cli"]',
+  );
+  if (ghCliCopy instanceof HTMLElement && isVisible(ghCliCopy)) {
+    const ariaLabel = ghCliCopy.getAttribute("aria-label")?.trim();
+    return ariaLabel
+      ? { tag: "clipboard-copy", ariaLabel }
+      : { tag: "clipboard-copy", text: "Copy" };
+  }
+
+  const candidates = document.querySelectorAll(
+    "clipboard-copy, [data-copy], button[aria-label], [title]",
+  );
+  const copyControls: HTMLElement[] = [];
+
+  for (const candidate of candidates) {
+    if (!(candidate instanceof HTMLElement) || !isVisible(candidate)) {
+      continue;
+    }
+
+    const ariaLabel = candidate.getAttribute("aria-label")?.trim() ?? "";
+    const title = candidate.getAttribute("title")?.trim() ?? "";
+    const label = ariaLabel || title;
+
+    if (!/\b(copy|clipboard)\b/i.test(`${label} ${getVisibleText(candidate)}`)) {
+      continue;
+    }
+
+    copyControls.push(candidate);
+  }
+
+  const best = pickBestCopyCandidate(copyControls);
+  if (!best) {
+    return null;
+  }
+
+  const tag = best.tagName.toLowerCase();
+  const ariaLabel = best.getAttribute("aria-label")?.trim() ?? "";
+  if (tag === "clipboard-copy") {
+    return ariaLabel
+      ? { tag: "clipboard-copy", ariaLabel }
+      : { tag: "clipboard-copy", text: getVisibleText(best) || "Copy" };
+  }
+
+  return ariaLabel
+    ? { tag: "button", ariaLabel }
+    : { tag: "button", text: best.getAttribute("title")?.trim() ?? "Copy" };
+}
+
+function looksLikeCloneInputMatch(match: ElementMatch): boolean {
+  const normalized = normalizeElementMatch(match);
+  return (
+    normalized.tag === "input" ||
+    normalized.id?.includes("clone") === true ||
+    normalized.id?.includes("gh-cli") === true
+  );
+}
+
+function resolveStepMatch(step: ScriptStep, nextStep?: ScriptStep): ElementMatch {
+  if (step.type !== "click" && step.type !== "waitFor") {
+    throw new Error("resolveStepMatch called for non-interactive step");
+  }
+
+  const match = normalizeElementMatch(step.match);
+  const copyLabel =
+    step.label ?? (nextStep?.type === "click" ? nextStep.label : undefined);
+  const shouldPreferCopyButton =
+    isCopyIntentLabel(copyLabel) || step.type === "waitFor";
+
+  if (shouldPreferCopyButton && looksLikeCloneInputMatch(match)) {
+    const runtimeCopy = deriveRuntimeCopyMatch();
+    if (runtimeCopy) {
+      return runtimeCopy;
+    }
+  }
+
+  return match;
+}
+
+function shouldUseCopyAction(step: ScriptStep, match: ElementMatch): boolean {
+  if (step.type !== "click") {
+    return false;
+  }
+
+  return (
+    isCopyIntentLabel(step.label) ||
+    match.tag === "clipboard-copy" ||
+    looksLikeCloneInputMatch(match)
+  );
+}
+
+async function executeScriptStep(
+  step: ScriptStep,
+  nextStep?: ScriptStep,
+): Promise<void> {
   switch (step.type) {
     case "click": {
-      requireElement(step.match, step.index ?? 0).click();
+      const match = resolveStepMatch(step, nextStep);
+      const element = requireElement(match, step.index ?? 0);
+      log.info("click step", {
+        label: step.label,
+        tag: element.tagName.toLowerCase(),
+        ariaLabel: element.getAttribute("aria-label"),
+        forAttr: element.getAttribute("for"),
+        score: scoreCopyCandidate(element),
+      });
+
+      if (shouldUseCopyAction(step, match)) {
+        await performCopyAction(element);
+        return;
+      }
+
+      element.click();
       return;
     }
     case "fill": {
-      fillElement(requireElement(step.match), step.value);
+      fillElement(requireElement(normalizeElementMatch(step.match)), step.value);
       return;
     }
     case "wait": {
@@ -245,7 +357,10 @@ async function executeScriptStep(step: ScriptStep): Promise<void> {
       return;
     }
     case "waitFor": {
-      await waitForMatch(step.match, step.timeoutMs ?? DEFAULT_SCRIPT_WAIT_FOR_MS);
+      await waitForMatch(
+        resolveStepMatch(step, nextStep),
+        step.timeoutMs ?? DEFAULT_SCRIPT_WAIT_FOR_MS,
+      );
       return;
     }
     default: {
@@ -258,8 +373,9 @@ async function executeScriptStep(step: ScriptStep): Promise<void> {
 export async function executeScript(script: MacroScript): Promise<void> {
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
+    const nextStep = script.steps[i + 1];
     try {
-      await executeScriptStep(step);
+      await executeScriptStep(step, nextStep);
     } catch (error) {
       log.error("step failed", {
         step: `${i + 1}/${script.steps.length}`,
