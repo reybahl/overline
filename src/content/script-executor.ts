@@ -1,19 +1,21 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 import { normalizeElementMatch } from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
+import type { ContentPoint } from "@/shared/types/messages";
 import {
   DEFAULT_SCRIPT_WAIT_FOR_MS,
   MATCH_POLL_INTERVAL_MS,
   MATCH_STABLE_POLLS,
+  SCROLL_SETTLE_MS,
 } from "@/shared/timing";
 
 const log = createLogger("script");
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
-const INTERACTIVE_SELECTOR =
-  "a, button, input, select, textarea, clipboard-copy";
+const INTERACTIVE_SELECTOR = "a, button, input, select, textarea";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -81,8 +83,7 @@ function matchesText(el: Element, expected: string): boolean {
     return true;
   }
 
-  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-  return ariaLabel === expected;
+  return getAccessibleName(el) === expected;
 }
 
 function matchesElement(el: Element, match: ElementMatch): boolean {
@@ -100,11 +101,8 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
     return false;
   }
 
-  if (criteria.ariaLabel) {
-    const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-    if (ariaLabel !== criteria.ariaLabel) {
-      return false;
-    }
+  if (criteria.ariaLabel && getAccessibleName(el) !== criteria.ariaLabel) {
+    return false;
   }
 
   if (criteria.text && !matchesText(el, criteria.text)) {
@@ -180,6 +178,25 @@ function requireElement(match: ElementMatch, index = 0): HTMLElement {
     throw new Error(ELEMENT_NOT_FOUND);
   }
   return matches[index];
+}
+
+/**
+ * Resolve a click target to its viewport center so the background can dispatch a
+ * trusted CDP click there. Scrolls the element into view first, then measures.
+ */
+export async function resolveClickPoint(
+  match: ElementMatch,
+  index = 0,
+): Promise<ContentPoint> {
+  const element = requireElement(normalizeElementMatch(match), index);
+  element.scrollIntoView({ block: "center", inline: "center" });
+  await delay(SCROLL_SETTLE_MS);
+
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
 }
 
 function fillElement(element: HTMLElement, value: string): void {
@@ -262,11 +279,4 @@ export async function executeScript(script: MacroScript): Promise<void> {
       throw error;
     }
   }
-}
-
-export async function waitForScriptMatch(
-  match: ElementMatch,
-  timeoutMs: number,
-): Promise<void> {
-  await waitForMatch(match, timeoutMs);
 }

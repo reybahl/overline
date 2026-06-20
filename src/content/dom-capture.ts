@@ -1,3 +1,4 @@
+import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 
 const INTERACTIVE_SELECTOR = [
@@ -6,7 +7,6 @@ const INTERACTIVE_SELECTOR = [
   "input",
   "select",
   "textarea",
-  "clipboard-copy",
   '[role="button"]',
   '[role="tab"]',
   '[role="menuitem"]',
@@ -24,7 +24,6 @@ const INTERACTIVE_TAGS = new Set([
   "input",
   "select",
   "textarea",
-  "clipboard-copy",
 ]);
 
 const INTERACTIVE_ROLES = new Set([
@@ -97,27 +96,6 @@ function getText(el: Element): string {
   return text.trim().replace(/\s+/g, " ").slice(0, 200);
 }
 
-function getAccessibleName(el: Element): string {
-  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-  if (ariaLabel) {
-    return ariaLabel;
-  }
-
-  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
-  if (labelledBy) {
-    const labelText = labelledBy
-      .split(/\s+/)
-      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-      .filter(Boolean)
-      .join(" ");
-    if (labelText) {
-      return labelText;
-    }
-  }
-
-  return el.getAttribute("title")?.trim() ?? "";
-}
-
 function getFieldValue(el: Element): string {
   if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
     return el.value?.trim() ?? "";
@@ -185,9 +163,6 @@ function getRole(el: Element): string {
       return "radio";
     }
     return "textbox";
-  }
-  if (tag === "clipboard-copy") {
-    return "button";
   }
 
   return tag;
@@ -257,22 +232,6 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
   }
 
   const tag = el.tagName.toLowerCase();
-  if (tag === "clipboard-copy") {
-    const forAttr = el.getAttribute("for")?.trim();
-    if (forAttr) {
-      return {
-        selector: `clipboard-copy[for="${escapeAttr(forAttr)}"]`,
-        idStable: isStableId(forAttr),
-      };
-    }
-    const value = el.getAttribute("value")?.trim();
-    if (value) {
-      return {
-        selector: `clipboard-copy[value="${escapeAttr(value.slice(0, 80))}"]`,
-        idStable: false,
-      };
-    }
-  }
 
   if (el instanceof HTMLAnchorElement) {
     const href = getStableHref(el);
@@ -282,6 +241,17 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
         idStable: true,
       };
     }
+  }
+
+  // Icon-only controls often carry their name via aria-labelledby with no other
+  // hook. Keep them targetable; playback re-resolves by accessible name, so an
+  // unstable referenced id here is fine.
+  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
+  if (labelledBy) {
+    return {
+      selector: `${tag}[aria-labelledby="${escapeAttr(labelledBy)}"]`,
+      idStable: labelledBy.split(/\s+/).every(isStableId),
+    };
   }
 
   if (el.id) {

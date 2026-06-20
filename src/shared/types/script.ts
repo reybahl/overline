@@ -1,9 +1,7 @@
 import { z } from "zod";
 
 export const ElementMatchSchema = z.object({
-  tag: z
-    .enum(["a", "button", "input", "select", "textarea", "clipboard-copy"])
-    .optional(),
+  tag: z.enum(["a", "button", "input", "select", "textarea"]).optional(),
   id: z.string().min(1).optional(),
   ariaLabel: z.string().min(1).optional(),
   text: z.string().min(1).optional(),

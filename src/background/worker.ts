@@ -155,7 +155,6 @@ function buildCompileScriptPrompt(
     "",
     "Allowed step types (clicks only — no navigate steps):",
     '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
-    "  · tag may be clipboard-copy for <clipboard-copy> custom elements",
     "  · index 0 = first matching element (use for latest/first/top item in a list after reaching the list page).",
     "  · id: ONLY when idStable is true in reference DOM (e.g. issues-tab). Never use unstable React ids (_R_…). Never prefix id with #.",
     "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",

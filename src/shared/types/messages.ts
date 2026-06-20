@@ -37,9 +37,17 @@ export type BackgroundResponse =
 export type ContentMessage =
   | { type: "EXECUTE_STEPS"; steps: import("@/shared/types/macro").MacroStep[] }
   | { type: "EXECUTE_SCRIPT"; steps: ScriptStep[] }
+  | {
+      type: "RESOLVE_CLICK_TARGET";
+      match: import("@/shared/types/script").ElementMatch;
+      index?: number;
+    }
   | { type: "RUN_MACRO"; macro: Macro }
   | { type: "PING" };
 
+/** Viewport-relative center of an element, in CSS pixels. */
+export type ContentPoint = { x: number; y: number };
+
 export type ContentResponse =
-  | { ok: true }
+  | { ok: true; point?: ContentPoint }
   | { ok: false; error: string };
