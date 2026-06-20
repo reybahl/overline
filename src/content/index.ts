@@ -1,5 +1,5 @@
 import { executeSteps } from "@/content/executor";
-import { executeScript } from "@/content/script-executor";
+import { executeScript, resolveClickPoint } from "@/content/script-executor";
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import { MacroScriptSchema } from "@/shared/types/script";
 
@@ -50,6 +50,17 @@ function initializeContentScript(): void {
             });
           return true;
         }
+        case "RESOLVE_CLICK_TARGET":
+          void resolveClickPoint(message.match, message.index)
+            .then((point) => {
+              sendResponse({ ok: true, point });
+            })
+            .catch((error: unknown) => {
+              const errorMessage =
+                error instanceof Error ? error.message : "Failed to locate element";
+              sendResponse({ ok: false, error: errorMessage });
+            });
+          return true;
         case "RUN_MACRO":
           void (async () => {
             if (message.macro.script) {

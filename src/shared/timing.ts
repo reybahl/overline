@@ -13,5 +13,8 @@ export const DEFAULT_SCRIPT_WAIT_FOR_MS = 15_000;
 /** Poll interval while waiting for DOM matches. */
 export const MATCH_POLL_INTERVAL_MS = 100;
 
+/** Pause after scrolling an element into view so its measured rect is stable. */
+export const SCROLL_SETTLE_MS = 120;
+
 /** Require this many consecutive successful polls before a match counts as ready. */
 export const MATCH_STABLE_POLLS = 3;

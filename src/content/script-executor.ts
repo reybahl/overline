@@ -2,10 +2,12 @@ import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/scrip
 import { isVisible } from "@/content/visibility";
 import { normalizeElementMatch } from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
+import type { ContentPoint } from "@/shared/types/messages";
 import {
   DEFAULT_SCRIPT_WAIT_FOR_MS,
   MATCH_POLL_INTERVAL_MS,
   MATCH_STABLE_POLLS,
+  SCROLL_SETTLE_MS,
 } from "@/shared/timing";
 
 const log = createLogger("script");
@@ -180,6 +182,25 @@ function requireElement(match: ElementMatch, index = 0): HTMLElement {
     throw new Error(ELEMENT_NOT_FOUND);
   }
   return matches[index];
+}
+
+/**
+ * Resolve a click target to its viewport center so the background can dispatch a
+ * trusted CDP click there. Scrolls the element into view first, then measures.
+ */
+export async function resolveClickPoint(
+  match: ElementMatch,
+  index = 0,
+): Promise<ContentPoint> {
+  const element = requireElement(normalizeElementMatch(match), index);
+  element.scrollIntoView({ block: "center", inline: "center" });
+  await delay(SCROLL_SETTLE_MS);
+
+  const rect = element.getBoundingClientRect();
+  return {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+  };
 }
 
 function fillElement(element: HTMLElement, value: string): void {

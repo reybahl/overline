@@ -1,9 +1,14 @@
 import { getTabUrl } from "@/background/capture";
+import {
+  attachDebugger,
+  detachDebugger,
+} from "@/background/cdp/driver";
+import { trustedClick } from "@/background/cdp/input";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
-import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
 
@@ -24,6 +29,76 @@ async function focusTabForPlayback(tabId: number): Promise<void> {
       tabId,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+/**
+ * Try to take a debugger session so clicks can be dispatched as trusted input.
+ * Returns false (instead of throwing) when CDP is unavailable — e.g. the user
+ * has DevTools open on the tab — so playback can fall back to synthetic clicks.
+ */
+async function tryAttachDebugger(tabId: number): Promise<boolean> {
+  try {
+    await attachDebugger(tabId);
+    return true;
+  } catch (error) {
+    log.warn("CDP unavailable, using synthetic clicks", {
+      tabId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+}
+
+/** Ask the content script for the viewport center of a click target. */
+async function resolveClickPointInTab(
+  tabId: number,
+  match: ElementMatch,
+  index: number,
+): Promise<{ x: number; y: number }> {
+  const response = await sendContentMessage(tabId, {
+    type: "RESOLVE_CLICK_TARGET",
+    match,
+    index,
+  });
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+  if (!response.point) {
+    throw new Error("No coordinates returned for click target.");
+  }
+  return response.point;
+}
+
+/**
+ * Click a compiled step. Prefers a trusted CDP click (required for clipboard /
+ * focus-gated actions); falls back to a synthetic content-script click if CDP is
+ * unavailable or the trusted path fails.
+ */
+async function clickScriptStep(
+  tabId: number,
+  step: ScriptClickStep,
+  cdpReady: boolean,
+): Promise<void> {
+  if (cdpReady) {
+    try {
+      const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
+      await trustedClick(tabId, point);
+      return;
+    } catch (error) {
+      log.warn("trusted click failed, falling back to synthetic", {
+        label: step.label,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const response = await sendContentMessage(tabId, {
+    type: "EXECUTE_SCRIPT",
+    steps: [step],
+  });
+  if (!response.ok) {
+    throw new Error(response.error);
   }
 }
 
@@ -116,6 +191,7 @@ async function waitForScriptMatchInTab(
 export async function runMacroScript(
   tabId: number,
   script: MacroScript,
+  cdpReady = false,
 ): Promise<void> {
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
@@ -131,18 +207,27 @@ export async function runMacroScript(
 
     log.info("executing step", { step: stepNum, type: step.type, label: step.label });
 
-    const response = await sendContentMessage(tabId, {
-      type: "EXECUTE_SCRIPT",
-      steps: [step],
-    });
-    if (!response.ok) {
+    try {
+      if (step.type === "click") {
+        await clickScriptStep(tabId, step, cdpReady);
+      } else {
+        const response = await sendContentMessage(tabId, {
+          type: "EXECUTE_SCRIPT",
+          steps: [step],
+        });
+        if (!response.ok) {
+          throw new Error(response.error);
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       log.error("step failed", {
         step: stepNum,
         type: step.type,
         label: step.label,
-        error: response.error,
+        error: message,
       });
-      throw new Error(response.error);
+      throw new Error(message);
     }
 
     if (scriptStepNeedsSettle(step)) {
@@ -161,11 +246,13 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     mode: macro.script ? "script" : "steps",
   });
 
+  let cdpReady = false;
   try {
     await focusTabForPlayback(tabId);
+    cdpReady = await tryAttachDebugger(tabId);
 
     if (macro.script) {
-      await runMacroScript(tabId, macro.script);
+      await runMacroScript(tabId, macro.script, cdpReady);
     } else {
       await runMacroSteps(tabId, macro.steps);
     }
@@ -178,6 +265,9 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     });
     throw error;
   } finally {
+    if (cdpReady) {
+      await detachDebugger(tabId);
+    }
     clearRunId();
   }
 }
