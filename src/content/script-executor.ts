@@ -1,9 +1,12 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import { createLogger } from "@/shared/logger";
 import {
   DEFAULT_SCRIPT_WAIT_FOR_MS,
   MATCH_POLL_INTERVAL_MS,
   MATCH_STABLE_POLLS,
 } from "@/shared/timing";
+
+const log = createLogger("script");
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
@@ -206,13 +209,15 @@ function fillElement(element: HTMLElement, value: string): void {
 }
 
 async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<void> {
-  const deadline = Date.now() + timeoutMs;
+  const started = Date.now();
+  const deadline = started + timeoutMs;
   let stablePolls = 0;
 
   while (Date.now() < deadline) {
     if (findMatchingElements(match).length > 0) {
       stablePolls += 1;
       if (stablePolls >= MATCH_STABLE_POLLS) {
+        log.debug("waitFor matched", { ms: Date.now() - started, matchCount: findMatchingElements(match).length });
         return;
       }
     } else {
@@ -221,6 +226,7 @@ async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<voi
     await delay(MATCH_POLL_INTERVAL_MS);
   }
 
+  log.warn("waitFor timed out", { ms: timeoutMs, match });
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
@@ -250,8 +256,19 @@ async function executeScriptStep(step: ScriptStep): Promise<void> {
 }
 
 export async function executeScript(script: MacroScript): Promise<void> {
-  for (const step of script.steps) {
-    await executeScriptStep(step);
+  for (let i = 0; i < script.steps.length; i++) {
+    const step = script.steps[i];
+    try {
+      await executeScriptStep(step);
+    } catch (error) {
+      log.error("step failed", {
+        step: `${i + 1}/${script.steps.length}`,
+        type: step.type,
+        label: step.label,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
   }
 }
 

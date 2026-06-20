@@ -1,4 +1,5 @@
 import type { DomElement } from "@/content/dom-capture";
+import type { LogEntry } from "@/shared/types/log";
 import type { Macro } from "@/shared/types/macro";
 import type { ScriptStep } from "@/shared/types/script";
 import type { PendingRecord } from "@/shared/types/pending-record";
@@ -19,7 +20,8 @@ export type BackgroundMessage =
   | { type: "SAVE_SETTINGS"; settings: Settings }
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
-  | { type: "DELETE_MACRO"; macroId: string };
+  | { type: "DELETE_MACRO"; macroId: string }
+  | { type: "PATCH_LOG"; entry: LogEntry };
 
 export type BackgroundResponse =
   | {

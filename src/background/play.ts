@@ -1,8 +1,11 @@
 import { getTabUrl } from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/tab-settle";
+import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+
+const log = createLogger("play");
 
 function stepNeedsElement(step: MacroStep): boolean {
   return (
@@ -96,19 +99,29 @@ export async function runMacroScript(
 ): Promise<void> {
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
+    const stepNum = `${i + 1}/${script.steps.length}`;
 
     if (i > 0 && step.type === "click") {
+      log.debug("pre-click wait", { step: stepNum, type: step.type, label: step.label });
       await waitForScriptMatchInTab(tabId, step.match);
     }
 
     const urlBeforeStep =
       step.type === "click" ? await getTabUrl(tabId) : undefined;
 
+    log.info("executing step", { step: stepNum, type: step.type, label: step.label });
+
     const response = await sendContentMessage(tabId, {
       type: "EXECUTE_SCRIPT",
       steps: [step],
     });
     if (!response.ok) {
+      log.error("step failed", {
+        step: stepNum,
+        type: step.type,
+        label: step.label,
+        error: response.error,
+      });
       throw new Error(response.error);
     }
 
@@ -119,10 +132,30 @@ export async function runMacroScript(
 }
 
 export async function runMacro(tabId: number, macro: Macro): Promise<void> {
-  if (macro.script) {
-    await runMacroScript(tabId, macro.script);
-    return;
-  }
+  const run = newRunId();
+  log.info("run started", {
+    run,
+    tabId,
+    macroId: macro.id,
+    macroName: macro.name,
+    mode: macro.script ? "script" : "steps",
+  });
 
-  await runMacroSteps(tabId, macro.steps);
+  try {
+    if (macro.script) {
+      await runMacroScript(tabId, macro.script);
+    } else {
+      await runMacroSteps(tabId, macro.steps);
+    }
+    log.info("run finished", { run, macroName: macro.name });
+  } catch (error) {
+    log.error("run failed", {
+      run,
+      macroName: macro.name,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  } finally {
+    clearRunId();
+  }
 }

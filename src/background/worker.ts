@@ -4,6 +4,7 @@ import type { z } from "zod";
 
 import type { DomElement } from "@/content/dom-capture";
 import { getLlmEnv } from "@/shared/env";
+import { createLogger } from "@/shared/logger";
 import { DEFAULT_SCRIPT_WAIT_FOR_MS } from "@/shared/timing";
 import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
 import {
@@ -20,6 +21,8 @@ import {
 
 const PRIMARY_MODEL = "gpt-oss-20b";
 const FALLBACK_MODEL = "llama-3.3-70b-versatile";
+
+const log = createLogger("llm");
 
 const RECORD_AGENT_RULES = [
   "- Only use selectors from the current page state",
@@ -169,7 +172,10 @@ async function generateObjectWithModels<T>(
       return result.object as T;
     } catch (error) {
       lastError = error;
-      console.warn(`[Patch] Model ${model} failed, trying next…`, error);
+      log.warn("model failed, trying next", {
+        model,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -300,7 +306,10 @@ export async function generateMacro(
       return await generateWithModel(env.apiKey, model, prompt, url);
     } catch (error) {
       lastError = error;
-      console.warn(`[Patch] Model ${model} failed, trying next…`, error);
+      log.warn("model failed, trying next", {
+        model,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

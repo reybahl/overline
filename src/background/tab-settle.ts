@@ -1,4 +1,5 @@
 import { getTabUrl } from "@/background/capture";
+import { createLogger } from "@/shared/logger";
 import {
   MATCH_POLL_INTERVAL_MS,
   PAGE_SETTLE_MS,
@@ -6,6 +7,8 @@ import {
 } from "@/shared/timing";
 
 export { PAGE_SETTLE_MS, STEP_WAIT_FOR_MS, TAB_LOAD_TIMEOUT_MS } from "@/shared/timing";
+
+const log = createLogger("settle");
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -66,6 +69,7 @@ export async function settleAfterStep(
       urlBeforeStep,
       TAB_LOAD_TIMEOUT_MS,
     );
+    log.debug("after click", { tabId, navigated, urlBefore: urlBeforeStep });
     if (navigated) {
       await delay(PAGE_SETTLE_MS);
       return;

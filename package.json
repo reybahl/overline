@@ -6,6 +6,7 @@
   "description": "Record and run browser macros with AI assistance",
   "scripts": {
     "dev": "vite",
+    "dev:watch": "vite build --watch",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit"
   },

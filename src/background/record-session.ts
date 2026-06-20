@@ -5,12 +5,15 @@ import {
   isRecordingCancelledError,
 } from "@/background/recording-session";
 import { compileMacroScript, inferRunScope } from "@/background/worker";
+import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
   clearPendingRecord,
   getPendingRecord,
   savePendingRecord,
 } from "@/shared/storage";
 import type { Macro } from "@/shared/types/macro";
+
+const log = createLogger("record");
 
 export async function startAgenticRecordSession(
   intent: string,
@@ -38,6 +41,9 @@ async function finishAgenticRecordSession(
   tabId: number,
   startUrl: string,
 ): Promise<void> {
+  const run = newRunId();
+  log.info("recording started", { run, intent, tabId, startUrl });
+
   try {
     const result = await runAgenticRecord(
       intent,
@@ -59,6 +65,12 @@ async function finishAgenticRecordSession(
     await assertRecordingSessionActive();
 
     const endUrl = await getTabUrl(tabId);
+    log.info("demo complete", {
+      run,
+      stepCount: result.macro.steps.length,
+      endUrl,
+    });
+
     let current = await getPendingRecord();
     if (current?.status === "recording") {
       await savePendingRecord({
@@ -75,6 +87,8 @@ async function finishAgenticRecordSession(
       endUrl,
       result.macro.steps,
     );
+
+    log.info("script compiled", { run, scriptSteps: script.steps.length });
 
     await assertRecordingSessionActive();
 
@@ -104,17 +118,25 @@ async function finishAgenticRecordSession(
       reasoning: result.reasoning,
       completedAt: Date.now(),
     });
+
+    log.info("recording complete", { run, macroName: macro.name });
   } catch (error) {
     if (isRecordingCancelledError(error)) {
+      log.info("recording cancelled", { run });
       return;
     }
+
+    const message = error instanceof Error ? error.message : "Recording failed";
+    log.error("recording failed", { run, error: message });
 
     await savePendingRecord({
       status: "error",
       intent,
-      error: error instanceof Error ? error.message : "Recording failed",
+      error: message,
       completedAt: Date.now(),
     });
+  } finally {
+    clearRunId();
   }
 }
 

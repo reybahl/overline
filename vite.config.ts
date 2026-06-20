@@ -1,3 +1,4 @@
+import { patchDevLogsPlugin } from "./vite-plugin-patch-logs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -20,8 +21,10 @@ function generateManifest() {
 export default defineConfig({
   plugins: [
     react(),
+    patchDevLogsPlugin(),
     webExtension({
       manifest: generateManifest,
+      disableAutoLaunch: true,
       additionalInputs: [
         "src/content/index.ts",
         "src/content/dom-capture.ts",
@@ -34,5 +37,10 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "src"),
     },
+  },
+  server: {
+    port: 5173,
+    strictPort: true,
+    host: "127.0.0.1",
   },
 });

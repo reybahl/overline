@@ -1,3 +1,4 @@
+import { relayLogEntry } from "@/background/log-relay";
 import { runMacro } from "@/background/play";
 import {
   discardPendingRecordSession,
@@ -5,6 +6,7 @@ import {
 } from "@/background/record-session";
 import { cancelPendingRecordSession } from "@/background/recording-session";
 import { generateMacro } from "@/background/worker";
+import { bindLogRelay, createLogger } from "@/shared/logger";
 import type {
   BackgroundMessage,
   BackgroundResponse,
@@ -25,24 +27,31 @@ import {
   isInjectableUrl,
 } from "@/shared/tab";
 
+const log = createLogger("bg");
+
+bindLogRelay(relayLogEntry);
+
 chrome.runtime.onInstalled.addListener(() => {
-  console.info("[Patch] Extension installed");
+  log.info("extension installed");
 });
 
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     switch (command) {
       case "record-macro":
-        console.warn("[Patch] Use the popup to record macros.");
+        log.warn("use popup to record macros");
         break;
       case "run-macro":
         await handleRunMacro();
         break;
       default:
-        console.warn(`[Patch] Unknown command: ${command}`);
+        log.warn("unknown command", { command });
     }
   } catch (error) {
-    console.error("[Patch] Command failed:", error);
+    log.error("command failed", {
+      command,
+      error: error instanceof Error ? error.message : String(error),
+    });
   }
 });
 
@@ -57,6 +66,10 @@ chrome.runtime.onMessage.addListener(
       .catch((error: unknown) => {
         const errorMessage =
           error instanceof Error ? error.message : "Unknown background error";
+        log.error("message handler failed", {
+          type: message.type,
+          error: errorMessage,
+        });
         sendResponse({ ok: false, error: errorMessage });
       });
 
@@ -165,13 +178,16 @@ async function handleMessage(
       await runMacro(message.tabId, macro);
       return { ok: true };
     }
+    case "PATCH_LOG":
+      relayLogEntry(message.entry);
+      return { ok: true };
     case "GENERATE_MACRO": {
       const macro = await generateMacro(
         message.intent,
         message.elements,
         message.url,
       );
-      console.info("[Patch] Generated macro:", macro);
+      log.info("generated macro", { name: macro.name, stepCount: macro.steps.length });
       return { ok: true, macro };
     }
     case "AGENTIC_RECORD":
@@ -232,14 +248,12 @@ async function handleRunMacroById(
   }
 
   if (!macroMatchesUrl(macro, url)) {
-    console.info(
-      `[Patch] Shortcut ignored: "${macro.name}" does not match ${url}`,
-    );
+    log.info("shortcut ignored — url mismatch", { macro: macro.name, url });
     return;
   }
 
   await runMacro(resolvedTabId, macro);
-  console.info(`[Patch] Ran macro "${macro.name}" via shortcut`);
+  log.info("ran macro via shortcut", { macro: macro.name });
 }
 
 async function handleRunMacro(): Promise<void> {
@@ -256,5 +270,5 @@ async function handleRunMacro(): Promise<void> {
   }
 
   await runMacro(tab.id!, macro);
-  console.info(`[Patch] Ran macro "${macro.name}"`);
+  log.info("ran macro", { macro: macro.name, url });
 }
