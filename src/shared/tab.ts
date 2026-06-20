@@ -26,7 +26,23 @@ export function getRestrictedPageMessage(url: string | undefined): string {
 }
 
 export async function getActiveTab(): Promise<chrome.tabs.Tab> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  try {
+    const window = await chrome.windows.getLastFocused({
+      populate: true,
+      windowTypes: ["normal"],
+    });
+    const tab = window.tabs?.find((entry) => entry.active);
+    if (tab?.id) {
+      return tab;
+    }
+  } catch {
+    // Fall through to tab query.
+  }
+
+  const [tab] = await chrome.tabs.query({
+    active: true,
+    windowType: "normal",
+  });
   if (!tab?.id) {
     throw new Error("No active tab found.");
   }

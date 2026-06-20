@@ -1,22 +1,6 @@
 import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
-
-const INTERACTIVE_SELECTOR = [
-  "button",
-  "a",
-  "input",
-  "select",
-  "textarea",
-  '[role="button"]',
-  '[role="tab"]',
-  '[role="menuitem"]',
-  '[role="option"]',
-  '[role="menuitemradio"]',
-  '[role="menuitemcheckbox"]',
-  '[role="switch"]',
-  '[role="checkbox"]',
-  '[role="radio"]',
-].join(", ");
+import { INTERACTIVE_SELECTOR } from "@/shared/interactive-selector";
 
 const INTERACTIVE_TAGS = new Set([
   "button",

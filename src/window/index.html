@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Patch</title>
+    <link rel="stylesheet" href="./window.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="header">
+        <h1>Patch</h1>
+      </header>
+
+      <label class="field" for="intent-input">
+        <span class="label">Intent</span>
+        <input
+          id="intent-input"
+          type="text"
+          class="control"
+          placeholder="Go to Files changed"
+        />
+      </label>
+
+      <label class="field" for="macro-select">
+        <span class="label">Macro</span>
+        <select id="macro-select" class="control"></select>
+      </label>
+
+      <div class="actions">
+        <button id="record-btn" type="button" class="btn btn-primary">
+          Record
+        </button>
+        <button id="run-btn" type="button" class="btn">Run</button>
+        <button id="capture-btn" type="button" class="btn">Capture DOM</button>
+        <button id="generate-btn" type="button" class="btn">Generate</button>
+        <button id="cancel-record-btn" type="button" class="btn" hidden>
+          Cancel recording
+        </button>
+      </div>
+
+      <p id="hint" class="hint">Patch runs on this page.</p>
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section id="review-panel" class="review-panel" hidden>
+        <h2 class="review-title">Review</h2>
+        <p id="review-summary" class="review-summary"></p>
+        <ol id="review-steps" class="review-steps"></ol>
+        <pre id="review-script-json" class="code-block" hidden></pre>
+        <div class="review-actions">
+          <button id="confirm-save-btn" type="button" class="btn btn-primary">
+            Save
+          </button>
+          <button id="discard-btn" type="button" class="btn">Discard</button>
+        </div>
+      </section>
+
+      <pre id="capture-output" class="code-block" hidden></pre>
+
+      <footer class="footer">
+        <a id="options-link" href="#">Manage macros</a>
+      </footer>
+    </main>
+
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>

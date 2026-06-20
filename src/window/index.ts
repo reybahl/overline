@@ -19,7 +19,7 @@ const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) {
-    throw new Error(`Popup markup is missing #${id}`);
+    throw new Error(`Patch markup is missing #${id}`);
   }
   return element as T;
 }
@@ -94,7 +94,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
       setRecordingUi(true);
       setStatus(
         record.progress ??
-          "Recording… the popup can close while Patch keeps working.",
+          "Recording… you can close Patch while it keeps working.",
       );
       startPendingRecordPoll();
       return;
@@ -361,7 +361,7 @@ async function handleRecordMacro(): Promise<void> {
       throw new Error(getRestrictedPageMessage(startUrl));
     }
 
-    setStatus("Recording… the popup can close while Patch keeps working.");
+    setStatus("Recording… you can close Patch while it keeps working.");
     startPendingRecordPoll();
 
     void sendBackgroundMessage({

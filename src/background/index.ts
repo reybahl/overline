@@ -1,3 +1,4 @@
+import { togglePatchOverlay } from "@/background/overlay";
 import { relayLogEntry } from "@/background/log-relay";
 import { runMacro } from "@/background/play";
 import {
@@ -35,11 +36,31 @@ chrome.runtime.onInstalled.addListener(() => {
   log.info("extension installed");
 });
 
+chrome.action.onClicked.addListener((tab) => {
+  if (tab.id === undefined) {
+    return;
+  }
+
+  void togglePatchOverlay(tab.id, tab.url).catch((error: unknown) => {
+    log.error("failed to open patch overlay", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+});
+
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     switch (command) {
+      case "open-patch": {
+        const tab = await getActiveTab();
+        if (tab.id === undefined) {
+          throw new Error("No active tab found.");
+        }
+        await togglePatchOverlay(tab.id, tab.url);
+        break;
+      }
       case "record-macro":
-        log.warn("use popup to record macros");
+        log.warn("use patch overlay to record macros");
         break;
       case "run-macro":
         await handleRunMacro();
@@ -152,7 +173,7 @@ async function handleMessage(
       return { ok: true, macros };
     }
     case "RECORD_MACRO":
-      throw new Error("Use the popup to record macros.");
+      throw new Error("Use the Patch overlay to record macros.");
     case "RUN_MACRO":
       await handleRunMacro();
       return { ok: true };

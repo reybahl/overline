@@ -43,7 +43,9 @@ export type ContentMessage =
       index?: number;
     }
   | { type: "RUN_MACRO"; macro: Macro }
-  | { type: "PING" };
+  | { type: "PING" }
+  | { type: "TOGGLE_PATCH_OVERLAY" }
+  | { type: "CLOSE_PATCH_OVERLAY" };
 
 /** Viewport-relative center of an element, in CSS pixels. */
 export type ContentPoint = { x: number; y: number };
