@@ -33,6 +33,13 @@
     "open_in_tab": true
   },
   "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+P",
+        "mac": "Command+Shift+P"
+      },
+      "description": "Open Patch"
+    },
     "record-macro": {
       "description": "Record a new macro"
     },
