@@ -1,18 +1,16 @@
-import { createGroq } from "@ai-sdk/groq";
 import { generateText } from "ai";
 
-import { getLlmEnv } from "@/shared/env";
+import { getLlmEnv, llmConfigHint } from "@/shared/env";
+import { resolveLanguageModel } from "@/shared/llm-model";
 
 export async function generateMacroSuggestion(prompt: string): Promise<string> {
   const env = getLlmEnv();
   if (!env) {
-    return "LLM not configured. Set VITE_GROQ_API_KEY and VITE_GROQ_MODEL in .env.";
+    return `LLM not configured.\n${llmConfigHint()}`;
   }
 
-  const groq = createGroq({ apiKey: env.apiKey });
-
   const result = await generateText({
-    model: groq(env.model),
+    model: resolveLanguageModel(env.model),
     prompt,
   });
 

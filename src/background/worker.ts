@@ -1,4 +1,3 @@
-import { createGroq } from "@ai-sdk/groq";
 import { generateObject } from "ai";
 import type { z } from "zod";
 
@@ -7,7 +6,11 @@ import {
   buildDemoElementHints,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
-import { getLlmEnv } from "@/shared/env";
+import { getLlmEnv, llmConfigHint } from "@/shared/env";
+import {
+  buildModelFallbackChain,
+  resolveLanguageModel,
+} from "@/shared/llm-model";
 import { createLogger } from "@/shared/logger";
 import { DEFAULT_SCRIPT_WAIT_FOR_MS } from "@/shared/timing";
 import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
@@ -22,11 +25,6 @@ import {
   type MacroStep,
   type RunScope,
 } from "@/shared/types/macro";
-
-const FALLBACK_MODEL = "llama-3.1-8b-instant";
-
-/** Models tried after VITE_GROQ_MODEL; invalid ids are skipped. */
-const EXTRA_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] as const;
 
 const log = createLogger("llm");
 
@@ -186,19 +184,16 @@ async function generateObjectWithModels<T>(
 ): Promise<T> {
   const env = getLlmEnv();
   if (!env) {
-    throw new Error(
-      "LLM not configured. Set VITE_GROQ_API_KEY and VITE_GROQ_MODEL in .env.",
-    );
+    throw new Error(`LLM not configured.\n${llmConfigHint()}`);
   }
 
-  const models = [...new Set([env.model, ...EXTRA_MODELS, FALLBACK_MODEL])];
+  const models = buildModelFallbackChain(env.model);
   let lastError: unknown;
 
-  for (const model of models) {
+  for (const modelRef of models) {
     try {
-      const groq = createGroq({ apiKey: env.apiKey });
       const result = await generateObject({
-        model: groq(model),
+        model: resolveLanguageModel(modelRef),
         schema,
         prompt,
       });
@@ -206,7 +201,7 @@ async function generateObjectWithModels<T>(
     } catch (error) {
       lastError = error;
       log.warn("model failed, trying next", {
-        model,
+        model: modelRef,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -214,18 +209,16 @@ async function generateObjectWithModels<T>(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("All Groq models failed.");
+    : new Error("All configured models failed.");
 }
 
 async function generateWithModel(
-  apiKey: string,
-  model: string,
+  modelRef: string,
   prompt: string,
   url: string,
 ): Promise<Macro> {
-  const groq = createGroq({ apiKey });
   const result = await generateObject({
-    model: groq(model),
+    model: resolveLanguageModel(modelRef),
     schema: MacroGenerationSchema,
     prompt,
   });
@@ -332,9 +325,7 @@ export async function generateMacro(
 ): Promise<Macro> {
   const env = getLlmEnv();
   if (!env) {
-    throw new Error(
-      "LLM not configured. Set VITE_GROQ_API_KEY and VITE_GROQ_MODEL in .env.",
-    );
+    throw new Error(`LLM not configured.\n${llmConfigHint()}`);
   }
 
   if (elements.length === 0) {
@@ -342,16 +333,16 @@ export async function generateMacro(
   }
 
   const prompt = buildSingleShotPrompt(intent, elements, url);
-  const models = [...new Set([env.model, ...EXTRA_MODELS, FALLBACK_MODEL])];
+  const models = buildModelFallbackChain(env.model);
   let lastError: unknown;
 
-  for (const model of models) {
+  for (const modelRef of models) {
     try {
-      return await generateWithModel(env.apiKey, model, prompt, url);
+      return await generateWithModel(modelRef, prompt, url);
     } catch (error) {
       lastError = error;
       log.warn("model failed, trying next", {
-        model,
+        model: modelRef,
         error: error instanceof Error ? error.message : String(error),
       });
     }
@@ -359,5 +350,5 @@ export async function generateMacro(
 
   throw lastError instanceof Error
     ? lastError
-    : new Error("All Groq models failed to generate a macro.");
+    : new Error("All configured models failed to generate a macro.");
 }
