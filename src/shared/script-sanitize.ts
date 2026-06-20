@@ -1,8 +1,19 @@
 import type { DomElement } from "@/content/dom-capture";
 import type { MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import {
+  normalizeElementId,
+  normalizeElementMatch,
+} from "@/shared/script-match";
 
-const TAGS = new Set(["a", "button", "input", "select", "textarea"]);
+const TAGS = new Set([
+  "a",
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "clipboard-copy",
+]);
 
 function parseTestId(selector: string): string | undefined {
   const match = selector.match(/\[data-testid="([^"]+)"\]/);
@@ -19,7 +30,7 @@ function parseStableId(selector: string): string | undefined {
 function domElementMatchesMatch(el: DomElement, match: ElementMatch): boolean {
   if (match.id) {
     const id = parseStableId(el.selector);
-    if (id !== match.id) {
+    if (id !== normalizeElementId(match.id)) {
       return false;
     }
   }
@@ -70,6 +81,17 @@ export function deriveMatchFromElement(el: DomElement): ElementMatch {
     match.tag = tag;
   }
 
+  if (el.tag === "clipboard-copy") {
+    if (el.ariaLabel) {
+      match.ariaLabel = el.ariaLabel;
+      return match;
+    }
+    if (el.text) {
+      match.text = el.text;
+    }
+    return match;
+  }
+
   if (el.idStable) {
     const id = parseStableId(el.selector);
     if (id) {
@@ -100,34 +122,37 @@ export function sanitizeMatch(
   elements: DomElement[],
   match: ElementMatch,
 ): ElementMatch {
-  if (countDomMatches(elements, match) > 0) {
-    return match;
+  const normalized = normalizeElementMatch(match);
+
+  if (countDomMatches(elements, normalized) > 0) {
+    return normalized;
   }
 
-  if (match.ariaLabel) {
-    const textFix: ElementMatch = { ...match };
+  if (normalized.ariaLabel) {
+    const textFix: ElementMatch = { ...normalized };
     delete textFix.ariaLabel;
-    textFix.text = match.ariaLabel;
+    textFix.text = normalized.ariaLabel;
     if (countDomMatches(elements, textFix) > 0) {
       return textFix;
     }
 
     const candidate = elements.find(
       (el) =>
-        el.text === match.ariaLabel && (!match.tag || el.tag === match.tag),
+        el.text === normalized.ariaLabel &&
+        (!normalized.tag || el.tag === normalized.tag),
     );
     if (candidate) {
       return deriveMatchFromElement(candidate);
     }
 
-    const withoutAria: ElementMatch = { ...match };
+    const withoutAria: ElementMatch = { ...normalized };
     delete withoutAria.ariaLabel;
     if (countDomMatches(elements, withoutAria) > 0) {
       return withoutAria;
     }
   }
 
-  return match;
+  return normalized;
 }
 
 export function buildDemoElementHints(

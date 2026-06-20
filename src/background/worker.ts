@@ -31,6 +31,7 @@ const log = createLogger("llm");
 const DOM_ELEMENT_RULES = [
   "- Each element has role, controlKind, idStable — use these to pick controls, not visible text alone",
   "- Duplicate labels (e.g. two \"Code\" elements): use controlKind — dropdown-trigger/disclosure for menus and dropdowns, nav-tab for repo section tabs, link for navigation",
+  "- State fields show the result of prior clicks: selected/pressed/checked true or expanded true means that control is ALREADY active — do not click it again, move to the next part of the intent",
   "- Prefer selectors where idStable is true",
   "- If menu or panel items are missing from the page state, click the dropdown-trigger or disclosure that opens them first — do not give up",
 ];
@@ -38,13 +39,14 @@ const DOM_ELEMENT_RULES = [
 const RECORD_AGENT_RULES = [
   "- Only use selectors from the current page state",
   "- Do not invent selectors",
+  "- Match the intent literally step by step — do not click unrelated controls to guess the next action",
   "- Use step types: click, type, fill, confirm, wait, waitFor, scroll",
   "- Never use the navigate step type — click links and buttons instead",
   "- For wait, put milliseconds in value",
   "- For waitFor, put selector and timeout ms in value",
   "- Never navigate backwards — do not click a link that returns to a page you already visited",
   "- If the intent is already complete, return done: true and do not emit another step",
-  "- If the intent cannot be completed after opening all required menus, set done: true and explain in reasoning",
+  "- If a required control is missing from page state, use waitFor for it — do not substitute a different button and do not mark done",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -142,6 +144,7 @@ function buildCompileScriptPrompt(
     "- Duplicate visible labels (e.g. two \"Code\" controls): use tag + text + controlKind — nav-tab is role link on #code-tab, dropdown is tag button with controlKind dropdown-trigger",
     "- For dropdown/menu intents: click tag button with text, NOT #code-tab and NOT ariaLabel unless present in DOM",
     "- waitFor must target the NEXT menu item or panel content you will click — NOT the same match as the dropdown trigger you just clicked",
+    "- id values must be bare element ids (e.g. issues-tab) — never prefix with #",
     "- Only add script steps that correspond to demo actions or intent clauses you can ground in reference DOM",
     "",
     "Critical: the script must implement EVERY part of the user intent, in order.",
@@ -152,8 +155,9 @@ function buildCompileScriptPrompt(
     "",
     "Allowed step types (clicks only — no navigate steps):",
     '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
+    "  · tag may be clipboard-copy for <clipboard-copy> custom elements",
     "  · index 0 = first matching element (use for latest/first/top item in a list after reaching the list page).",
-    "  · id: ONLY when idStable is true in reference DOM (e.g. issues-tab). Never use unstable React ids (_R_…).",
+    "  · id: ONLY when idStable is true in reference DOM (e.g. issues-tab). Never use unstable React ids (_R_…). Never prefix id with #.",
     "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",
     "  · testId: data-testid when present in reference DOM.",
     "  · Match priority: stable id > testId > ariaLabel (if non-empty in DOM) > text > hrefPattern",

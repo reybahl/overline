@@ -1,9 +1,12 @@
+import { isVisible } from "@/content/visibility";
+
 const INTERACTIVE_SELECTOR = [
   "button",
   "a",
   "input",
   "select",
   "textarea",
+  "clipboard-copy",
   '[role="button"]',
   '[role="tab"]',
   '[role="menuitem"]',
@@ -21,6 +24,7 @@ const INTERACTIVE_TAGS = new Set([
   "input",
   "select",
   "textarea",
+  "clipboard-copy",
 ]);
 
 const INTERACTIVE_ROLES = new Set([
@@ -68,6 +72,12 @@ export type DomElement = {
   controlKind?: string;
   expanded?: boolean;
   hasPopup?: string;
+  /** aria-selected — true once a tab/option is active. */
+  selected?: boolean;
+  /** aria-pressed — true for an engaged toggle button. */
+  pressed?: boolean;
+  /** checked state for checkboxes/radios/aria-checked. */
+  checked?: boolean;
 };
 
 function escapeAttr(value: string): string {
@@ -75,38 +85,44 @@ function escapeAttr(value: string): string {
 }
 
 function isHidden(el: Element): boolean {
-  if (!(el instanceof HTMLElement)) {
-    return true;
-  }
-
-  if (el.hidden) {
-    return true;
-  }
-
   if (el instanceof HTMLInputElement && el.type === "hidden") {
     return true;
   }
 
-  if (el.getAttribute("aria-hidden") === "true") {
-    return true;
-  }
-
-  const style = window.getComputedStyle(el);
-  if (
-    style.display === "none" ||
-    style.visibility === "hidden" ||
-    Number.parseFloat(style.opacity) === 0
-  ) {
-    return true;
-  }
-
-  const rect = el.getBoundingClientRect();
-  return rect.width === 0 && rect.height === 0;
+  return !isVisible(el);
 }
 
 function getText(el: Element): string {
   const text = (el as HTMLElement).innerText ?? el.textContent ?? "";
   return text.trim().replace(/\s+/g, " ").slice(0, 200);
+}
+
+function getAccessibleName(el: Element): string {
+  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
+  if (ariaLabel) {
+    return ariaLabel;
+  }
+
+  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
+  if (labelledBy) {
+    const labelText = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+      .filter(Boolean)
+      .join(" ");
+    if (labelText) {
+      return labelText;
+    }
+  }
+
+  return el.getAttribute("title")?.trim() ?? "";
+}
+
+function getFieldValue(el: Element): string {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return el.value?.trim() ?? "";
+  }
+  return "";
 }
 
 function getPlaceholder(el: Element): string {
@@ -120,8 +136,14 @@ function hasMeaningfulLabel(
   text: string,
   ariaLabel: string,
   placeholder: string,
+  fieldValue = "",
 ): boolean {
-  return text.length > 0 || ariaLabel.length > 0 || placeholder.length > 0;
+  return (
+    text.length > 0 ||
+    ariaLabel.length > 0 ||
+    placeholder.length > 0 ||
+    fieldValue.length > 0
+  );
 }
 
 function getStableHref(anchor: HTMLAnchorElement): string | null {
@@ -163,6 +185,9 @@ function getRole(el: Element): string {
       return "radio";
     }
     return "textbox";
+  }
+  if (tag === "clipboard-copy") {
+    return "button";
   }
 
   return tag;
@@ -222,6 +247,33 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
     };
   }
 
+  const title = el.getAttribute("title")?.trim();
+  if (title) {
+    const tag = el.tagName.toLowerCase();
+    return {
+      selector: `${tag}[title="${escapeAttr(title)}"]`,
+      idStable: true,
+    };
+  }
+
+  const tag = el.tagName.toLowerCase();
+  if (tag === "clipboard-copy") {
+    const forAttr = el.getAttribute("for")?.trim();
+    if (forAttr) {
+      return {
+        selector: `clipboard-copy[for="${escapeAttr(forAttr)}"]`,
+        idStable: isStableId(forAttr),
+      };
+    }
+    const value = el.getAttribute("value")?.trim();
+    if (value) {
+      return {
+        selector: `clipboard-copy[value="${escapeAttr(value.slice(0, 80))}"]`,
+        idStable: false,
+      };
+    }
+  }
+
   if (el instanceof HTMLAnchorElement) {
     const href = getStableHref(el);
     if (href) {
@@ -239,8 +291,8 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
   return null;
 }
 
-function readExpanded(el: Element): boolean | undefined {
-  const value = el.getAttribute("aria-expanded");
+function readAriaBoolean(el: Element, attr: string): boolean | undefined {
+  const value = el.getAttribute(attr);
   if (value === "true") {
     return true;
   }
@@ -250,9 +302,31 @@ function readExpanded(el: Element): boolean | undefined {
   return undefined;
 }
 
+function readExpanded(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-expanded");
+}
+
 function readHasPopup(el: Element): string | undefined {
   const value = el.getAttribute("aria-haspopup")?.trim();
   return value || undefined;
+}
+
+function readSelected(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-selected");
+}
+
+function readPressed(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-pressed");
+}
+
+function readChecked(el: Element): boolean | undefined {
+  if (
+    el instanceof HTMLInputElement &&
+    (el.type === "checkbox" || el.type === "radio")
+  ) {
+    return el.checked;
+  }
+  return readAriaBoolean(el, "aria-checked");
 }
 
 export function captureDom(): DomElement[] {
@@ -279,17 +353,21 @@ export function captureDom(): DomElement[] {
     }
 
     const tag = element.tagName.toLowerCase();
-    const text = getText(element);
-    const ariaLabel = element.getAttribute("aria-label")?.trim() ?? "";
+    const fieldValue = getFieldValue(element);
+    const text = getText(element) || fieldValue.slice(0, 200);
+    const ariaLabel = getAccessibleName(element);
     const placeholder = getPlaceholder(element);
 
-    if (!hasMeaningfulLabel(text, ariaLabel, placeholder)) {
+    if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue)) {
       continue;
     }
 
     const controlKind = inferControlKind(element, role);
     const expanded = readExpanded(element);
     const hasPopup = readHasPopup(element);
+    const selected = readSelected(element);
+    const pressed = readPressed(element);
+    const checked = readChecked(element);
 
     results.push({
       tag,
@@ -302,6 +380,9 @@ export function captureDom(): DomElement[] {
       ...(controlKind ? { controlKind } : {}),
       ...(expanded !== undefined ? { expanded } : {}),
       ...(hasPopup ? { hasPopup } : {}),
+      ...(selected !== undefined ? { selected } : {}),
+      ...(pressed !== undefined ? { pressed } : {}),
+      ...(checked !== undefined ? { checked } : {}),
     });
   }
 
