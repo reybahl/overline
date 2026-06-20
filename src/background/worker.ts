@@ -4,6 +4,7 @@ import type { z } from "zod";
 
 import type { DomElement } from "@/content/dom-capture";
 import { getLlmEnv } from "@/shared/env";
+import { DEFAULT_SCRIPT_WAIT_FOR_MS } from "@/shared/timing";
 import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
 import {
   AgentTurnSchema,
@@ -124,7 +125,12 @@ function buildCompileScriptPrompt(
     "  · For repo/section tabs, prefer match.id (from demo #issues-tab), then ariaLabel, then text",
     '- fill: { type: "fill", label?, match: {...}, value: "..." }',
     '- wait: { type: "wait", label?, ms: 500 }',
-    '- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: 5000 }',
+    `- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: ${DEFAULT_SCRIPT_WAIT_FOR_MS} }`,
+    "",
+    "Reliability (required for multi-step flows):",
+    "- After any click that navigates to a new page or section, insert a waitFor before the next click",
+    "- Use the same match as the upcoming click (or a distinctive element on the target page)",
+    `- Prefer click → waitFor → click rather than back-to-back clicks; use timeoutMs ${DEFAULT_SCRIPT_WAIT_FOR_MS} on slow networks`,
     "",
     "Rules:",
     "- Never emit navigate steps — click links and buttons instead",

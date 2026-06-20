@@ -1,5 +1,17 @@
-const PAGE_SETTLE_MS = 500;
-const TAB_LOAD_TIMEOUT_MS = 8000;
+import { getTabUrl } from "@/background/capture";
+import {
+  MATCH_POLL_INTERVAL_MS,
+  PAGE_SETTLE_MS,
+  TAB_LOAD_TIMEOUT_MS,
+} from "@/shared/timing";
+
+export { PAGE_SETTLE_MS, STEP_WAIT_FOR_MS, TAB_LOAD_TIMEOUT_MS } from "@/shared/timing";
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 async function waitForTabLoad(tabId: number): Promise<void> {
   const tab = await chrome.tabs.get(tabId);
@@ -25,9 +37,41 @@ async function waitForTabLoad(tabId: number): Promise<void> {
   });
 }
 
-export async function settleAfterStep(tabId: number): Promise<void> {
+async function waitForUrlChange(
+  tabId: number,
+  previousUrl: string,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const url = await getTabUrl(tabId);
+    if (url && url !== previousUrl) {
+      await waitForTabLoad(tabId);
+      return true;
+    }
+    await delay(MATCH_POLL_INTERVAL_MS);
+  }
+
+  return false;
+}
+
+export async function settleAfterStep(
+  tabId: number,
+  urlBeforeStep?: string,
+): Promise<void> {
+  if (urlBeforeStep) {
+    const navigated = await waitForUrlChange(
+      tabId,
+      urlBeforeStep,
+      TAB_LOAD_TIMEOUT_MS,
+    );
+    if (navigated) {
+      await delay(PAGE_SETTLE_MS);
+      return;
+    }
+  }
+
   await waitForTabLoad(tabId);
-  await new Promise((resolve) => {
-    setTimeout(resolve, PAGE_SETTLE_MS);
-  });
+  await delay(PAGE_SETTLE_MS);
 }

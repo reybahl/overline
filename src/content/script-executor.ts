@@ -1,4 +1,9 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import {
+  DEFAULT_SCRIPT_WAIT_FOR_MS,
+  MATCH_POLL_INTERVAL_MS,
+  MATCH_STABLE_POLLS,
+} from "@/shared/timing";
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
@@ -202,12 +207,18 @@ function fillElement(element: HTMLElement, value: string): void {
 
 async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs;
+  let stablePolls = 0;
 
   while (Date.now() < deadline) {
     if (findMatchingElements(match).length > 0) {
-      return;
+      stablePolls += 1;
+      if (stablePolls >= MATCH_STABLE_POLLS) {
+        return;
+      }
+    } else {
+      stablePolls = 0;
     }
-    await delay(100);
+    await delay(MATCH_POLL_INTERVAL_MS);
   }
 
   throw new Error(ELEMENT_NOT_FOUND);
@@ -228,7 +239,7 @@ async function executeScriptStep(step: ScriptStep): Promise<void> {
       return;
     }
     case "waitFor": {
-      await waitForMatch(step.match, step.timeoutMs ?? 5000);
+      await waitForMatch(step.match, step.timeoutMs ?? DEFAULT_SCRIPT_WAIT_FOR_MS);
       return;
     }
     default: {

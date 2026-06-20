@@ -1,9 +1,8 @@
+import { getTabUrl } from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
-import { settleAfterStep } from "@/background/tab-settle";
+import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/tab-settle";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
-
-const STEP_WAIT_FOR_MS = 8000;
 
 function stepNeedsElement(step: MacroStep): boolean {
   return (
@@ -52,6 +51,11 @@ export async function runMacroSteps(
       await waitForSelectorInTab(tabId, step.selector!);
     }
 
+    const urlBeforeStep =
+      step.type === "click" || step.type === "navigate"
+        ? await getTabUrl(tabId)
+        : undefined;
+
     const response = await sendContentMessage(tabId, {
       type: "EXECUTE_STEPS",
       steps: [step],
@@ -61,7 +65,7 @@ export async function runMacroSteps(
     }
 
     if (step.type === "click" || step.type === "navigate") {
-      await settleAfterStep(tabId);
+      await settleAfterStep(tabId, urlBeforeStep);
     }
   }
 }
@@ -97,6 +101,9 @@ export async function runMacroScript(
       await waitForScriptMatchInTab(tabId, step.match);
     }
 
+    const urlBeforeStep =
+      step.type === "click" ? await getTabUrl(tabId) : undefined;
+
     const response = await sendContentMessage(tabId, {
       type: "EXECUTE_SCRIPT",
       steps: [step],
@@ -106,7 +113,7 @@ export async function runMacroScript(
     }
 
     if (scriptStepNeedsSettle(step)) {
-      await settleAfterStep(tabId);
+      await settleAfterStep(tabId, urlBeforeStep);
     }
   }
 }

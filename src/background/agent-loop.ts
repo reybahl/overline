@@ -140,6 +140,9 @@ export async function runAgentLoop(
       }${step.value ? ` → ${step.value}` : ""}`,
     );
 
+    const urlBeforeStep =
+      step.type === "click" ? await getTabUrl(tabId) : undefined;
+
     const response = await sendContentMessage(tabId, {
       type: "EXECUTE_STEPS",
       steps: [step],
@@ -151,7 +154,7 @@ export async function runAgentLoop(
       continue;
     }
 
-    await settleAfterStep(tabId);
+    await settleAfterStep(tabId, urlBeforeStep);
   }
 
   if (stepsTaken.length === 0) {

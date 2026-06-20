@@ -33,7 +33,7 @@ export function formatScriptStep(step: ScriptStep, index: number): string {
       return `${index + 1}. ${prefix}wait · ${step.ms}ms`;
     case "waitFor":
       return `${index + 1}. ${prefix}waitFor · ${formatMatch(step.match)}${
-        step.timeoutMs ? ` (${step.timeoutMs}ms)` : ""
+        step.timeoutMs ? ` · up to ${Math.round(step.timeoutMs / 1000)}s` : ""
       }`;
     default: {
       const _exhaustive: never = step;
