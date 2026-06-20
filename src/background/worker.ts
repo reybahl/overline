@@ -24,6 +24,13 @@ const FALLBACK_MODEL = "llama-3.3-70b-versatile";
 
 const log = createLogger("llm");
 
+const DOM_ELEMENT_RULES = [
+  "- Each element has role, controlKind, idStable — use these to pick controls, not visible text alone",
+  "- Duplicate labels (e.g. two \"Code\" elements): use controlKind — dropdown-trigger/disclosure for menus and dropdowns, nav-tab for repo section tabs, link for navigation",
+  "- Prefer selectors where idStable is true",
+  "- If menu or panel items are missing from the page state, click the dropdown-trigger or disclosure that opens them first — do not give up",
+];
+
 const RECORD_AGENT_RULES = [
   "- Only use selectors from the current page state",
   "- Do not invent selectors",
@@ -33,7 +40,8 @@ const RECORD_AGENT_RULES = [
   "- For waitFor, put selector and timeout ms in value",
   "- Never navigate backwards — do not click a link that returns to a page you already visited",
   "- If the intent is already complete, return done: true and do not emit another step",
-  "- If the intent cannot be completed, set done: true and explain in reasoning",
+  "- If the intent cannot be completed after opening all required menus, set done: true and explain in reasoning",
+  ...DOM_ELEMENT_RULES,
 ];
 
 function buildSingleShotPrompt(
@@ -53,7 +61,8 @@ function buildSingleShotPrompt(
     "Return a macro that accomplishes the intent using only the listed elements.",
     "Rules:",
     "- Use only step types: click, type, fill, confirm, navigate, wait, waitFor, scroll",
-    "- Prefer stable selectors from the element list",
+    "- Prefer stable selectors (idStable: true) from the element list",
+    ...DOM_ELEMENT_RULES,
     "- For type/fill steps, put the text to enter in value",
     "- For click steps, use selector from the matching element",
     "- For wait steps, put milliseconds in value as a string (e.g. \"500\")",
@@ -126,6 +135,8 @@ function buildCompileScriptPrompt(
     "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",
     "  · testId: data-testid when stable in the demo (e.g. issue-pr-title-link).",
     "  · For repo/section tabs, prefer match.id (from demo #issues-tab), then ariaLabel, then text",
+    "  · For dropdown/menu intents, prefer tag button + text or ariaLabel, not nav-tab ids like code-tab",
+    "  · Use controlKind from the demo when generalizing: dropdown-trigger → button with hasPopup/expanded, nav-tab → tab link",
     '- fill: { type: "fill", label?, match: {...}, value: "..." }',
     '- wait: { type: "wait", label?, ms: 500 }',
     `- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: ${DEFAULT_SCRIPT_WAIT_FOR_MS} }`,
