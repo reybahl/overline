@@ -1,3 +1,4 @@
+import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 
 const INTERACTIVE_SELECTOR = [
@@ -95,27 +96,6 @@ function isHidden(el: Element): boolean {
 function getText(el: Element): string {
   const text = (el as HTMLElement).innerText ?? el.textContent ?? "";
   return text.trim().replace(/\s+/g, " ").slice(0, 200);
-}
-
-function getAccessibleName(el: Element): string {
-  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-  if (ariaLabel) {
-    return ariaLabel;
-  }
-
-  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
-  if (labelledBy) {
-    const labelText = labelledBy
-      .split(/\s+/)
-      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
-      .filter(Boolean)
-      .join(" ");
-    if (labelText) {
-      return labelText;
-    }
-  }
-
-  return el.getAttribute("title")?.trim() ?? "";
 }
 
 function getFieldValue(el: Element): string {
@@ -282,6 +262,17 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
         idStable: true,
       };
     }
+  }
+
+  // Icon-only controls often carry their name via aria-labelledby with no other
+  // hook. Keep them targetable; playback re-resolves by accessible name, so an
+  // unstable referenced id here is fine.
+  const labelledBy = el.getAttribute("aria-labelledby")?.trim();
+  if (labelledBy) {
+    return {
+      selector: `${tag}[aria-labelledby="${escapeAttr(labelledBy)}"]`,
+      idStable: labelledBy.split(/\s+/).every(isStableId),
+    };
   }
 
   if (el.id) {

@@ -1,4 +1,5 @@
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
+import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 import { normalizeElementMatch } from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
@@ -83,8 +84,7 @@ function matchesText(el: Element, expected: string): boolean {
     return true;
   }
 
-  const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-  return ariaLabel === expected;
+  return getAccessibleName(el) === expected;
 }
 
 function matchesElement(el: Element, match: ElementMatch): boolean {
@@ -102,11 +102,8 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
     return false;
   }
 
-  if (criteria.ariaLabel) {
-    const ariaLabel = el.getAttribute("aria-label")?.trim() ?? "";
-    if (ariaLabel !== criteria.ariaLabel) {
-      return false;
-    }
+  if (criteria.ariaLabel && getAccessibleName(el) !== criteria.ariaLabel) {
+    return false;
   }
 
   if (criteria.text && !matchesText(el, criteria.text)) {
