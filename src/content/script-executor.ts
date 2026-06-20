@@ -15,8 +15,7 @@ const log = createLogger("script");
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
-const INTERACTIVE_SELECTOR =
-  "a, button, input, select, textarea, clipboard-copy";
+const INTERACTIVE_SELECTOR = "a, button, input, select, textarea";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -280,11 +279,4 @@ export async function executeScript(script: MacroScript): Promise<void> {
       throw error;
     }
   }
-}
-
-export async function waitForScriptMatch(
-  match: ElementMatch,
-  timeoutMs: number,
-): Promise<void> {
-  await waitForMatch(match, timeoutMs);
 }

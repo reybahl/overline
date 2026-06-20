@@ -6,14 +6,7 @@ import {
   normalizeElementMatch,
 } from "@/shared/script-match";
 
-const TAGS = new Set([
-  "a",
-  "button",
-  "input",
-  "select",
-  "textarea",
-  "clipboard-copy",
-]);
+const TAGS = new Set(["a", "button", "input", "select", "textarea"]);
 
 function parseTestId(selector: string): string | undefined {
   const match = selector.match(/\[data-testid="([^"]+)"\]/);
@@ -79,17 +72,6 @@ export function deriveMatchFromElement(el: DomElement): ElementMatch {
 
   if (tag) {
     match.tag = tag;
-  }
-
-  if (el.tag === "clipboard-copy") {
-    if (el.ariaLabel) {
-      match.ariaLabel = el.ariaLabel;
-      return match;
-    }
-    if (el.text) {
-      match.text = el.text;
-    }
-    return match;
   }
 
   if (el.idStable) {

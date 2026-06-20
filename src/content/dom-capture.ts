@@ -7,7 +7,6 @@ const INTERACTIVE_SELECTOR = [
   "input",
   "select",
   "textarea",
-  "clipboard-copy",
   '[role="button"]',
   '[role="tab"]',
   '[role="menuitem"]',
@@ -25,7 +24,6 @@ const INTERACTIVE_TAGS = new Set([
   "input",
   "select",
   "textarea",
-  "clipboard-copy",
 ]);
 
 const INTERACTIVE_ROLES = new Set([
@@ -166,9 +164,6 @@ function getRole(el: Element): string {
     }
     return "textbox";
   }
-  if (tag === "clipboard-copy") {
-    return "button";
-  }
 
   return tag;
 }
@@ -237,22 +232,6 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
   }
 
   const tag = el.tagName.toLowerCase();
-  if (tag === "clipboard-copy") {
-    const forAttr = el.getAttribute("for")?.trim();
-    if (forAttr) {
-      return {
-        selector: `clipboard-copy[for="${escapeAttr(forAttr)}"]`,
-        idStable: isStableId(forAttr),
-      };
-    }
-    const value = el.getAttribute("value")?.trim();
-    if (value) {
-      return {
-        selector: `clipboard-copy[value="${escapeAttr(value.slice(0, 80))}"]`,
-        idStable: false,
-      };
-    }
-  }
 
   if (el instanceof HTMLAnchorElement) {
     const href = getStableHref(el);
