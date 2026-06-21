@@ -1,0 +1,68 @@
+:root {
+  color-scheme: light dark;
+
+  /* Color */
+  --patch-bg: #ffffff;
+  --patch-surface: #ffffff;
+  --patch-surface-muted: #f7f7f5;
+  --patch-fg: #1b1b1f;
+  --patch-fg-secondary: #6b6f76;
+  --patch-border: rgb(15 15 15 / 10%);
+  --patch-border-strong: rgb(15 15 15 / 16%);
+  --patch-hover: rgb(15 15 15 / 4%);
+  --patch-active: rgb(15 15 15 / 7%);
+  --patch-primary: #222326;
+  --patch-primary-fg: #ffffff;
+  --patch-primary-hover: #34353a;
+  --patch-focus: rgb(94 106 210 / 35%);
+  --patch-error: #c62828;
+  --patch-overlay-scrim: rgb(15 15 15 / 28%);
+
+  /* Radius */
+  --patch-radius: 8px;
+  --patch-radius-sm: 6px;
+  --patch-radius-lg: 12px;
+
+  /* Spacing */
+  --patch-space-1: 4px;
+  --patch-space-2: 6px;
+  --patch-space-3: 8px;
+  --patch-space-4: 10px;
+  --patch-space-5: 12px;
+  --patch-space-6: 14px;
+  --patch-space-7: 16px;
+
+  /* Typography */
+  --patch-font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --patch-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --patch-text-sm: 12px;
+  --patch-text-base: 14px;
+  --patch-text-title: 15px;
+
+  /* Motion */
+  --patch-transition: 120ms ease;
+
+  /* Shell */
+  --patch-shell-width: 380px;
+  --patch-shell-max-height: 560px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --patch-bg: #202020;
+    --patch-surface: #262626;
+    --patch-surface-muted: #2f2f2f;
+    --patch-fg: #ededed;
+    --patch-fg-secondary: #9b9b9b;
+    --patch-border: rgb(255 255 255 / 10%);
+    --patch-border-strong: rgb(255 255 255 / 14%);
+    --patch-hover: rgb(255 255 255 / 5%);
+    --patch-active: rgb(255 255 255 / 8%);
+    --patch-primary: #ededed;
+    --patch-primary-fg: #171717;
+    --patch-primary-hover: #ffffff;
+    --patch-focus: rgb(142 155 255 / 35%);
+    --patch-error: #ff8a80;
+    --patch-overlay-scrim: rgb(0 0 0 / 55%);
+  }
+}

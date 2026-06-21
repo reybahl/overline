@@ -1,12 +1,15 @@
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
+import {
+  PATCH_SHELL_MAX_HEIGHT,
+  PATCH_SHELL_WIDTH,
+} from "@/ui/tokens";
 
 const OVERLAY_HOST_ID = "patch-overlay-host";
 const OVERLAY_STYLE_ID = "patch-overlay-styles";
-const PANEL_WIDTH = 380;
-const PANEL_MAX_HEIGHT = 560;
 const PANEL_PATH = "src/window/index.html";
 const PANEL_RESIZE_MESSAGE = "PATCH_PANEL_RESIZE";
 
+/* Color values mirror src/ui/tokens.css */
 const overlayStyles = `
 #${OVERLAY_HOST_ID} {
   position: fixed;
@@ -19,7 +22,7 @@ const overlayStyles = `
 }
 
 #${OVERLAY_HOST_ID} .patch-overlay-panel {
-  width: ${PANEL_WIDTH}px;
+  width: ${PATCH_SHELL_WIDTH}px;
   background: #ffffff;
   border-radius: 12px;
   box-shadow:
@@ -27,6 +30,39 @@ const overlayStyles = `
     0 2px 8px rgb(15 15 15 / 8%);
   flex-shrink: 0;
   overflow: hidden;
+}
+
+@keyframes patch-overlay-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes patch-panel-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  #${OVERLAY_HOST_ID} {
+    animation: patch-overlay-enter 150ms ease;
+  }
+
+  #${OVERLAY_HOST_ID} .patch-overlay-panel {
+    animation: patch-panel-enter 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition: height 120ms ease;
+  }
 }
 
 #${OVERLAY_HOST_ID} .patch-overlay-frame {
@@ -84,7 +120,7 @@ function isOverlayOpen(): boolean {
 
 function clampPanelHeight(height: number): number {
   const maxHeight = Math.min(
-    PANEL_MAX_HEIGHT,
+    PATCH_SHELL_MAX_HEIGHT,
     Math.floor(window.innerHeight * 0.85),
   );
   return Math.min(Math.max(height, 1), maxHeight);
