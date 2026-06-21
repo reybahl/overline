@@ -16,6 +16,10 @@ import {
   isInjectableUrl,
 } from "@/shared/tab";
 import { formatShortcutForDisplay } from "@/shared/shortcut";
+import {
+  PATCH_PANEL_CLOSE_MESSAGE,
+  PATCH_PANEL_RESIZE_MESSAGE,
+} from "@/ui/tokens";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
@@ -657,6 +661,15 @@ searchInput.addEventListener("keydown", (event) => {
   }
 });
 
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  event.preventDefault();
+  closePalette();
+});
+
 recordBtn.addEventListener("click", () => {
   void handleRecordMacro();
 });
@@ -685,13 +698,24 @@ optionsLink.addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();
 });
 
+function closePalette(): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  window.parent.postMessage({ type: PATCH_PANEL_CLOSE_MESSAGE }, "*");
+}
+
 function reportPanelHeight(): void {
   if (window.parent === window) {
     return;
   }
 
   const height = Math.ceil(document.documentElement.offsetHeight);
-  window.parent.postMessage({ type: "PATCH_PANEL_RESIZE", height }, "*");
+  window.parent.postMessage(
+    { type: PATCH_PANEL_RESIZE_MESSAGE, height },
+    "*",
+  );
 }
 
 function startPanelHeightObserver(): void {

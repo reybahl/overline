@@ -1,5 +1,7 @@
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import {
+  PATCH_PANEL_CLOSE_MESSAGE,
+  PATCH_PANEL_RESIZE_MESSAGE,
   PATCH_SHELL_MAX_HEIGHT,
   PATCH_SHELL_WIDTH,
 } from "@/ui/tokens";
@@ -7,7 +9,6 @@ import {
 const OVERLAY_HOST_ID = "patch-overlay-host";
 const OVERLAY_STYLE_ID = "patch-overlay-styles";
 const PANEL_PATH = "src/window/index.html";
-const PANEL_RESIZE_MESSAGE = "PATCH_PANEL_RESIZE";
 
 /* Color values mirror src/ui/tokens.css */
 const overlayStyles = `
@@ -126,7 +127,7 @@ function clampPanelHeight(height: number): number {
   return Math.min(Math.max(height, 1), maxHeight);
 }
 
-function handlePanelResize(event: MessageEvent): void {
+function handlePanelMessage(event: MessageEvent): void {
   if (event.source !== panelFrame?.contentWindow) {
     return;
   }
@@ -136,7 +137,12 @@ function handlePanelResize(event: MessageEvent): void {
     return;
   }
 
-  if (event.data?.type !== PANEL_RESIZE_MESSAGE) {
+  if (event.data?.type === PATCH_PANEL_CLOSE_MESSAGE) {
+    closeOverlay();
+    return;
+  }
+
+  if (event.data?.type !== PATCH_PANEL_RESIZE_MESSAGE) {
     return;
   }
 
@@ -164,7 +170,7 @@ function closeOverlay(): void {
   overlayHost = null;
   panelElement = null;
   panelFrame = null;
-  window.removeEventListener("message", handlePanelResize);
+  window.removeEventListener("message", handlePanelMessage);
   document.body.style.overflow = previousBodyOverflow;
 }
 
@@ -204,7 +210,7 @@ function openOverlay(): void {
 
   panelElement = panel;
   panelFrame = iframe;
-  window.addEventListener("message", handlePanelResize);
+  window.addEventListener("message", handlePanelMessage);
 
   keydownHandler = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
