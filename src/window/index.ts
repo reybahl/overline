@@ -39,7 +39,7 @@ const reviewScriptJsonEl = requireElement<HTMLPreElement>("review-script-json");
 const confirmSaveBtn = requireElement<HTMLButtonElement>("confirm-save-btn");
 const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
-const optionsLink = requireElement<HTMLAnchorElement>("options-link");
+const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
 const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
 
@@ -571,10 +571,34 @@ cancelRecordBtn.addEventListener("click", () => {
   void handleCancelRecording();
 });
 
-optionsLink.addEventListener("click", (event) => {
-  event.preventDefault();
+optionsLink.addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();
 });
+
+function reportPanelHeight(): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  const height = Math.ceil(document.documentElement.offsetHeight);
+  window.parent.postMessage({ type: "PATCH_PANEL_RESIZE", height }, "*");
+}
+
+function startPanelHeightObserver(): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  const scheduleReport = (): void => {
+    requestAnimationFrame(reportPanelHeight);
+  };
+
+  scheduleReport();
+  window.addEventListener("load", scheduleReport);
+  new ResizeObserver(scheduleReport).observe(document.documentElement);
+}
+
+startPanelHeightObserver();
 
 void refreshMacroSelect()
   .then(() => syncPendingRecord())
