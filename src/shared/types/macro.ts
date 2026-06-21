@@ -68,6 +68,7 @@ export const AgentTurnSchema = z.object({
   done: z.boolean(),
   reasoning: z.string().optional(),
   macroName: z.string().optional(),
+  macroDescription: z.string().optional(),
 });
 
 export type AgentTurn = z.infer<typeof AgentTurnSchema>;

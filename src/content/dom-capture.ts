@@ -283,12 +283,31 @@ function readChecked(el: Element): boolean | undefined {
   return readAriaBoolean(el, "aria-checked");
 }
 
+function capturePriority(element: DomElement): number {
+  let score = 0;
+
+  if (element.controlKind === "nav-tab") {
+    score += 100;
+  }
+  if (element.idStable) {
+    score += 50;
+  }
+  if (element.controlKind === "dropdown-trigger" || element.controlKind === "disclosure") {
+    score += 30;
+  }
+  if (element.role === "link" && element.text.length > 0) {
+    score += 10;
+  }
+
+  return score;
+}
+
 export function captureDom(): DomElement[] {
   const elements = document.querySelectorAll(INTERACTIVE_SELECTOR);
   const results: DomElement[] = [];
 
   for (const element of elements) {
-    if (results.length >= MAX_ELEMENTS) {
+    if (results.length >= MAX_ELEMENTS * 4) {
       break;
     }
 
@@ -340,7 +359,8 @@ export function captureDom(): DomElement[] {
     });
   }
 
-  return results;
+  results.sort((left, right) => capturePriority(right) - capturePriority(left));
+  return results.slice(0, MAX_ELEMENTS);
 }
 
 declare global {

@@ -56,6 +56,11 @@ const MACRO_NAME_RULE =
   'Examples: "Copy GitHub Clone URL", "Open Issues Tab", "Save Billing Settings". ' +
   "Do not use kebab-case, snake_case, or abbreviations.";
 
+const MACRO_DESCRIPTION_RULE =
+  "One plain-English sentence describing what the macro does — not where it runs, " +
+  'not the raw user intent. Examples: "Copies the HTTPS clone URL from the Code menu.", ' +
+  '"Opens the Issues tab on the current repository."';
+
 function buildSingleShotPrompt(
   intent: string,
   elements: DomElement[],
@@ -81,6 +86,7 @@ function buildSingleShotPrompt(
     "- For waitFor steps, put timeout milliseconds in value and selector to wait for",
     "- Keep steps minimal and ordered",
     `- Name the macro: ${MACRO_NAME_RULE}`,
+    `- Description: ${MACRO_DESCRIPTION_RULE}`,
   ].join("\n");
 }
 
@@ -102,11 +108,14 @@ function buildAgentTurnPrompt(
     "Current page state:",
     JSON.stringify(elements, null, 2),
     "",
-    "What is the single next step to take? Check Current URL first — set done: true if the intent is already satisfied.",
+    "What is the single next step to take?",
     "Rules:",
+    "- Never set done: true when steps taken so far is empty — you must record at least one action first",
+    "- Set done: true only when the intent is fully satisfied (check selected/pressed state and URL, not URL alone)",
     "- For multi-step intents (e.g. \"go to X then Y\"), set done: true once the final destination is reached",
     ...RECORD_AGENT_RULES,
     `- When done: true, set macroName. ${MACRO_NAME_RULE}`,
+    `- When done: true, set macroDescription. ${MACRO_DESCRIPTION_RULE}`,
   ]
     .filter(Boolean)
     .join("\n");

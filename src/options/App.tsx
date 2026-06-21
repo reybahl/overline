@@ -341,13 +341,13 @@ export default function App() {
                         <span className="patch-badge">Active</span>
                       ) : null}
                     </div>
+                    {macro.description ? (
+                      <p className="patch-card__meta">{macro.description}</p>
+                    ) : null}
                     {macro.intent ? (
                       <p className="patch-card__meta">
                         Intent: &quot;{macro.intent}&quot;
                       </p>
-                    ) : null}
-                    {macro.description ? (
-                      <p className="patch-card__meta">{macro.description}</p>
                     ) : null}
                   </div>
                   <button
