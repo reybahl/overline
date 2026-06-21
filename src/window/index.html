@@ -4,39 +4,55 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Patch</title>
-    <link rel="stylesheet" href="./window.css" />
   </head>
   <body>
-    <main class="patch-shell">
-      <header class="patch-header">
-        <h1 class="patch-header__title">Patch</h1>
-      </header>
+    <main class="patch-shell patch-shell--palette">
+      <div id="palette-panel" class="patch-palette">
+        <div class="patch-palette__search-wrap">
+          <input
+            id="search-input"
+            type="search"
+            class="patch-palette__search"
+            placeholder="Search macros…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-controls="macro-list"
+            aria-autocomplete="list"
+          />
+        </div>
 
-      <label class="patch-field" for="intent-input">
-        <span class="patch-label">Intent</span>
-        <input
-          id="intent-input"
-          type="text"
-          class="patch-input"
-          placeholder="Go to Files changed"
-        />
-      </label>
+        <div class="patch-palette__list-wrap">
+          <ul id="macro-list" class="patch-palette__list" role="listbox" aria-label="Macros"></ul>
+          <p id="macro-empty" class="patch-palette__empty patch-text-muted" hidden>
+            No macros found
+          </p>
+        </div>
 
-      <label class="patch-field" for="macro-select">
-        <span class="patch-label">Macro</span>
-        <select id="macro-select" class="patch-input"></select>
-      </label>
-
-      <div class="patch-stack patch-stack--actions">
-        <button id="record-btn" type="button" class="patch-btn patch-btn--primary">
-          Record
-        </button>
-        <button id="run-btn" type="button" class="patch-btn">Run</button>
-        <button id="capture-btn" type="button" class="patch-btn">Capture DOM</button>
-        <button id="generate-btn" type="button" class="patch-btn">Generate</button>
-        <button id="cancel-record-btn" type="button" class="patch-btn" hidden>
-          Cancel recording
-        </button>
+        <footer class="patch-palette-footer">
+          <div class="patch-palette-footer__record">
+            <input
+              id="intent-input"
+              type="text"
+              class="patch-palette__intent"
+              placeholder="Describe what to record…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button id="record-btn" type="button" class="patch-btn patch-btn--sm patch-btn--primary">
+              Record
+            </button>
+          </div>
+          <div class="patch-palette-footer__actions">
+            <button id="capture-btn" type="button" class="patch-btn patch-btn--sm">Capture DOM</button>
+            <button id="generate-btn" type="button" class="patch-btn patch-btn--sm">Generate</button>
+            <button id="cancel-record-btn" type="button" class="patch-btn patch-btn--sm" hidden>
+              Cancel recording
+            </button>
+            <button type="button" id="options-link" class="patch-btn patch-btn--sm patch-btn--ghost">
+              Manage macros
+            </button>
+          </div>
+        </footer>
       </div>
 
       <p id="status" class="patch-status" role="status" aria-live="polite"></p>
@@ -55,12 +71,6 @@
       </section>
 
       <pre id="capture-output" class="patch-code" hidden></pre>
-
-      <footer class="patch-footer">
-        <button type="button" id="options-link" class="patch-btn patch-btn--ghost">
-          Manage macros
-        </button>
-      </footer>
     </main>
 
     <script type="module" src="./index.ts"></script>

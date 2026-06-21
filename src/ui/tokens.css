@@ -46,8 +46,8 @@
   --patch-transition: 120ms ease;
 
   /* Shell */
-  --patch-shell-width: 380px;
-  --patch-shell-max-height: 560px;
+  --patch-shell-width: 560px;
+  --patch-shell-max-height: 480px;
 }
 
 @media (prefers-color-scheme: dark) {

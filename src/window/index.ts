@@ -1,3 +1,5 @@
+import "@/ui/index.css";
+
 import type { DomElement } from "@/content/dom-capture";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { PendingRecord } from "@/shared/types/pending-record";
@@ -13,6 +15,7 @@ import {
   getRestrictedPageMessage,
   isInjectableUrl,
 } from "@/shared/tab";
+import { formatShortcutForDisplay } from "@/shared/shortcut";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
@@ -24,10 +27,12 @@ function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+const searchInput = requireElement<HTMLInputElement>("search-input");
 const intentInput = requireElement<HTMLInputElement>("intent-input");
-const macroSelect = requireElement<HTMLSelectElement>("macro-select");
+const macroListEl = requireElement<HTMLUListElement>("macro-list");
+const macroEmptyEl = requireElement<HTMLParagraphElement>("macro-empty");
+const palettePanelEl = requireElement<HTMLElement>("palette-panel");
 const recordBtn = requireElement<HTMLButtonElement>("record-btn");
-const runBtn = requireElement<HTMLButtonElement>("run-btn");
 const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
 const generateBtn = requireElement<HTMLButtonElement>("generate-btn");
 const statusEl = requireElement<HTMLParagraphElement>("status");
@@ -41,9 +46,13 @@ const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
 const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
-const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
+const actionButtons = [recordBtn, captureBtn, generateBtn];
 
 let savedMacros: Macro[] = [];
+let pageMacros: Macro[] = [];
+let filteredMacros: Macro[] = [];
+let selectedIndex = 0;
+let currentTabUrl = "";
 let pendingMacro: Macro | null = null;
 let pendingRecordPoll: number | undefined;
 
@@ -85,6 +94,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
   if (!record) {
     stopPendingRecordPoll();
     setRecordingUi(false);
+    palettePanelEl.hidden = false;
     return;
   }
 
@@ -92,6 +102,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
     case "recording":
       setBusy(true);
       setRecordingUi(true);
+      palettePanelEl.hidden = true;
       setStatus(
         record.progress ??
           "Recording… you can close Patch while it keeps working.",
@@ -102,6 +113,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
       stopPendingRecordPoll();
       setBusy(false);
       setRecordingUi(false);
+      palettePanelEl.hidden = true;
       showReview(record.macro, record.reasoning);
       setStatus("Review the recorded steps below.");
       return;
@@ -109,6 +121,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
       stopPendingRecordPoll();
       setBusy(false);
       setRecordingUi(false);
+      palettePanelEl.hidden = false;
       hideReview();
       setStatus(record.error, true);
       return;
@@ -128,10 +141,14 @@ function setBusy(disabled: boolean): void {
   for (const button of actionButtons) {
     button.toggleAttribute("disabled", disabled);
   }
+  searchInput.toggleAttribute("disabled", disabled);
   intentInput.toggleAttribute("disabled", disabled);
-  macroSelect.toggleAttribute("disabled", disabled);
   confirmSaveBtn.toggleAttribute("disabled", disabled);
   discardBtn.toggleAttribute("disabled", disabled);
+
+  for (const button of macroListEl.querySelectorAll("button")) {
+    button.toggleAttribute("disabled", disabled);
+  }
 }
 
 function setRecordingUi(isRecording: boolean): void {
@@ -212,22 +229,114 @@ function showReview(macro: Macro, reasoning: string[] = []): void {
   reviewPanelEl.hidden = false;
 }
 
-function getIntent(): string {
-  return intentInput.value.trim();
-}
-
 function requireIntent(): string {
-  const intent = getIntent();
+  const intent = intentInput.value.trim();
   if (!intent) {
     throw new Error("Enter an intent first.");
   }
   return intent;
 }
 
-function getSelectedMacro(): Macro | null {
-  const macroId = macroSelect.value;
-  if (!macroId) return null;
-  return savedMacros.find((macro) => macro.id === macroId) ?? null;
+function getMacroDescription(macro: Macro): string | undefined {
+  return macro.description ?? macro.intent;
+}
+
+function filterMacros(macros: Macro[], query: string): Macro[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) {
+    return macros;
+  }
+
+  return macros.filter((macro) => {
+    const haystack = [macro.name, macro.description, macro.intent]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(normalized);
+  });
+}
+
+function scrollSelectedIntoView(): void {
+  const activeItem = macroListEl.querySelector(".patch-palette__item--active");
+  activeItem?.scrollIntoView({ block: "nearest" });
+}
+
+function renderMacroList(highlightMacroId?: string): void {
+  filteredMacros = filterMacros(pageMacros, searchInput.value);
+  macroListEl.replaceChildren();
+
+  if (highlightMacroId) {
+    const highlightIndex = filteredMacros.findIndex(
+      (macro) => macro.id === highlightMacroId,
+    );
+    selectedIndex = highlightIndex >= 0 ? highlightIndex : 0;
+  }
+
+  if (filteredMacros.length === 0) {
+    macroEmptyEl.hidden = false;
+    macroEmptyEl.textContent =
+      pageMacros.length === 0
+        ? currentTabUrl
+          ? "No macros for this page"
+          : "No macros saved"
+        : "No matching macros";
+    selectedIndex = 0;
+    return;
+  }
+
+  macroEmptyEl.hidden = true;
+
+  if (selectedIndex >= filteredMacros.length) {
+    selectedIndex = filteredMacros.length - 1;
+  }
+  if (selectedIndex < 0) {
+    selectedIndex = 0;
+  }
+
+  for (const [index, macro] of filteredMacros.entries()) {
+    const item = document.createElement("li");
+    item.className = "patch-palette__item";
+    if (index === selectedIndex) {
+      item.classList.add("patch-palette__item--active");
+    }
+    item.setAttribute("role", "option");
+    item.setAttribute("aria-selected", index === selectedIndex ? "true" : "false");
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "patch-palette__item-btn";
+    button.addEventListener("click", () => {
+      void handleRunMacro(macro);
+    });
+
+    const main = document.createElement("div");
+    main.className = "patch-palette__item-main";
+
+    const title = document.createElement("span");
+    title.className = "patch-palette__item-title";
+    title.textContent = macro.name;
+    main.appendChild(title);
+
+    const description = getMacroDescription(macro);
+    if (description) {
+      const subtitle = document.createElement("span");
+      subtitle.className = "patch-palette__item-desc";
+      subtitle.textContent = description;
+      main.appendChild(subtitle);
+    }
+
+    button.appendChild(main);
+
+    if (macro.shortcut) {
+      const shortcut = document.createElement("kbd");
+      shortcut.className = "patch-kbd patch-kbd--compact";
+      shortcut.textContent = formatShortcutForDisplay(macro.shortcut);
+      button.appendChild(shortcut);
+    }
+
+    item.appendChild(button);
+    macroListEl.appendChild(item);
+  }
 }
 
 async function sendBackgroundMessage(
@@ -236,59 +345,22 @@ async function sendBackgroundMessage(
   return chrome.runtime.sendMessage(message);
 }
 
-async function refreshMacroSelect(preferredMacroId?: string): Promise<void> {
+async function refreshMacros(preferredMacroId?: string): Promise<void> {
   const tab = await getActiveTab();
-  const url = tab.url ?? "";
+  currentTabUrl = tab.url ?? "";
 
-  const [macrosResponse, settingsResponse] = await Promise.all([
-    sendBackgroundMessage({ type: "GET_MACROS" }),
-    sendBackgroundMessage({ type: "GET_SETTINGS" }),
-  ]);
+  const macrosResponse = await sendBackgroundMessage({ type: "GET_MACROS" });
 
   if (!macrosResponse.ok) {
     throw new Error(macrosResponse.error);
   }
 
   savedMacros = macrosResponse.macros ?? [];
-  const options = url ? getMacrosForUrl(savedMacros, url) : [];
+  pageMacros = currentTabUrl
+    ? getMacrosForUrl(savedMacros, currentTabUrl)
+    : [];
 
-  macroSelect.replaceChildren();
-
-  if (options.length === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = url
-      ? "No macros for this page"
-      : "No macros saved";
-    macroSelect.appendChild(option);
-    runBtn.toggleAttribute("disabled", true);
-    return;
-  }
-
-  runBtn.toggleAttribute("disabled", false);
-
-  for (const macro of options) {
-    const option = document.createElement("option");
-    option.value = macro.id;
-    option.textContent = `${macro.name}${
-      macro.script
-        ? ` · ${macro.script.steps.length} script step${
-            macro.script.steps.length === 1 ? "" : "s"
-          }`
-        : ` (${macro.steps.length} steps)`
-    }`;
-    macroSelect.appendChild(option);
-  }
-
-  const preferredId =
-    preferredMacroId ??
-    (settingsResponse.ok
-      ? settingsResponse.settings?.currentMacroId ?? undefined
-      : undefined);
-
-  if (preferredId && options.some((macro) => macro.id === preferredId)) {
-    macroSelect.value = preferredId;
-  }
+  renderMacroList(preferredMacroId);
 }
 
 async function captureDomOnActiveTab(): Promise<{
@@ -423,9 +495,12 @@ async function handleConfirmSave(): Promise<void> {
     const macroId = pendingMacro.id;
     const macroName = pendingMacro.name;
     hideReview();
+    palettePanelEl.hidden = false;
+    intentInput.value = "";
     await clearPendingRecord();
-    await refreshMacroSelect(macroId);
+    await refreshMacros(macroId);
     setStatus(`Saved macro "${macroName}"`);
+    searchInput.focus();
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to save macro";
@@ -437,8 +512,10 @@ async function handleConfirmSave(): Promise<void> {
 
 function handleDiscard(): void {
   hideReview();
+  palettePanelEl.hidden = false;
   void clearPendingRecord().then(() => {
     setStatus("Recording discarded.");
+    searchInput.focus();
   });
 }
 
@@ -446,6 +523,7 @@ async function handleCancelRecording(): Promise<void> {
   stopPendingRecordPoll();
   setBusy(false);
   setRecordingUi(false);
+  palettePanelEl.hidden = false;
 
   try {
     const response = await sendBackgroundMessage({
@@ -456,6 +534,7 @@ async function handleCancelRecording(): Promise<void> {
     }
     applyPendingRecord(response.pendingRecord ?? null);
     setStatus("Recording cancelled.");
+    searchInput.focus();
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to cancel recording";
@@ -498,15 +577,16 @@ async function handleGenerateMacro(): Promise<void> {
   }
 }
 
-async function handleRunMacro(): Promise<void> {
+async function handleRunMacro(macro?: Macro): Promise<void> {
+  const target = macro ?? filteredMacros[selectedIndex];
+  if (!target) {
+    setStatus("No macro selected.", true);
+    return;
+  }
+
   setBusy(true);
 
   try {
-    const macro = getSelectedMacro();
-    if (!macro) {
-      throw new Error("Select a macro to run.");
-    }
-
     const tab = await getActiveTab();
     const tabId = tab.id;
     const url = tab.url;
@@ -517,23 +597,23 @@ async function handleRunMacro(): Promise<void> {
     if (!url || !isInjectableUrl(url)) {
       throw new Error(getRestrictedPageMessage(url));
     }
-    if (!macroMatchesUrl(macro, url)) {
-      throw new Error(`"${macro.name}" does not run on this page.`);
+    if (!macroMatchesUrl(target, url)) {
+      throw new Error(`"${target.name}" does not run on this page.`);
     }
 
-    setStatus(`Running "${macro.name}"…`);
+    setStatus(`Running "${target.name}"…`);
 
     const response = await sendBackgroundMessage({
       type: "EXECUTE_MACRO",
       tabId,
-      macroId: macro.id,
+      macroId: target.id,
     });
 
     if (!response?.ok) {
       throw new Error(response?.error ?? "Failed to run macro.");
     }
 
-    setStatus(`Ran macro "${macro.name}"`);
+    setStatus(`Ran macro "${target.name}"`);
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to run macro";
@@ -543,12 +623,42 @@ async function handleRunMacro(): Promise<void> {
   }
 }
 
-recordBtn.addEventListener("click", () => {
-  void handleRecordMacro();
+searchInput.addEventListener("input", () => {
+  selectedIndex = 0;
+  renderMacroList();
 });
 
-runBtn.addEventListener("click", () => {
-  void handleRunMacro();
+searchInput.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown") {
+    if (filteredMacros.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    selectedIndex = Math.min(selectedIndex + 1, filteredMacros.length - 1);
+    renderMacroList();
+    scrollSelectedIntoView();
+    return;
+  }
+
+  if (event.key === "ArrowUp") {
+    if (filteredMacros.length === 0) {
+      return;
+    }
+    event.preventDefault();
+    selectedIndex = Math.max(selectedIndex - 1, 0);
+    renderMacroList();
+    scrollSelectedIntoView();
+    return;
+  }
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void handleRunMacro();
+  }
+});
+
+recordBtn.addEventListener("click", () => {
+  void handleRecordMacro();
 });
 
 captureBtn.addEventListener("click", () => {
@@ -600,8 +710,11 @@ function startPanelHeightObserver(): void {
 
 startPanelHeightObserver();
 
-void refreshMacroSelect()
+void refreshMacros()
   .then(() => syncPendingRecord())
+  .then(() => {
+    searchInput.focus();
+  })
   .catch((error: unknown) => {
     const message =
       error instanceof Error ? error.message : "Failed to load macros";
@@ -609,9 +722,19 @@ void refreshMacroSelect()
   });
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local" || !("patch:pendingRecord" in changes)) {
+  if (areaName !== "local") {
     return;
   }
 
-  void syncPendingRecord();
+  if ("patch:macros" in changes) {
+    void refreshMacros().catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to refresh macros";
+      setStatus(message, true);
+    });
+  }
+
+  if ("patch:pendingRecord" in changes) {
+    void syncPendingRecord();
+  }
 });
