@@ -38,6 +38,7 @@
   --patch-text-sm: 12px;
   --patch-text-base: 14px;
   --patch-text-title: 15px;
+  --patch-text-heading: 22px;
 
   /* Motion */
   --patch-transition: 120ms ease;
