@@ -1,1 +1,14 @@
 @import "../ui/index.css";
+
+.patch-page--options {
+  max-width: 34rem;
+  padding-top: var(--patch-space-6);
+}
+
+.patch-page--options .patch-page-header {
+  margin-bottom: var(--patch-space-5);
+}
+
+.patch-page--options .patch-stack--loose {
+  gap: var(--patch-space-2);
+}

@@ -331,10 +331,10 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
     <details className="patch-card">
       <summary className="patch-card__summary">
         <div className="patch-card__summary-main">
-          <div className="patch-inline-actions">
+          <div className="patch-card__heading">
             <span className="patch-card__title">{macro.name}</span>
             {macro.shortcut ? (
-              <kbd className="patch-kbd">
+              <kbd className="patch-kbd patch-kbd--compact">
                 {formatShortcutForDisplay(macro.shortcut)}
               </kbd>
             ) : null}
@@ -506,12 +506,11 @@ export default function App() {
 
   return (
     <>
-      <main className="patch-page">
+      <main className="patch-page patch-page--options">
       <header className="patch-page-header">
         <h1 className="patch-header__title patch-header__title--lg">Patch</h1>
         <p className="patch-header__subtitle">
-          Manage saved macros. Configure where each macro runs and assign keyboard
-          shortcuts.
+          Saved macros, shortcuts, and run scope.
         </p>
       </header>
 

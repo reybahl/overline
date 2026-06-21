@@ -214,19 +214,34 @@ select.patch-input {
 }
 
 .patch-card {
+  overflow: hidden;
   border: 1px solid var(--patch-border);
-  border-radius: var(--patch-radius-sm);
-  background: var(--patch-surface-muted);
+  border-radius: var(--patch-radius);
+  background: var(--patch-surface);
+  transition: border-color var(--patch-transition);
+}
+
+.patch-card:hover {
+  border-color: var(--patch-border-strong);
 }
 
 .patch-card__summary {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: var(--patch-space-4);
-  padding: var(--patch-space-5);
+  padding: var(--patch-space-4) var(--patch-space-5);
   cursor: pointer;
   list-style: none;
+  transition: background-color var(--patch-transition);
+}
+
+.patch-card__summary:hover {
+  background: var(--patch-hover);
+}
+
+.patch-card[open] > .patch-card__summary {
+  background: var(--patch-hover);
 }
 
 .patch-card__summary::-webkit-details-marker {
@@ -236,13 +251,19 @@ select.patch-input {
 .patch-card__summary::after {
   content: "";
   flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  margin-top: 6px;
+  width: 5px;
+  height: 5px;
   border-right: 1.5px solid var(--patch-fg-secondary);
   border-bottom: 1.5px solid var(--patch-fg-secondary);
   transform: rotate(-45deg);
-  transition: transform var(--patch-transition);
+  opacity: 0.7;
+  transition:
+    transform var(--patch-transition),
+    opacity var(--patch-transition);
+}
+
+.patch-card__summary:hover::after {
+  opacity: 1;
 }
 
 .patch-card[open] > .patch-card__summary::after {
@@ -310,15 +331,33 @@ select.patch-input {
   gap: var(--patch-space-5);
 }
 
+.patch-card__heading {
+  display: flex;
+  align-items: center;
+  gap: var(--patch-space-2);
+  min-width: 0;
+}
+
 .patch-card__title {
   margin: 0;
+  min-width: 0;
+  font-size: var(--patch-text-base);
   font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .patch-card__meta {
-  margin: var(--patch-space-1) 0 0;
+  margin: 0;
   font-size: var(--patch-text-sm);
+  line-height: 1.45;
   color: var(--patch-fg-secondary);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .patch-badge {
@@ -344,6 +383,15 @@ select.patch-input {
   font: 11px / 1.45 var(--patch-font-mono);
   background: var(--patch-surface);
   color: var(--patch-fg);
+}
+
+.patch-kbd--compact {
+  flex-shrink: 0;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 1.6;
+  color: var(--patch-fg-secondary);
+  background: transparent;
 }
 
 .patch-disclosure {
