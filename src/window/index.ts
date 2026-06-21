@@ -121,7 +121,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
 
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
-  statusEl.classList.toggle("error", isError);
+  statusEl.classList.toggle("patch-status--error", isError);
 }
 
 function setBusy(disabled: boolean): void {

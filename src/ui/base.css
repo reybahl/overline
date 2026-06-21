@@ -1,0 +1,86 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--patch-bg);
+  color: var(--patch-fg);
+  font: var(--patch-text-base) / 1.4 var(--patch-font);
+  -webkit-font-smoothing: antialiased;
+}
+
+.patch-shell {
+  width: var(--patch-shell-width);
+  padding: var(--patch-space-7);
+}
+
+.patch-page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--patch-space-7);
+}
+
+.patch-page-header {
+  margin-bottom: var(--patch-space-7);
+}
+
+.patch-header__title--lg {
+  font-size: var(--patch-text-heading);
+}
+
+.patch-header__subtitle {
+  margin: var(--patch-space-2) 0 0;
+  font-size: var(--patch-text-sm);
+  color: var(--patch-fg-secondary);
+}
+
+.patch-stack--loose {
+  gap: var(--patch-space-5);
+}
+
+.patch-header {
+  margin-bottom: var(--patch-space-6);
+}
+
+.patch-header__title {
+  margin: 0;
+  font-size: var(--patch-text-title);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.patch-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--patch-space-2);
+}
+
+ul.patch-stack {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.patch-stack--actions {
+  margin-top: var(--patch-space-1);
+}
+
+.patch-row {
+  display: flex;
+  gap: var(--patch-space-2);
+}
+
+.patch-row > .patch-btn {
+  flex: 1;
+}
+
+.patch-footer {
+  margin-top: var(--patch-space-5);
+}

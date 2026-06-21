@@ -7,57 +7,57 @@
     <link rel="stylesheet" href="./window.css" />
   </head>
   <body>
-    <main class="shell">
-      <header class="header">
-        <h1>Patch</h1>
+    <main class="patch-shell">
+      <header class="patch-header">
+        <h1 class="patch-header__title">Patch</h1>
       </header>
 
-      <label class="field" for="intent-input">
-        <span class="label">Intent</span>
+      <label class="patch-field" for="intent-input">
+        <span class="patch-label">Intent</span>
         <input
           id="intent-input"
           type="text"
-          class="control"
+          class="patch-input"
           placeholder="Go to Files changed"
         />
       </label>
 
-      <label class="field" for="macro-select">
-        <span class="label">Macro</span>
-        <select id="macro-select" class="control"></select>
+      <label class="patch-field" for="macro-select">
+        <span class="patch-label">Macro</span>
+        <select id="macro-select" class="patch-input"></select>
       </label>
 
-      <div class="actions">
-        <button id="record-btn" type="button" class="btn btn-primary">
+      <div class="patch-stack patch-stack--actions">
+        <button id="record-btn" type="button" class="patch-btn patch-btn--primary">
           Record
         </button>
-        <button id="run-btn" type="button" class="btn">Run</button>
-        <button id="capture-btn" type="button" class="btn">Capture DOM</button>
-        <button id="generate-btn" type="button" class="btn">Generate</button>
-        <button id="cancel-record-btn" type="button" class="btn" hidden>
+        <button id="run-btn" type="button" class="patch-btn">Run</button>
+        <button id="capture-btn" type="button" class="patch-btn">Capture DOM</button>
+        <button id="generate-btn" type="button" class="patch-btn">Generate</button>
+        <button id="cancel-record-btn" type="button" class="patch-btn" hidden>
           Cancel recording
         </button>
       </div>
 
-      <p id="status" class="status" role="status" aria-live="polite"></p>
+      <p id="status" class="patch-status" role="status" aria-live="polite"></p>
 
-      <section id="review-panel" class="review-panel" hidden>
-        <h2 class="review-title">Review</h2>
-        <p id="review-summary" class="review-summary"></p>
-        <ol id="review-steps" class="review-steps"></ol>
-        <pre id="review-script-json" class="code-block" hidden></pre>
-        <div class="review-actions">
-          <button id="confirm-save-btn" type="button" class="btn btn-primary">
+      <section id="review-panel" class="patch-section" hidden>
+        <h2 class="patch-section__title">Review</h2>
+        <p id="review-summary" class="patch-text-muted"></p>
+        <ol id="review-steps" class="patch-list"></ol>
+        <pre id="review-script-json" class="patch-code" hidden></pre>
+        <div class="patch-row">
+          <button id="confirm-save-btn" type="button" class="patch-btn patch-btn--primary">
             Save
           </button>
-          <button id="discard-btn" type="button" class="btn">Discard</button>
+          <button id="discard-btn" type="button" class="patch-btn">Discard</button>
         </div>
       </section>
 
-      <pre id="capture-output" class="code-block" hidden></pre>
+      <pre id="capture-output" class="patch-code" hidden></pre>
 
-      <footer class="footer">
-        <button type="button" id="options-link" class="footer-action">
+      <footer class="patch-footer">
+        <button type="button" id="options-link" class="patch-btn patch-btn--ghost">
           Manage macros
         </button>
       </footer>
