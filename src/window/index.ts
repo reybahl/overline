@@ -19,7 +19,7 @@ const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) {
-    throw new Error(`Popup markup is missing #${id}`);
+    throw new Error(`Patch markup is missing #${id}`);
   }
   return element as T;
 }
@@ -39,7 +39,7 @@ const reviewScriptJsonEl = requireElement<HTMLPreElement>("review-script-json");
 const confirmSaveBtn = requireElement<HTMLButtonElement>("confirm-save-btn");
 const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
-const optionsLink = requireElement<HTMLAnchorElement>("options-link");
+const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
 const actionButtons = [recordBtn, runBtn, captureBtn, generateBtn];
 
@@ -94,7 +94,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
       setRecordingUi(true);
       setStatus(
         record.progress ??
-          "Recording… the popup can close while Patch keeps working.",
+          "Recording… you can close Patch while it keeps working.",
       );
       startPendingRecordPoll();
       return;
@@ -361,7 +361,7 @@ async function handleRecordMacro(): Promise<void> {
       throw new Error(getRestrictedPageMessage(startUrl));
     }
 
-    setStatus("Recording… the popup can close while Patch keeps working.");
+    setStatus("Recording… you can close Patch while it keeps working.");
     startPendingRecordPoll();
 
     void sendBackgroundMessage({
@@ -571,10 +571,34 @@ cancelRecordBtn.addEventListener("click", () => {
   void handleCancelRecording();
 });
 
-optionsLink.addEventListener("click", (event) => {
-  event.preventDefault();
+optionsLink.addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();
 });
+
+function reportPanelHeight(): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  const height = Math.ceil(document.documentElement.offsetHeight);
+  window.parent.postMessage({ type: "PATCH_PANEL_RESIZE", height }, "*");
+}
+
+function startPanelHeightObserver(): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  const scheduleReport = (): void => {
+    requestAnimationFrame(reportPanelHeight);
+  };
+
+  scheduleReport();
+  window.addEventListener("load", scheduleReport);
+  new ResizeObserver(scheduleReport).observe(document.documentElement);
+}
+
+startPanelHeightObserver();
 
 void refreshMacroSelect()
   .then(() => syncPendingRecord())

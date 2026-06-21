@@ -1,3 +1,4 @@
+import { INTERACTIVE_SELECTOR } from "@/shared/interactive-selector";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
@@ -15,7 +16,6 @@ const log = createLogger("script");
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
-const INTERACTIVE_SELECTOR = "a, button, input, select, textarea";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -86,6 +86,14 @@ function matchesText(el: Element, expected: string): boolean {
   return getAccessibleName(el) === expected;
 }
 
+function matchesAccessibleLabel(el: Element, expected: string): boolean {
+  if (getAccessibleName(el) === expected) {
+    return true;
+  }
+
+  return matchesText(el, expected);
+}
+
 function matchesElement(el: Element, match: ElementMatch): boolean {
   const criteria = normalizeElementMatch(match);
 
@@ -101,7 +109,7 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
     return false;
   }
 
-  if (criteria.ariaLabel && getAccessibleName(el) !== criteria.ariaLabel) {
+  if (criteria.ariaLabel && !matchesAccessibleLabel(el, criteria.ariaLabel)) {
     return false;
   }
 

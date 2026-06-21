@@ -7,7 +7,6 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_popup": "src/popup/index.html",
     "default_title": "Patch",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -20,8 +19,14 @@
   "content_scripts": [
     {
       "matches": ["http://*/*", "https://*/*"],
-      "js": ["src/content/shortcuts.js"],
+      "js": ["src/content/shortcuts.js", "src/content/overlay-host.js"],
       "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["src/window/index.html"],
+      "matches": ["http://*/*", "https://*/*"]
     }
   ],
   "background": {
@@ -33,7 +38,7 @@
     "open_in_tab": true
   },
   "commands": {
-    "_execute_action": {
+    "open-patch": {
       "suggested_key": {
         "default": "Ctrl+Shift+P",
         "mac": "Command+Shift+P"

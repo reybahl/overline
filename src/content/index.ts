@@ -19,6 +19,13 @@ function initializeContentScript(): void {
       _sender,
       sendResponse: (response: ContentResponse) => void,
     ) => {
+      if (
+        message.type === "TOGGLE_PATCH_OVERLAY" ||
+        message.type === "CLOSE_PATCH_OVERLAY"
+      ) {
+        return false;
+      }
+
       switch (message.type) {
         case "PING":
           sendResponse({ ok: true });

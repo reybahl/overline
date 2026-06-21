@@ -26,6 +26,7 @@ export default defineConfig({
       manifest: generateManifest,
       disableAutoLaunch: true,
       additionalInputs: [
+        "src/window/index.html",
         "src/content/index.ts",
         "src/content/dom-capture.ts",
         "src/content/shortcuts.ts",

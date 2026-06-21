@@ -1,3 +1,4 @@
+import { closePatchOverlay } from "@/background/overlay";
 import { getTabUrl } from "@/background/capture";
 import {
   attachDebugger,
@@ -248,6 +249,7 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
 
   let cdpReady = false;
   try {
+    await closePatchOverlay(tabId);
     await focusTabForPlayback(tabId);
     cdpReady = await tryAttachDebugger(tabId);
 
