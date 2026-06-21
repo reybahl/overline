@@ -16,7 +16,9 @@
   --patch-primary-hover: #34353a;
   --patch-focus: rgb(94 106 210 / 35%);
   --patch-error: #c62828;
+  --patch-destructive: #c62828;
   --patch-overlay-scrim: rgb(15 15 15 / 28%);
+  --patch-shadow-lg: 0 24px 48px rgb(15 15 15 / 16%), 0 2px 8px rgb(15 15 15 / 8%);
 
   /* Radius */
   --patch-radius: 8px;
@@ -64,6 +66,8 @@
     --patch-primary-hover: #ffffff;
     --patch-focus: rgb(142 155 255 / 35%);
     --patch-error: #ff8a80;
+    --patch-destructive: #f87171;
     --patch-overlay-scrim: rgb(0 0 0 / 55%);
+    --patch-shadow-lg: 0 24px 48px rgb(0 0 0 / 45%), 0 0 0 1px rgb(255 255 255 / 8%);
   }
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 
+import { ConfirmDialog } from "@/ui/ConfirmDialog";
 import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
 import { formatScriptStep } from "@/shared/script-format";
@@ -238,6 +239,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -266,10 +268,13 @@ export default function App() {
     })();
   }, []);
 
-  async function deleteMacro(macro: Macro): Promise<void> {
-    if (!window.confirm(`Delete "${macro.name}"?`)) {
+  async function confirmDeleteMacro(): Promise<void> {
+    if (!macroPendingDelete) {
       return;
     }
+
+    const macro = macroPendingDelete;
+    setMacroPendingDelete(null);
 
     const response = await sendBackgroundMessage({
       type: "DELETE_MACRO",
@@ -304,7 +309,8 @@ export default function App() {
   }
 
   return (
-    <main className="patch-page">
+    <>
+      <main className="patch-page">
       <header className="patch-page-header">
         <h1 className="patch-header__title patch-header__title--lg">Patch</h1>
         <p className="patch-header__subtitle">
@@ -348,7 +354,7 @@ export default function App() {
                     type="button"
                     className="patch-btn patch-btn--danger"
                     onClick={() => {
-                      void deleteMacro(macro);
+                      setMacroPendingDelete(macro);
                     }}
                   >
                     Delete
@@ -412,6 +418,26 @@ export default function App() {
           </ul>
         )}
       </section>
-    </main>
+      </main>
+
+      <ConfirmDialog
+        open={macroPendingDelete !== null}
+        title="Delete macro?"
+        message={
+          macroPendingDelete
+            ? `"${macroPendingDelete.name}" will be permanently removed.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={() => {
+          void confirmDeleteMacro();
+        }}
+        onCancel={() => {
+          setMacroPendingDelete(null);
+        }}
+      />
+    </>
   );
 }
