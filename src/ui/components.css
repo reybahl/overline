@@ -217,7 +217,90 @@ select.patch-input {
   border: 1px solid var(--patch-border);
   border-radius: var(--patch-radius-sm);
   background: var(--patch-surface-muted);
+}
+
+.patch-card__summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--patch-space-4);
   padding: var(--patch-space-5);
+  cursor: pointer;
+  list-style: none;
+}
+
+.patch-card__summary::-webkit-details-marker {
+  display: none;
+}
+
+.patch-card__summary::after {
+  content: "";
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-right: 1.5px solid var(--patch-fg-secondary);
+  border-bottom: 1.5px solid var(--patch-fg-secondary);
+  transform: rotate(-45deg);
+  transition: transform var(--patch-transition);
+}
+
+.patch-card[open] > .patch-card__summary::after {
+  transform: rotate(45deg);
+}
+
+.patch-card__summary-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--patch-space-1);
+}
+
+.patch-card__body {
+  padding: 0 var(--patch-space-5) var(--patch-space-5);
+  border-top: 1px solid var(--patch-border);
+}
+
+.patch-card__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--patch-space-5);
+  padding-top: var(--patch-space-4);
+  border-top: 1px solid var(--patch-border);
+}
+
+.patch-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--patch-radius-sm);
+  background: transparent;
+  color: var(--patch-fg-secondary);
+}
+
+.patch-btn--icon:hover:not(:disabled) {
+  background: var(--patch-hover);
+  border-color: transparent;
+}
+
+.patch-btn--icon.patch-btn--danger:hover:not(:disabled) {
+  color: var(--patch-destructive);
+  background: color-mix(in srgb, var(--patch-destructive) 12%, transparent);
+}
+
+.patch-icon {
+  display: block;
+}
+
+.patch-card__body .patch-section:first-of-type {
+  margin-top: var(--patch-space-5);
+  padding-top: 0;
+  border-top: 0;
 }
 
 .patch-card__header {

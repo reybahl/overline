@@ -138,6 +138,90 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
   );
 }
 
+type MacroDetailsEditorProps = {
+  macro: Macro;
+  onSaved: (macros: Macro[]) => void;
+  onError: (message: string | null) => void;
+};
+
+function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps) {
+  const [name, setName] = useState(macro.name);
+  const [description, setDescription] = useState(macro.description ?? "");
+  const [dirty, setDirty] = useState(false);
+
+  async function saveDetails(): Promise<void> {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      onError("Name is required.");
+      return;
+    }
+
+    const response = await sendBackgroundMessage({
+      type: "SAVE_MACRO",
+      macro: {
+        ...macro,
+        name: trimmedName,
+        description: description.trim() || undefined,
+        updatedAt: Date.now(),
+      },
+    });
+
+    if (!response.ok) {
+      onError(response.error);
+      return;
+    }
+
+    onError(null);
+    onSaved(response.macros ?? []);
+    setDirty(false);
+  }
+
+  return (
+    <div className="patch-section">
+      <label className="patch-field">
+        <span className="patch-label">Name</span>
+        <input
+          type="text"
+          className="patch-input"
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setDirty(true);
+          }}
+        />
+      </label>
+      <label className="patch-field">
+        <span className="patch-label">Description</span>
+        <input
+          type="text"
+          className="patch-input"
+          placeholder={
+            macro.intent && !macro.description
+              ? macro.intent
+              : "What this macro does"
+          }
+          value={description}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            setDirty(true);
+          }}
+        />
+      </label>
+      {dirty ? (
+        <button
+          type="button"
+          className="patch-btn patch-btn--sm"
+          onClick={() => {
+            void saveDetails();
+          }}
+        >
+          Save
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 type RunScopeEditorProps = {
   macro: Macro;
   onSaved: (macros: Macro[]) => void;
@@ -233,9 +317,131 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
   );
 }
 
+type MacroCardProps = {
+  macro: Macro;
+  onSaved: (macros: Macro[]) => void;
+  onError: (message: string | null) => void;
+  onDelete: () => void;
+};
+
+function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
+  const summaryDescription = macro.description ?? macro.intent;
+
+  return (
+    <details className="patch-card">
+      <summary className="patch-card__summary">
+        <div className="patch-card__summary-main">
+          <div className="patch-inline-actions">
+            <span className="patch-card__title">{macro.name}</span>
+            {macro.shortcut ? (
+              <kbd className="patch-kbd">
+                {formatShortcutForDisplay(macro.shortcut)}
+              </kbd>
+            ) : null}
+          </div>
+          {summaryDescription ? (
+            <p className="patch-card__meta">{summaryDescription}</p>
+          ) : null}
+        </div>
+      </summary>
+
+      <div className="patch-card__body">
+        <MacroDetailsEditor
+          key={`${macro.id}-${macro.updatedAt}-details`}
+          macro={macro}
+          onSaved={onSaved}
+          onError={onError}
+        />
+        <RunScopeEditor
+          key={`${macro.id}-${macro.updatedAt}`}
+          macro={macro}
+          onSaved={onSaved}
+          onError={onError}
+        />
+        <ShortcutEditor macro={macro} onSaved={onSaved} onError={onError} />
+
+        {macro.script ? (
+          <details className="patch-disclosure">
+            <summary>
+              {macro.script.steps.length} compiled script step
+              {macro.script.steps.length === 1 ? "" : "s"}
+            </summary>
+            <ol className="patch-list--stack">
+              {macro.script.steps.map((step, index) => (
+                <li
+                  key={`${macro.id}-script-${index}`}
+                  className="patch-code-item"
+                >
+                  {formatScriptStep(step, index)}
+                </li>
+              ))}
+            </ol>
+            <details className="patch-disclosure">
+              <summary>Raw script JSON</summary>
+              <pre className="patch-code">
+                {JSON.stringify(macro.script, null, 2)}
+              </pre>
+            </details>
+          </details>
+        ) : null}
+
+        <details className="patch-disclosure">
+          <summary>
+            {macro.script
+              ? `${macro.steps.length} demo ${
+                  macro.steps.length === 1 ? "step" : "steps"
+                } (reference)`
+              : `${macro.steps.length} ${
+                  macro.steps.length === 1 ? "step" : "steps"
+                }`}
+          </summary>
+          <ol className="patch-list--stack">
+            {macro.steps.map((step, index) => (
+              <li key={step.id} className="patch-code-item">
+                {formatStep(step, index)}
+              </li>
+            ))}
+          </ol>
+        </details>
+
+        <div className="patch-card__footer">
+          <button
+            type="button"
+            className="patch-btn patch-btn--icon patch-btn--danger"
+            aria-label={`Delete ${macro.name}`}
+            onClick={onDelete}
+          >
+            <svg
+              className="patch-icon"
+              width="16"
+              height="16"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M2.5 4.5h11M6 4.5V3.25A.75.75 0 0 1 6.75 2.5h2.5a.75.75 0 0 1 .75.75V4.5M12.5 4.5v8.25a.75.75 0 0 1-.75.75H4.25a.75.75 0 0 1-.75-.75V4.5"
+                stroke="currentColor"
+                strokeWidth="1.25"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M6.75 7.25v4M9.25 7.25v4"
+                stroke="currentColor"
+                strokeWidth="1.25"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </details>
+  );
+}
+
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
-  const [activeMacroId, setActiveMacroId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
@@ -244,20 +450,13 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       try {
-        const [macrosResponse, settingsResponse] = await Promise.all([
-          sendBackgroundMessage({ type: "GET_MACROS" }),
-          sendBackgroundMessage({ type: "GET_SETTINGS" }),
-        ]);
+        const macrosResponse = await sendBackgroundMessage({ type: "GET_MACROS" });
 
         if (!macrosResponse.ok) {
           throw new Error(macrosResponse.error);
         }
-        if (!settingsResponse.ok) {
-          throw new Error(settingsResponse.error);
-        }
 
         setMacros(macrosResponse.macros ?? []);
-        setActiveMacroId(settingsResponse.settings?.currentMacroId ?? null);
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to load macros";
@@ -287,9 +486,6 @@ export default function App() {
     }
 
     setMacros(response.macros ?? []);
-    if (activeMacroId === macro.id) {
-      setActiveMacroId(null);
-    }
   }
 
   if (loading) {
@@ -323,101 +519,26 @@ export default function App() {
         <p className="patch-alert patch-alert--error">{shortcutError}</p>
       ) : null}
 
-      <section className="patch-panel">
-        <h2 className="patch-panel__title">Macros</h2>
-        {macros.length === 0 ? (
-          <p className="patch-text-muted">
-            No macros yet. Open Patch on a page and choose Record.
-          </p>
-        ) : (
-          <ul className="patch-stack patch-stack--loose">
-            {macros.map((macro) => (
-              <li key={macro.id} className="patch-card">
-                <div className="patch-card__header">
-                  <div>
-                    <div className="patch-inline-actions">
-                      <p className="patch-card__title">{macro.name}</p>
-                      {macro.id === activeMacroId ? (
-                        <span className="patch-badge">Active</span>
-                      ) : null}
-                    </div>
-                    {macro.description ? (
-                      <p className="patch-card__meta">{macro.description}</p>
-                    ) : null}
-                    {macro.intent ? (
-                      <p className="patch-card__meta">
-                        Intent: &quot;{macro.intent}&quot;
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    className="patch-btn patch-btn--danger"
-                    onClick={() => {
-                      setMacroPendingDelete(macro);
-                    }}
-                  >
-                    Delete
-                  </button>
-                </div>
-                <RunScopeEditor
-                  key={`${macro.id}-${macro.updatedAt}`}
-                  macro={macro}
-                  onSaved={setMacros}
-                  onError={setShortcutError}
-                />
-                <ShortcutEditor
-                  macro={macro}
-                  onSaved={setMacros}
-                  onError={setShortcutError}
-                />
-                {macro.script ? (
-                  <details className="patch-disclosure" open>
-                    <summary>
-                      {macro.script.steps.length} compiled script step
-                      {macro.script.steps.length === 1 ? "" : "s"}
-                    </summary>
-                    <ol className="patch-list--stack">
-                      {macro.script.steps.map((step, index) => (
-                        <li
-                          key={`${macro.id}-script-${index}`}
-                          className="patch-code-item"
-                        >
-                          {formatScriptStep(step, index)}
-                        </li>
-                      ))}
-                    </ol>
-                    <details className="patch-disclosure">
-                      <summary>Raw script JSON</summary>
-                      <pre className="patch-code">
-                        {JSON.stringify(macro.script, null, 2)}
-                      </pre>
-                    </details>
-                  </details>
-                ) : null}
-                <details className="patch-disclosure">
-                  <summary>
-                    {macro.script
-                      ? `${macro.steps.length} demo ${
-                          macro.steps.length === 1 ? "step" : "steps"
-                        } (reference)`
-                      : `${macro.steps.length} ${
-                          macro.steps.length === 1 ? "step" : "steps"
-                        }`}
-                  </summary>
-                  <ol className="patch-list--stack">
-                    {macro.steps.map((step, index) => (
-                      <li key={step.id} className="patch-code-item">
-                        {formatStep(step, index)}
-                      </li>
-                    ))}
-                  </ol>
-                </details>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {macros.length === 0 ? (
+        <p className="patch-text-muted">
+          No macros yet. Open Patch on a page and choose Record.
+        </p>
+      ) : (
+        <ul className="patch-stack patch-stack--loose">
+          {macros.map((macro) => (
+            <li key={macro.id}>
+              <MacroCard
+                macro={macro}
+                onSaved={setMacros}
+                onError={setShortcutError}
+                onDelete={() => {
+                  setMacroPendingDelete(macro);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
       </main>
 
       <ConfirmDialog
