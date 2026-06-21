@@ -50,6 +50,12 @@ const RECORD_AGENT_RULES = [
   ...DOM_ELEMENT_RULES,
 ];
 
+const MACRO_NAME_RULE =
+  "Use a short, readable title in plain English (2-5 words, Title Case) — " +
+  'like a label a person would read, not a slug or identifier. ' +
+  'Examples: "Copy GitHub Clone URL", "Open Issues Tab", "Save Billing Settings". ' +
+  "Do not use kebab-case, snake_case, or abbreviations.";
+
 function buildSingleShotPrompt(
   intent: string,
   elements: DomElement[],
@@ -74,7 +80,7 @@ function buildSingleShotPrompt(
     "- For wait steps, put milliseconds in value as a string (e.g. \"500\")",
     "- For waitFor steps, put timeout milliseconds in value and selector to wait for",
     "- Keep steps minimal and ordered",
-    "- Name the macro concisely",
+    `- Name the macro: ${MACRO_NAME_RULE}`,
   ].join("\n");
 }
 
@@ -100,7 +106,7 @@ function buildAgentTurnPrompt(
     "Rules:",
     "- For multi-step intents (e.g. \"go to X then Y\"), set done: true once the final destination is reached",
     ...RECORD_AGENT_RULES,
-    "- When done: true, optionally set macroName to a short name for the macro",
+    `- When done: true, set macroName. ${MACRO_NAME_RULE}`,
   ]
     .filter(Boolean)
     .join("\n");
