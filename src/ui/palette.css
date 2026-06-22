@@ -174,15 +174,29 @@
     box-shadow var(--patch-transition);
 }
 
-.patch-palette-footer__bar > .patch-btn--primary {
+.patch-palette-footer__bar > #generate-btn {
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.patch-palette-footer .patch-btn--icon {
+  width: 32px;
   height: 32px;
-  padding-top: 0;
-  padding-bottom: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  color: var(--patch-fg-secondary);
+}
+
+.patch-palette-footer .patch-btn--icon:hover:not(:disabled) {
+  color: var(--patch-fg);
+}
+
+.patch-palette-footer .patch-btn--icon.patch-btn--primary {
+  color: var(--patch-primary-fg);
+  background: var(--patch-primary);
+}
+
+.patch-palette-footer .patch-btn--icon.patch-btn--primary:hover:not(:disabled) {
+  color: var(--patch-primary-fg);
+  background: var(--patch-primary-hover);
 }
 
 .patch-palette__intent::placeholder {
@@ -202,9 +216,4 @@
 .patch-palette__intent:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.patch-shell--palette .patch-palette-footer .patch-btn--ghost {
-  height: auto;
-  padding: var(--patch-space-1) 0;
 }

@@ -31,13 +31,23 @@
         <footer class="patch-palette-footer">
           <div class="patch-palette-footer__bar">
             <div class="patch-palette-footer__leading">
-              <button id="capture-btn" type="button" class="patch-btn patch-btn--sm">Capture DOM</button>
+              <button
+                id="capture-btn"
+                type="button"
+                class="patch-btn patch-btn--icon"
+                title="Capture DOM"
+                aria-label="Capture DOM"
+              ></button>
               <button id="cancel-record-btn" type="button" class="patch-btn patch-btn--sm" hidden>
                 Cancel recording
               </button>
-              <button type="button" id="options-link" class="patch-btn patch-btn--sm patch-btn--ghost">
-                Manage macros
-              </button>
+              <button
+                type="button"
+                id="options-link"
+                class="patch-btn patch-btn--icon"
+                title="Manage macros"
+                aria-label="Manage macros"
+              ></button>
             </div>
             <input
               id="intent-input"
@@ -48,9 +58,13 @@
               spellcheck="false"
               hidden
             />
-            <button id="generate-btn" type="button" class="patch-btn patch-btn--sm patch-btn--primary">
-              Generate
-            </button>
+            <button
+              id="generate-btn"
+              type="button"
+              class="patch-btn patch-btn--icon patch-btn--primary"
+              title="Generate"
+              aria-label="Generate"
+            ></button>
           </div>
         </footer>
       </div>

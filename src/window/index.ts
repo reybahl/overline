@@ -20,6 +20,8 @@ import {
   PATCH_PANEL_CLOSE_MESSAGE,
   PATCH_PANEL_RESIZE_MESSAGE,
 } from "@/ui/tokens";
+import { mountLucideIcon } from "@/ui/mount-icon";
+import { Braces, Plus, Settings } from "lucide";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
@@ -50,6 +52,10 @@ const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
 const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
 const actionButtons = [generateBtn, captureBtn];
+
+mountLucideIcon(captureBtn, Braces);
+mountLucideIcon(optionsLink, Settings);
+mountLucideIcon(generateBtn, Plus);
 
 let savedMacros: Macro[] = [];
 let pageMacros: Macro[] = [];
