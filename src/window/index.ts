@@ -135,6 +135,10 @@ function applyPendingRecord(record: PendingRecord | null): void {
   }
 }
 
+function setIntentInputVisible(visible: boolean): void {
+  intentInput.hidden = !visible;
+}
+
 function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
   statusEl.classList.toggle("patch-status--error", isError);
@@ -230,14 +234,6 @@ function showReview(macro: Macro, reasoning: string[] = []): void {
   }
 
   reviewPanelEl.hidden = false;
-}
-
-function requireIntent(): string {
-  const intent = intentInput.value.trim();
-  if (!intent) {
-    throw new Error("Enter an intent first.");
-  }
-  return intent;
 }
 
 function getMacroDescription(macro: Macro): string | undefined {
@@ -401,6 +397,13 @@ async function captureDomOnActiveTab(): Promise<{
 }
 
 async function handleCaptureDom(): Promise<void> {
+  if (!captureOutputEl.hidden) {
+    captureOutputEl.hidden = true;
+    captureOutputEl.textContent = "";
+    setStatus("");
+    return;
+  }
+
   setBusy(true);
   captureOutputEl.hidden = true;
   captureOutputEl.textContent = "";
@@ -421,10 +424,25 @@ async function handleCaptureDom(): Promise<void> {
 
 async function handleRecordMacro(): Promise<void> {
   hideReview();
+
+  const wasIntentHidden = intentInput.hidden;
+  setIntentInputVisible(true);
+
+  const intent = intentInput.value.trim();
+  if (!intent) {
+    intentInput.focus();
+    if (wasIntentHidden) {
+      setStatus("");
+      return;
+    }
+    setStatus("Enter an intent first.", true);
+    return;
+  }
+
+  setIntentInputVisible(false);
   setBusy(true);
 
   try {
-    const intent = requireIntent();
     const tab = await getActiveTab();
     const tabId = tab.id;
     const startUrl = tab.url;
@@ -475,9 +493,7 @@ async function handleRecordMacro(): Promise<void> {
       error instanceof Error ? error.message : "Failed to record macro";
     setStatus(errorMessage, true);
     setBusy(false);
-    if (errorMessage === "Enter an intent first.") {
-      intentInput.focus();
-    }
+    setIntentInputVisible(false);
   }
 }
 
@@ -500,6 +516,7 @@ async function handleConfirmSave(): Promise<void> {
     hideReview();
     palettePanelEl.hidden = false;
     intentInput.value = "";
+    setIntentInputVisible(false);
     await clearPendingRecord();
     await refreshMacros(macroId);
     setStatus(`Saved macro "${macroName}"`);
@@ -516,6 +533,8 @@ async function handleConfirmSave(): Promise<void> {
 function handleDiscard(): void {
   hideReview();
   palettePanelEl.hidden = false;
+  intentInput.value = "";
+  setIntentInputVisible(false);
   void clearPendingRecord().then(() => {
     setStatus("Recording discarded.");
     searchInput.focus();
@@ -527,6 +546,8 @@ async function handleCancelRecording(): Promise<void> {
   setBusy(false);
   setRecordingUi(false);
   palettePanelEl.hidden = false;
+  intentInput.value = "";
+  setIntentInputVisible(false);
 
   try {
     const response = await sendBackgroundMessage({
@@ -636,6 +657,13 @@ document.addEventListener("keydown", (event) => {
 
 generateBtn.addEventListener("click", () => {
   void handleRecordMacro();
+});
+
+intentInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    void handleRecordMacro();
+  }
 });
 
 captureBtn.addEventListener("click", () => {

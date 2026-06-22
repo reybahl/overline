@@ -3,7 +3,8 @@
 .patch-shell--palette {
   display: flex;
   flex-direction: column;
-  padding: var(--patch-space-2);
+  width: 100%;
+  padding: 0;
   min-height: 0;
 }
 
@@ -11,9 +12,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border: 1px solid var(--patch-border);
-  border-radius: var(--patch-radius);
-  background: var(--patch-surface);
+  flex: 1;
   overflow: hidden;
 }
 
@@ -139,19 +138,23 @@
 }
 
 .patch-palette-footer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--patch-space-3);
   flex-shrink: 0;
   padding: var(--patch-space-4);
   border-top: 1px solid var(--patch-border);
-  background: var(--patch-surface-muted);
 }
 
-.patch-palette-footer__record {
+.patch-palette-footer__bar {
   display: flex;
   align-items: center;
   gap: var(--patch-space-2);
+}
+
+.patch-palette-footer__leading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--patch-space-2);
+  flex-shrink: 0;
 }
 
 .patch-palette__intent {
@@ -171,8 +174,9 @@
     box-shadow var(--patch-transition);
 }
 
-.patch-palette-footer__record .patch-btn {
+.patch-palette-footer__bar > .patch-btn--primary {
   flex-shrink: 0;
+  margin-left: auto;
   height: 32px;
   padding-top: 0;
   padding-bottom: 0;
@@ -198,13 +202,6 @@
 .patch-palette__intent:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-.patch-palette-footer__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--patch-space-2);
 }
 
 .patch-shell--palette .patch-palette-footer .patch-btn--ghost {

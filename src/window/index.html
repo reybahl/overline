@@ -29,7 +29,16 @@
         </div>
 
         <footer class="patch-palette-footer">
-          <div class="patch-palette-footer__record">
+          <div class="patch-palette-footer__bar">
+            <div class="patch-palette-footer__leading">
+              <button id="capture-btn" type="button" class="patch-btn patch-btn--sm">Capture DOM</button>
+              <button id="cancel-record-btn" type="button" class="patch-btn patch-btn--sm" hidden>
+                Cancel recording
+              </button>
+              <button type="button" id="options-link" class="patch-btn patch-btn--sm patch-btn--ghost">
+                Manage macros
+              </button>
+            </div>
             <input
               id="intent-input"
               type="text"
@@ -37,18 +46,10 @@
               placeholder="Describe what to record…"
               autocomplete="off"
               spellcheck="false"
+              hidden
             />
             <button id="generate-btn" type="button" class="patch-btn patch-btn--sm patch-btn--primary">
               Generate
-            </button>
-          </div>
-          <div class="patch-palette-footer__actions">
-            <button id="capture-btn" type="button" class="patch-btn patch-btn--sm">Capture DOM</button>
-            <button id="cancel-record-btn" type="button" class="patch-btn patch-btn--sm" hidden>
-              Cancel recording
-            </button>
-            <button type="button" id="options-link" class="patch-btn patch-btn--sm patch-btn--ghost">
-              Manage macros
             </button>
           </div>
         </footer>
