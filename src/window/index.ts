@@ -546,41 +546,6 @@ async function handleCancelRecording(): Promise<void> {
   }
 }
 
-async function handleGenerateMacro(): Promise<void> {
-  setBusy(true);
-
-  try {
-    const intent = requireIntent();
-
-    setStatus("Capturing DOM…");
-    const { elements, url } = await captureDomOnActiveTab();
-
-    setStatus("Generating macro…");
-    const response = await sendBackgroundMessage({
-      type: "GENERATE_MACRO",
-      intent,
-      elements,
-      url,
-    });
-
-    if (!response.ok) {
-      throw new Error(response.error);
-    }
-
-    console.info("[Patch] Generated macro:", response.macro);
-    setStatus("Macro generated — see console");
-  } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Failed to generate macro";
-    setStatus(errorMessage, true);
-    if (errorMessage === "Enter an intent first.") {
-      intentInput.focus();
-    }
-  } finally {
-    setBusy(false);
-  }
-}
-
 async function handleRunMacro(macro?: Macro): Promise<void> {
   const target = macro ?? filteredMacros[selectedIndex];
   if (!target) {
@@ -676,10 +641,6 @@ recordBtn.addEventListener("click", () => {
 
 captureBtn.addEventListener("click", () => {
   void handleCaptureDom();
-});
-
-generateBtn.addEventListener("click", () => {
-  void handleGenerateMacro();
 });
 
 confirmSaveBtn.addEventListener("click", () => {

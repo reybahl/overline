@@ -54,14 +54,7 @@ export const MacroGenerationStepSchema = z.object({
   value: z.string().optional(),
 });
 
-export const MacroGenerationSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  steps: z.array(MacroGenerationStepSchema).min(1),
-});
-
 export type MacroGenerationStep = z.infer<typeof MacroGenerationStepSchema>;
-export type MacroGeneration = z.infer<typeof MacroGenerationSchema>;
 
 export const AgentTurnSchema = z.object({
   step: MacroGenerationStepSchema,
@@ -98,22 +91,5 @@ export function createMacroPreview(
     createdAt: now,
     updatedAt: now,
     steps,
-  });
-}
-
-export function toMacro(generated: MacroGeneration, url: string): Macro {
-  const now = Date.now();
-  return MacroSchema.parse({
-    id: crypto.randomUUID(),
-    name: generated.name,
-    description: generated.description,
-    urlPattern: deriveUrlPattern(url),
-    createdAt: now,
-    updatedAt: now,
-    steps: generated.steps.map((step) => ({
-      ...step,
-      id: crypto.randomUUID(),
-      timestamp: now,
-    })),
   });
 }

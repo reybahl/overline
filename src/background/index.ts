@@ -6,7 +6,6 @@ import {
   startAgenticRecordSession,
 } from "@/background/record-session";
 import { cancelPendingRecordSession } from "@/background/recording-session";
-import { generateMacro } from "@/background/worker";
 import { bindLogRelay, createLogger } from "@/shared/logger";
 import type {
   BackgroundMessage,
@@ -202,15 +201,6 @@ async function handleMessage(
     case "PATCH_LOG":
       relayLogEntry(message.entry);
       return { ok: true };
-    case "GENERATE_MACRO": {
-      const macro = await generateMacro(
-        message.intent,
-        message.elements,
-        message.url,
-      );
-      log.info("generated macro", { name: macro.name, stepCount: macro.steps.length });
-      return { ok: true, macro };
-    }
     case "AGENTIC_RECORD":
     case "START_AGENTIC_RECORD": {
       await startAgenticRecordSession(

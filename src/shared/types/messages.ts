@@ -1,4 +1,3 @@
-import type { DomElement } from "@/content/dom-capture";
 import type { LogEntry } from "@/shared/types/log";
 import type { Macro } from "@/shared/types/macro";
 import type { ScriptStep } from "@/shared/types/script";
@@ -15,7 +14,6 @@ export type BackgroundMessage =
   | { type: "RUN_MACRO" }
   | { type: "RUN_MACRO_BY_ID"; macroId: string }
   | { type: "EXECUTE_MACRO"; tabId: number; macroId: string }
-  | { type: "GENERATE_MACRO"; intent: string; elements: DomElement[]; url: string }
   | { type: "GET_SETTINGS" }
   | { type: "SAVE_SETTINGS"; settings: Settings }
   | { type: "GET_MACROS" }
