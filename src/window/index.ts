@@ -36,7 +36,6 @@ const intentInput = requireElement<HTMLInputElement>("intent-input");
 const macroListEl = requireElement<HTMLUListElement>("macro-list");
 const macroEmptyEl = requireElement<HTMLParagraphElement>("macro-empty");
 const palettePanelEl = requireElement<HTMLElement>("palette-panel");
-const recordBtn = requireElement<HTMLButtonElement>("record-btn");
 const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
 const generateBtn = requireElement<HTMLButtonElement>("generate-btn");
 const statusEl = requireElement<HTMLParagraphElement>("status");
@@ -50,7 +49,7 @@ const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
 const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
-const actionButtons = [recordBtn, captureBtn, generateBtn];
+const actionButtons = [generateBtn, captureBtn];
 
 let savedMacros: Macro[] = [];
 let pageMacros: Macro[] = [];
@@ -635,7 +634,7 @@ document.addEventListener("keydown", (event) => {
   closePalette();
 });
 
-recordBtn.addEventListener("click", () => {
+generateBtn.addEventListener("click", () => {
   void handleRecordMacro();
 });
 
