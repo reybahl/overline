@@ -261,14 +261,63 @@ function filterMacros(macros: Macro[], query: string): Macro[] {
   });
 }
 
+function getTrimmedSearchQuery(): string {
+  return searchInput.value.trim();
+}
+
+function hasCreateMacroOption(): boolean {
+  return getTrimmedSearchQuery().length > 0;
+}
+
+function getSelectableItemCount(): number {
+  return filteredMacros.length + (hasCreateMacroOption() ? 1 : 0);
+}
+
+function isCreateMacroOptionSelected(): boolean {
+  return hasCreateMacroOption() && selectedIndex === filteredMacros.length;
+}
+
 function scrollSelectedIntoView(): void {
   const activeItem = macroListEl.querySelector(".patch-palette__item--active");
   activeItem?.scrollIntoView({ block: "nearest" });
 }
 
+function renderCreateMacroItem(index: number): HTMLLIElement {
+  const query = getTrimmedSearchQuery();
+  const item = document.createElement("li");
+  item.className = "patch-palette__item patch-palette__item--create";
+  if (index === selectedIndex) {
+    item.classList.add("patch-palette__item--active");
+  }
+  item.setAttribute("role", "option");
+  item.setAttribute("aria-selected", index === selectedIndex ? "true" : "false");
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "patch-palette__item-btn";
+  button.addEventListener("click", () => {
+    void handleCreateMacroFromSearch();
+  });
+
+  mountLucideIcon(button, Plus);
+
+  const main = document.createElement("div");
+  main.className = "patch-palette__item-main";
+
+  const title = document.createElement("span");
+  title.className = "patch-palette__item-title";
+  title.textContent = `Create new macro "${query}"`;
+  main.appendChild(title);
+
+  button.appendChild(main);
+  item.appendChild(button);
+  return item;
+}
+
 function renderMacroList(highlightMacroId?: string): void {
   filteredMacros = filterMacros(pageMacros, searchInput.value);
   macroListEl.replaceChildren();
+  const showCreateOption = hasCreateMacroOption();
 
   if (highlightMacroId) {
     const highlightIndex = filteredMacros.findIndex(
@@ -277,7 +326,8 @@ function renderMacroList(highlightMacroId?: string): void {
     selectedIndex = highlightIndex >= 0 ? highlightIndex : 0;
   }
 
-  if (filteredMacros.length === 0) {
+  const itemCount = getSelectableItemCount();
+  if (itemCount === 0) {
     macroEmptyEl.hidden = false;
     macroEmptyEl.textContent =
       pageMacros.length === 0
@@ -291,8 +341,8 @@ function renderMacroList(highlightMacroId?: string): void {
 
   macroEmptyEl.hidden = true;
 
-  if (selectedIndex >= filteredMacros.length) {
-    selectedIndex = filteredMacros.length - 1;
+  if (selectedIndex >= itemCount) {
+    selectedIndex = itemCount - 1;
   }
   if (selectedIndex < 0) {
     selectedIndex = 0;
@@ -341,6 +391,10 @@ function renderMacroList(highlightMacroId?: string): void {
 
     item.appendChild(button);
     macroListEl.appendChild(item);
+  }
+
+  if (showCreateOption) {
+    macroListEl.appendChild(renderCreateMacroItem(filteredMacros.length));
   }
 }
 
@@ -428,23 +482,42 @@ async function handleCaptureDom(): Promise<void> {
   }
 }
 
-async function handleRecordMacro(): Promise<void> {
-  hideReview();
-
-  const wasIntentHidden = intentInput.hidden;
-  setIntentInputVisible(true);
-
-  const intent = intentInput.value.trim();
-  if (!intent) {
-    intentInput.focus();
-    if (wasIntentHidden) {
-      setStatus("");
-      return;
-    }
-    setStatus("Enter an intent first.", true);
+async function handleCreateMacroFromSearch(): Promise<void> {
+  const query = getTrimmedSearchQuery();
+  if (!query) {
     return;
   }
 
+  await handleRecordMacro(query);
+}
+
+async function handleRecordMacro(intentOverride?: string): Promise<void> {
+  hideReview();
+
+  let intent: string;
+
+  if (intentOverride !== undefined) {
+    intent = intentOverride.trim();
+    if (!intent) {
+      return;
+    }
+  } else {
+    const wasIntentHidden = intentInput.hidden;
+    setIntentInputVisible(true);
+
+    intent = intentInput.value.trim();
+    if (!intent) {
+      intentInput.focus();
+      if (wasIntentHidden) {
+        setStatus("");
+        return;
+      }
+      setStatus("Enter an intent first.", true);
+      return;
+    }
+  }
+
+  intentInput.value = intent;
   setIntentInputVisible(false);
   setBusy(true);
 
@@ -573,6 +646,11 @@ async function handleCancelRecording(): Promise<void> {
 }
 
 async function handleRunMacro(macro?: Macro): Promise<void> {
+  if (!macro && isCreateMacroOptionSelected()) {
+    await handleCreateMacroFromSearch();
+    return;
+  }
+
   const target = macro ?? filteredMacros[selectedIndex];
   if (!target) {
     setStatus("No macro selected.", true);
@@ -624,19 +702,21 @@ searchInput.addEventListener("input", () => {
 });
 
 searchInput.addEventListener("keydown", (event) => {
+  const itemCount = getSelectableItemCount();
+
   if (event.key === "ArrowDown") {
-    if (filteredMacros.length === 0) {
+    if (itemCount === 0) {
       return;
     }
     event.preventDefault();
-    selectedIndex = Math.min(selectedIndex + 1, filteredMacros.length - 1);
+    selectedIndex = Math.min(selectedIndex + 1, itemCount - 1);
     renderMacroList();
     scrollSelectedIntoView();
     return;
   }
 
   if (event.key === "ArrowUp") {
-    if (filteredMacros.length === 0) {
+    if (itemCount === 0) {
       return;
     }
     event.preventDefault();
