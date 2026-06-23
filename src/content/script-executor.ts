@@ -225,6 +225,12 @@ function fillElement(element: HTMLElement, value: string): void {
 async function waitForMatch(match: ElementMatch, timeoutMs: number): Promise<void> {
   const started = Date.now();
   const deadline = started + timeoutMs;
+
+  if (findMatchingElements(match).length > 0) {
+    log.debug("waitFor matched", { ms: 0, matchCount: findMatchingElements(match).length });
+    return;
+  }
+
   let stablePolls = 0;
 
   while (Date.now() < deadline) {

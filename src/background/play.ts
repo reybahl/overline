@@ -9,6 +9,7 @@ import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import { elementMatchesEqual } from "@/shared/script-match";
 import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
@@ -199,8 +200,15 @@ export async function runMacroScript(
     const stepNum = `${i + 1}/${script.steps.length}`;
 
     if (i > 0 && step.type === "click") {
-      log.debug("pre-click wait", { step: stepNum, type: step.type, label: step.label });
-      await waitForScriptMatchInTab(tabId, step.match);
+      const previousStep = script.steps[i - 1];
+      const alreadyWaited =
+        previousStep.type === "waitFor" &&
+        elementMatchesEqual(previousStep.match, step.match);
+
+      if (!alreadyWaited) {
+        log.debug("pre-click wait", { step: stepNum, type: step.type, label: step.label });
+        await waitForScriptMatchInTab(tabId, step.match);
+      }
     }
 
     const urlBeforeStep =

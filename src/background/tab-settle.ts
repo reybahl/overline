@@ -4,6 +4,7 @@ import {
   MATCH_POLL_INTERVAL_MS,
   PAGE_SETTLE_MS,
   TAB_LOAD_TIMEOUT_MS,
+  URL_CHANGE_DETECT_MS,
 } from "@/shared/timing";
 
 export { PAGE_SETTLE_MS, STEP_WAIT_FOR_MS, TAB_LOAD_TIMEOUT_MS } from "@/shared/timing";
@@ -67,13 +68,13 @@ export async function settleAfterStep(
     const navigated = await waitForUrlChange(
       tabId,
       urlBeforeStep,
-      TAB_LOAD_TIMEOUT_MS,
+      URL_CHANGE_DETECT_MS,
     );
     log.debug("after click", { tabId, navigated, urlBefore: urlBeforeStep });
     if (navigated) {
       await delay(PAGE_SETTLE_MS);
-      return;
     }
+    return;
   }
 
   await waitForTabLoad(tabId);

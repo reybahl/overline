@@ -12,3 +12,10 @@ export function normalizeElementMatch(match: ElementMatch): ElementMatch {
   const id = normalizeElementId(match.id);
   return id === match.id ? match : { ...match, id };
 }
+
+export function elementMatchesEqual(a: ElementMatch, b: ElementMatch): boolean {
+  return (
+    JSON.stringify(normalizeElementMatch(a)) ===
+    JSON.stringify(normalizeElementMatch(b))
+  );
+}
