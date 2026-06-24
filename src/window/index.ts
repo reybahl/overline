@@ -9,6 +9,7 @@ import type {
 } from "@/shared/types/messages";
 import { formatScriptStep } from "@/shared/script-format";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
+import { RECORDING_CANCELLED_MESSAGE } from "@/background/recording-session";
 import { clearPendingRecord, getPendingRecord } from "@/shared/storage";
 import {
   getActiveTab,
@@ -132,6 +133,10 @@ function applyPendingRecord(record: PendingRecord | null): void {
       setRecordingUi(false);
       palettePanelEl.hidden = false;
       hideReview();
+      if (record.error === RECORDING_CANCELLED_MESSAGE) {
+        void clearPendingRecord();
+        return;
+      }
       setStatus(record.error, true);
       return;
     default: {
@@ -636,7 +641,7 @@ async function handleCancelRecording(): Promise<void> {
       throw new Error(response.error);
     }
     applyPendingRecord(response.pendingRecord ?? null);
-    setStatus("Recording cancelled.");
+    setStatus(RECORDING_CANCELLED_MESSAGE);
     searchInput.focus();
   } catch (error) {
     const message =

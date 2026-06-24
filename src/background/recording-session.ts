@@ -1,12 +1,13 @@
 import {
   clearPendingRecord,
   getPendingRecord,
-  savePendingRecord,
 } from "@/shared/storage";
+
+export const RECORDING_CANCELLED_MESSAGE = "Recording cancelled.";
 
 export class RecordingCancelledError extends Error {
   constructor() {
-    super("Recording cancelled.");
+    super(RECORDING_CANCELLED_MESSAGE);
     this.name = "RecordingCancelledError";
   }
 }
@@ -23,17 +24,6 @@ export async function assertRecordingSessionActive(): Promise<void> {
 }
 
 export async function cancelPendingRecordSession(): Promise<void> {
-  const pending = await getPendingRecord();
-  if (pending?.status === "recording") {
-    await savePendingRecord({
-      status: "error",
-      intent: pending.intent,
-      error: "Recording cancelled.",
-      completedAt: Date.now(),
-    });
-    return;
-  }
-
   await clearPendingRecord();
 }
 
