@@ -32,8 +32,8 @@ function initializeContentScript(): void {
           return false;
         case "EXECUTE_STEPS":
           void executeSteps(message.steps)
-            .then(() => {
-              sendResponse({ ok: true });
+            .then((matches) => {
+              sendResponse({ ok: true, matches });
             })
             .catch((error: unknown) => {
               const errorMessage =

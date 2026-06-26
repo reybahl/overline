@@ -4,8 +4,14 @@ export const PAGE_SETTLE_MS = 750;
 /** Max time to wait for a full tab navigation to finish. */
 export const TAB_LOAD_TIMEOUT_MS = 20_000;
 
-/** Brief window after a click to see if navigation started; avoids blocking on in-page UI. */
-export const URL_CHANGE_DETECT_MS = 400;
+/**
+ * Window after a click to detect whether it triggered navigation. Single-page
+ * apps (GitHub, etc.) often soft-navigate via history.pushState only after an
+ * async fetch, which can take ~1s — a shorter window misses the URL change and
+ * makes a click look inert. We short-circuit as soon as the URL changes, so the
+ * only cost is for purely in-page clicks (e.g. opening a menu).
+ */
+export const URL_CHANGE_DETECT_MS = 1200;
 
 /** Default timeout when waiting for an element match during playback. */
 export const STEP_WAIT_FOR_MS = 20_000;

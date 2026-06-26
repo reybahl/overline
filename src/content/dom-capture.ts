@@ -1,6 +1,7 @@
 import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 import { INTERACTIVE_SELECTOR } from "@/shared/interactive-selector";
+import { isStableId } from "@/shared/stable-id";
 
 const INTERACTIVE_TAGS = new Set([
   "button",
@@ -26,23 +27,6 @@ const INTERACTIVE_ROLES = new Set([
 ]);
 
 const MAX_ELEMENTS = 80;
-
-/** Generated framework ids — prefer role/text selectors over these. */
-function isStableId(id: string): boolean {
-  if (!id) {
-    return false;
-  }
-  if (id.startsWith("_R_") || id.startsWith("react-aria")) {
-    return false;
-  }
-  if (/^:r[0-9a-z]+:$/i.test(id)) {
-    return false;
-  }
-  if (/^[a-f0-9-]{20,}$/i.test(id)) {
-    return false;
-  }
-  return true;
-}
 
 export type DomElement = {
   tag: string;

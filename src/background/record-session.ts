@@ -1,10 +1,11 @@
-import { captureDomInTab, getTabUrl } from "@/background/capture";
+import { getTabUrl } from "@/background/capture";
 import { runAgenticRecord } from "@/background/record";
 import {
   assertRecordingSessionActive,
   isRecordingCancelledError,
 } from "@/background/recording-session";
-import { compileMacroScript, inferRunScope } from "@/background/worker";
+import { inferRunScope } from "@/background/worker";
+import { buildScriptFromDemo } from "@/shared/build-script";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
   clearPendingRecord,
@@ -75,22 +76,15 @@ async function finishAgenticRecordSession(
     if (current?.status === "recording") {
       await savePendingRecord({
         ...current,
-        progress: "Compiling generalized script…",
+        progress: "Building replayable script…",
       });
     }
 
     await assertRecordingSessionActive();
 
-    const referenceElements = await captureDomInTab(tabId);
-    const script = await compileMacroScript(
-      intent,
-      startUrl,
-      endUrl,
-      result.macro.steps,
-      referenceElements,
-    );
+    const script = buildScriptFromDemo(result.macro.steps);
 
-    log.info("script compiled", { run, scriptSteps: script.steps.length });
+    log.info("script built", { run, scriptSteps: script.steps.length });
 
     await assertRecordingSessionActive();
 

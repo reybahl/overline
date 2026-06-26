@@ -1,6 +1,6 @@
 import type { LogEntry } from "@/shared/types/log";
 import type { Macro } from "@/shared/types/macro";
-import type { ScriptStep } from "@/shared/types/script";
+import type { ElementMatch, ScriptStep } from "@/shared/types/script";
 import type { PendingRecord } from "@/shared/types/pending-record";
 import type { Settings } from "@/shared/types/settings";
 
@@ -49,5 +49,10 @@ export type ContentMessage =
 export type ContentPoint = { x: number; y: number };
 
 export type ContentResponse =
-  | { ok: true; point?: ContentPoint }
+  | {
+      ok: true;
+      point?: ContentPoint;
+      /** Per-step element matches from EXECUTE_STEPS; null for non-element steps. */
+      matches?: (ElementMatch | null)[];
+    }
   | { ok: false; error: string };
