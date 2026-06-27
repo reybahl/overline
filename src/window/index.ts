@@ -7,7 +7,7 @@ import type { PendingRecord } from "@/shared/types/pending-record";
 import { formatScriptStep } from "@/shared/script-format";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { RECORDING_CANCELLED_MESSAGE } from "@/background/recording-session";
-import { clearPendingRecord, getPendingRecord } from "@/shared/storage";
+import { clearPendingRecord, getPendingRecord, subscribePatchStorage } from "@/shared/storage";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -815,12 +815,8 @@ void refreshMacros()
     setStatus(message, true);
   });
 
-chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName !== "local") {
-    return;
-  }
-
-  if ("patch:macros" in changes) {
+subscribePatchStorage((change) => {
+  if (change.macros) {
     void refreshMacros().catch((error: unknown) => {
       const message =
         error instanceof Error ? error.message : "Failed to refresh macros";
@@ -828,7 +824,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     });
   }
 
-  if ("patch:pendingRecord" in changes) {
+  if (change.pendingRecord) {
     void syncPendingRecord();
   }
 });
