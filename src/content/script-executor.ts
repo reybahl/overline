@@ -48,10 +48,57 @@ function getTestId(el: Element): string {
   return el.getAttribute("data-testid")?.trim() ?? "";
 }
 
+function pathSegmentAt(index: number): string | undefined {
+  return window.location.pathname.split("/").filter(Boolean)[index];
+}
+
+function linkPathname(href: string, resolvedHref: string): string | undefined {
+  try {
+    return new URL(resolvedHref || href, window.location.href).pathname;
+  } catch {
+    if (href.startsWith("/")) {
+      return href.split("?")[0]?.split("#")[0];
+    }
+    return undefined;
+  }
+}
+
+function matchesHrefFromPathSegment(
+  href: string,
+  resolvedHref: string,
+  segmentIndex: number,
+): boolean {
+  const segment = pathSegmentAt(segmentIndex);
+  if (!segment) {
+    return false;
+  }
+
+  const linkPath = linkPathname(href, resolvedHref);
+  if (!linkPath) {
+    return false;
+  }
+
+  const expected = `/${segment}`;
+  return linkPath === expected || linkPath === `${expected}/`;
+}
+
 function matchesHrefPattern(href: string, resolvedHref: string, pattern: string): boolean {
   try {
     const regex = new RegExp(pattern);
     if (regex.test(href) || regex.test(resolvedHref)) {
+      return true;
+    }
+
+    const pathnameAndSearch = (() => {
+      try {
+        const url = new URL(resolvedHref || href, window.location.href);
+        return url.pathname + url.search;
+      } catch {
+        return href;
+      }
+    })();
+
+    if (regex.test(pathnameAndSearch)) {
       return true;
     }
 
@@ -133,6 +180,13 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
   }
 
   if (
+    criteria.hrefFromPathSegment !== undefined &&
+    !matchesHrefFromPathSegment(href, resolvedHref, criteria.hrefFromPathSegment)
+  ) {
+    return false;
+  }
+
+  if (
     criteria.hrefPattern &&
     !matchesHrefPattern(href, resolvedHref, criteria.hrefPattern)
   ) {
@@ -148,6 +202,7 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
     criteria.hrefSuffix ||
     criteria.hrefContains ||
     criteria.hrefPattern ||
+    criteria.hrefFromPathSegment !== undefined ||
     criteria.testId;
 
   return Boolean(hasCriteria);

@@ -13,9 +13,30 @@ function stripUnstableId(match: ElementMatch): ElementMatch {
   return rest;
 }
 
+/** hrefFromPathSegment generalizes the target — exact text would contradict it. */
+function stripTextWithPathSegment(match: ElementMatch): ElementMatch {
+  if (match.hrefFromPathSegment === undefined) {
+    return match;
+  }
+
+  const { text: _text, textContains: _textContains, ...rest } = match;
+  return rest;
+}
+
+/** Tab/query hrefPattern and path-segment matching are mutually exclusive strategies. */
+function stripPathSegmentWithHrefPattern(match: ElementMatch): ElementMatch {
+  if (match.hrefFromPathSegment === undefined || !match.hrefPattern) {
+    return match;
+  }
+
+  const { hrefFromPathSegment: _segment, ...rest } = match;
+  return rest;
+}
+
 export type DemoScriptStep = {
   type: MacroStep["type"];
   value?: string;
+  pageUrl?: string;
   recordedMatch?: ElementMatch;
 };
 
@@ -28,6 +49,7 @@ export function buildDemoScriptForCompile(
     .map((step) => ({
       type: step.type,
       value: step.value,
+      pageUrl: step.pageUrl,
       recordedMatch: step.recordedMatch,
     }));
 }
@@ -44,7 +66,9 @@ export function sanitizeCompiledScript(script: MacroScript): MacroScript {
       return step;
     }
 
-    let match = stripUnstableId(normalizeElementMatch(step.match));
+    let match = stripPathSegmentWithHrefPattern(
+      stripTextWithPathSegment(stripUnstableId(normalizeElementMatch(step.match))),
+    );
 
     if (step.type === "click") {
       clickMatchByIndex.set(index, match);

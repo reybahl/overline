@@ -13,13 +13,16 @@ import {
 } from "@/shared/llm-model";
 import { createLogger } from "@/shared/logger";
 import { DEFAULT_SCRIPT_WAIT_FOR_MS } from "@/shared/timing";
-import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
 import {
   AgentTurnSchema,
+  CompiledMacroOutputSchema,
+  RecordingPlanSchema,
   RunScopeSchema,
   type AgentTurn,
+  type CompiledMacroOutput,
   type MacroGenerationStep,
   type MacroStep,
+  type RecordingPlan,
   type RunScope,
 } from "@/shared/types/macro";
 
@@ -34,18 +37,15 @@ const DOM_ELEMENT_RULES = [
 ];
 
 const RECORD_AGENT_RULES = [
+  "- Keep plan.goal in mind — emit the single next action that advances from the current page state",
   "- Only use selectors from the current page state",
   "- Do not invent selectors",
-  "- Match the intent literally step by step — do not click unrelated controls to guess the next action",
-  "- Map intent words to element text/ariaLabel: \"code dropdown\" → the clone/download Code button (controlKind dropdown-trigger, visible text \"Code\" in the repo toolbar), NOT the repo \"Switch repository\" header button, NOT the repo nav \"Code\" tab link",
-  "- Do not click header chrome (Switch repository, notifications, search) unless the intent explicitly names them",
   "- Use step types: click, type, fill, confirm, wait, waitFor, scroll",
   "- Never use the navigate step type — click links and buttons instead",
   "- For wait, put milliseconds in value",
   "- For waitFor, put selector and timeout ms in value",
   "- Never navigate backwards — do not click a link that returns to a page you already visited",
-  "- If the intent is already complete, return done: true and do not emit another step",
-  "- Multi-part intents (comma, \"then\", or two verbs like open X + switch to Y) need multiple clicks — do not mark done after only the first action",
+  "- Set done: true only when plan.goal is clearly reached on the current page — not at an intermediate stop",
   "- If a required control is missing from page state, use waitFor for it — do not substitute a different button and do not mark done",
   ...DOM_ELEMENT_RULES,
 ];
@@ -58,21 +58,43 @@ const MACRO_NAME_RULE =
 
 const MACRO_DESCRIPTION_RULE =
   "One plain-English sentence describing what the macro does — not where it runs, " +
-  'not the raw user intent. Examples: "Copies the HTTPS clone URL from the Code menu.", ' +
-  '"Opens the Issues tab on the current repository."';
+  "not the raw user intent, and not names/slugs/URLs from the recording session. " +
+  'Use roles: "the owner", "the current repository". ' +
+  'Examples: "Copies the HTTPS clone URL from the Code menu.", ' +
+  '"Opens the followers list for the repository owner."';
+
+function buildRecordingPlanPrompt(intent: string): string {
+  return [
+    "Rewrite the user intent as one sentence describing the end state when the task is fully complete.",
+    "This is a reminder for the recorder — not a step list, not avoid rules, not success checks.",
+    "",
+    `User intent: "${intent}"`,
+    "",
+    "Return: { goal: \"...\" }",
+    "- Describe the destination/outcome, not the first click",
+    "- No usernames, repo names, or URLs from a specific session — keep it general where possible",
+  ].join("\n");
+}
 
 function buildAgentTurnPrompt(
   intent: string,
+  plan: RecordingPlan,
   stepsSoFar: MacroGenerationStep[],
   elements: DomElement[],
   url: string,
   lastError?: string,
 ): string {
+  const clickCount = stepsSoFar.filter((step) => step.type === "click").length;
+
   return [
     "You are recording a browser automation macro one step at a time.",
+    "Keep plan.goal in mind while choosing each next action from the current page.",
     "",
     `Original intent: "${intent}"`,
+    `End goal: "${plan.goal}"`,
     `Current URL: ${url}`,
+    "",
+    `Progress: ${clickCount} click(s) recorded so far`,
     `Steps taken so far: ${JSON.stringify(stepsSoFar)}`,
     lastError ? `Last step failed: ${lastError}` : "",
     "",
@@ -81,12 +103,11 @@ function buildAgentTurnPrompt(
     "",
     "What is the single next step to take?",
     "Rules:",
-    "- Never set done: true when steps taken so far is empty — you must record at least one action first",
-    "- Set done: true only when the intent is fully satisfied (check selected/pressed state and URL, not URL alone)",
-    "- For multi-step intents (e.g. \"go to X then Y\"), set done: true once the final destination is reached",
+    "- Emit the next action that moves toward the end goal",
+    "- Never set done: true when steps taken so far is empty — record at least one action first",
+    "- Set done: true only when the end goal is clearly reached on the current page",
     ...RECORD_AGENT_RULES,
     `- When done: true, set macroName. ${MACRO_NAME_RULE}`,
-    `- When done: true, set macroDescription. ${MACRO_DESCRIPTION_RULE}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -97,6 +118,7 @@ function buildCompileScriptPrompt(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
+  plan?: RecordingPlan,
 ): string {
   const demoScript = buildDemoScriptForCompile(demoSteps);
 
@@ -108,28 +130,72 @@ function buildCompileScriptPrompt(
     `User intent: "${intent}"`,
     `Recording started on: ${startUrl}`,
     `Recording ended on: ${endUrl}`,
+    "Each demo step includes pageUrl (URL at click time) — use it with recordedMatch.hrefSuffix to choose link disambiguation.",
+    ...(plan ? ["", `End goal (context): "${plan.goal}"`] : []),
     "",
     "Demo script (specific matches captured at click time — your input):",
     JSON.stringify(demoScript, null, 2),
     "",
-    "Return a script with version 1 and an ordered steps array.",
+    "Return:",
+    "- script: { version: 1, steps: [...] } — generalized replay steps",
+    `- description: ${MACRO_DESCRIPTION_RULE}`,
+    "  Infer description from the full demo path (all steps, startUrl → endUrl) — not from intent alone.",
     "",
     "Role (critical):",
-    "- One output step per demo step, same order — do not add, drop, or merge steps",
+    "- One output click/fill step per demo click/fill step — same count, same order; never drop or merge steps",
+    "- Navigation clicks on the path to the goal are required steps, not detours — include every demo step",
     "- Each output match must generalize the corresponding demo recordedMatch — never invent unrelated ids, tags, or text",
     "- Never retarget a demo step to a different control than recordedMatch indicates (same button/link the user clicked during recording)",
     "- Visible text with dynamic counts/badges → use textContains with static label words only, not the full string with numbers",
     "- hrefSuffix with instance-specific paths → generalize to hrefPattern or hrefContains that preserves scope — see Href rules below",
     "- When intent names a specific item (e.g. switch to main), keep a specific match — do not over-generalize",
     "",
-    "Href generalization (critical):",
-    "- recordedMatch.hrefSuffix is the full path at click time (e.g. /owner/repo/pulls)",
-    "- Generalize owner/repo slugs to patterns — do NOT collapse to a short substring that also matches site-wide nav",
-    "- BAD: hrefSuffix /reybahl/patch/pulls → hrefContains /pulls (matches global header a[href=\"/pulls\"] \"All pull requests\" before the repo tab)",
-    "- GOOD: hrefSuffix /owner/repo/pulls → hrefPattern /[^/]+/[^/]+/pulls (repo-scoped tab on any repo)",
-    "- GOOD: combine textContains from recordedMatch.text when present (e.g. textContains Pull requests) with a scoped hrefPattern",
-    "- hrefContains is only safe when the substring is specific enough to avoid global nav duplicates",
-    "- Prefer hrefPattern over hrefContains when the path has multiple segments",
+    "Href and link disambiguation (critical — reason per step, any site):",
+    "Each demo step has pageUrl + recordedMatch. Generalize each step in isolation.",
+    "",
+    "Segment counting (do this first for every step):",
+    "- Use THIS step's pageUrl only — never startUrl, endUrl, or a prior step's page",
+    "- Parse recordedMatch.hrefSuffix: if absolute URL, take pathname + search; strip hash",
+    "- Count pathname segments only (split on /, ignore empty) — query string is separate",
+    "- Query-only or query-heavy hrefs (?tab=followers, /user?tab=followers): pathname segment count is 1 for /user, 0 extra segments from query",
+    "",
+    "Decision tree:",
+    "  A) Parsed href pathname equals /{segmentN} (NO query string) where segmentN is segment N of THIS step's pageUrl pathname?",
+    "     → hrefFromPathSegment: N. Omit match.text and match.textContains — segment index generalizes the target.",
+    "     → NOT for tab links: /user?tab=followers has a query — use B instead.",
+    "  B) href has a query string (?tab=…), extra path segments, or is otherwise NOT a bare /{segment} link?",
+    "     → hrefPattern (preserve query as \\\\?tab=…); add textContains only if ambiguous on that page",
+    "     → Never combine hrefFromPathSegment with hrefPattern on the same step.",
+    "  C) Is hrefContains alone specific enough on this page type?",
+    "     → Use only when the substring cannot match unrelated nav chrome.",
+    "",
+    "1. Pathname segment count examples (from parsed href, not host):",
+    "   - /user → ONE segment",
+    "   - /org/project → TWO segments",
+    "   - /user?tab=followers → ONE pathname segment; pattern query as \\\\?tab=followers",
+    "   - ?tab=followers on page /user → hrefPattern \\\\?tab=followers or /[^/]+\\\\?tab=followers — NOT two pathname segments",
+    "",
+    "2. hrefFromPathSegment (when link equals a segment of THIS step's pageUrl pathname):",
+    "   - Example (any site): pageUrl /org/project/…, href /org → hrefFromPathSegment: 0, no text field",
+    "   - Example (any site): pageUrl /accounts/123/settings, href /accounts/123 → hrefFromPathSegment: 1, no text field",
+    "   - Resolves from live URL at playback — do not also pin match.text to the recorded username/slug",
+    "   - Do NOT use hrefPattern ^/[^/]+$ when hrefFromPathSegment applies",
+    "",
+    "3. hrefPattern (when href is NOT a pageUrl path segment):",
+    "   - Segment count must match THIS step's parsed href pathname — never copy count from another step",
+    "   - BAD: /org/project/pulls → hrefContains /pulls (matches site-wide nav)",
+    "   - GOOD: /org/project/pulls → /[^/]+/[^/]+/pulls",
+    "   - BAD: /user?tab=followers → /[^/]+/[^/]+\\\\?tab=followers (two segments; href has one)",
+    "   - GOOD: /user?tab=followers → \\\\?tab=followers or /[^/]+\\\\?tab=followers",
+    "",
+    "4. Combine criteria only when needed:",
+    "   - hrefFromPathSegment alone is usually enough — do not add text",
+    "   - hrefPattern + textContains when multiple links share the same href shape on that page",
+    "   - Query strings: preserve ?key=value as \\\\?key=value in hrefPattern (matches pathname+search at playback)",
+    "",
+    "5. hrefContains — only when the substring is specific enough to avoid false positives",
+    "",
+    "Choose the strategy that matches intent and recordedMatch — not the shortest regex.",
     "",
     "Element id stability (critical):",
     "- recordedMatch.id may be an auto-generated framework id that will NOT exist on replay",
@@ -145,17 +211,23 @@ function buildCompileScriptPrompt(
     "- id → id (only when stable semantic id)",
     "- unstable id → text, textContains, testId, ariaLabel, or hrefContains/hrefPattern from the same recordedMatch",
     "- text → textContains (strip volatile counts/badges)",
-    "- hrefSuffix → hrefPattern (preferred for multi-segment paths) or scoped hrefContains; add index: 0 for first/latest/top when intent requires it",
-    "- testId → testId (unchanged)",
+    "- hrefSuffix → hrefFromPathSegment, hrefPattern, or scoped hrefContains — see link disambiguation above",
+    "- testId → testId (unchanged, only when recordedMatch had testId for that step)",
     "",
     "Forbidden:",
     "- Adding steps not present in the demo script",
     "- match fields that do not generalize from that step's recordedMatch",
+    "- testId when that demo step's recordedMatch has no testId",
+    "- match.text pinning a username/slug when hrefFromPathSegment or hrefPattern already generalizes",
+    "- match.textContains combined with hrefFromPathSegment — hrefFromPathSegment alone must identify the link",
+    "- hrefFromPathSegment combined with hrefPattern on the same step — pick one strategy",
+    "- hrefFromPathSegment for hrefSuffix containing ? (tab links) — use hrefPattern \\\\?tab=… instead",
+    "- hrefPattern whose pathname segment count differs from THIS step's parsed hrefSuffix pathname",
     "- Using tag when recordedMatch had no tag and text/id/href already identify the target",
     "- waitFor on a different target than the next click's match",
     "",
     "Allowed step types:",
-    '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
+    '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, hrefFromPathSegment?, testId? }, index?: 0 }',
     '- fill: { type: "fill", label?, match: {...}, value: "..." }',
     '- wait: { type: "wait", label?, ms: number }',
     `- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: ${DEFAULT_SCRIPT_WAIT_FOR_MS} }`,
@@ -203,8 +275,14 @@ async function generateObjectWithModels<T>(
     : new Error("All configured models failed.");
 }
 
+export async function buildRecordingPlan(intent: string): Promise<RecordingPlan> {
+  const prompt = buildRecordingPlanPrompt(intent);
+  return generateObjectWithModels<RecordingPlan>(RecordingPlanSchema, prompt);
+}
+
 export async function getNextStep(
   intent: string,
+  plan: RecordingPlan,
   stepsSoFar: MacroGenerationStep[],
   elements: DomElement[],
   url: string,
@@ -216,6 +294,7 @@ export async function getNextStep(
 
   const prompt = buildAgentTurnPrompt(
     intent,
+    plan,
     stepsSoFar,
     elements,
     url,
@@ -230,7 +309,8 @@ export async function compileMacroScript(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
-): Promise<MacroScript> {
+  plan?: RecordingPlan,
+): Promise<CompiledMacroOutput> {
   const missingMatches = demoSteps.filter(
     (step) =>
       (step.type === "click" || step.type === "fill") && !step.recordedMatch,
@@ -241,12 +321,21 @@ export async function compileMacroScript(
     });
   }
 
-  const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
-  const script = await generateObjectWithModels<MacroScript>(
-    MacroScriptSchema,
+  const prompt = buildCompileScriptPrompt(
+    intent,
+    startUrl,
+    endUrl,
+    demoSteps,
+    plan,
+  );
+  const result = await generateObjectWithModels<CompiledMacroOutput>(
+    CompiledMacroOutputSchema,
     prompt,
   );
-  return sanitizeCompiledScript(script);
+  return {
+    ...result,
+    script: sanitizeCompiledScript(result.script),
+  };
 }
 
 function buildRunScopePrompt(
@@ -255,15 +344,20 @@ function buildRunScopePrompt(
   endUrl: string,
   steps: MacroStep[],
 ): string {
+  const firstStepPageUrl = steps.find((step) => step.pageUrl)?.pageUrl ?? startUrl;
+
   return [
     "You decide where a browser automation macro should be allowed to run.",
+    "A macro runs from ONE kind of starting page — not multiple unrelated page types.",
     "",
     `User intent: "${intent}"`,
     `Recording started on: ${startUrl}`,
+    `First step pageUrl: ${firstStepPageUrl}`,
     `Recording ended on: ${endUrl}`,
     `Recorded steps: ${JSON.stringify(
       steps.map((step) => ({
         type: step.type,
+        pageUrl: step.pageUrl,
         selector: step.selector,
         value: step.value,
       })),
@@ -272,18 +366,18 @@ function buildRunScopePrompt(
     "Return a JavaScript RegExp pattern (as a string) tested against the full page URL.",
     "Also return a short plain-English description for the user.",
     "",
-    "Critical: the pattern must match pages where the user STARTS this macro (the start URL),",
-    "not only the destination after steps finish. endUrl is where the macro navigates to;",
-    "do not require the tab to already be on endUrl before running.",
+    "Critical:",
+    "- Match ONLY the page type where recording STARTED (startUrl / first step pageUrl)",
+    "- endUrl is where playback navigates TO — never require endUrl before running",
+    "- Pick ONE page shape — do NOT combine unrelated types (e.g. repo pages OR profile pages)",
+    "- Example: started on /owner/repo → match repo pages (^…/[^/]+/[^/]+(?:/.*)?$), NOT bare profile /owner URLs",
+    "- Example: started on /owner profile → match profile pages (^…/[^/]+(?:[/?#].*)?$), NOT /owner/repo URLs",
     "",
     "Rules:",
-    "- Generalize when the intent is site navigation (e.g. open a tab/section) — match any similar starting page, not one specific account or slug",
+    "- Generalize slugs/ids with [^/]+ but keep the same path segment count and page role as the start URL",
     "- Keep narrow when the intent is page-specific (e.g. fill this form on this page)",
     "- Escape regex metacharacters in literal URL segments (., ?, etc.)",
     "- Prefer anchoring with ^ and $",
-    "- Generalize path segments that vary (owners, ids, slugs) with [^/]+ when intent is not page-specific",
-    "- Example for a dynamic section: ^https://example\\.com/accounts/[^/]+(?:/.*)?$",
-    "- Example for one exact page: ^https://example\\.com/path(?:[/?#].*)?$",
     "- Do not match unrelated sites",
   ].join("\n");
 }

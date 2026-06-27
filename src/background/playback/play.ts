@@ -6,10 +6,10 @@ import {
 } from "@/background/cdp/driver";
 import { trustedClick } from "@/background/cdp/input";
 import { sendContentMessage } from "@/background/inject";
-import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
+import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
-import { elementMatchesEqual } from "@/shared/script-match";
+import { elementMatchesEqual, clickMatchLikelyNavigates } from "@/shared/script-match";
 import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
@@ -195,12 +195,22 @@ export async function runMacroScript(
   script: MacroScript,
   cdpReady = false,
 ): Promise<void> {
+  let urlBeforeLastClick: string | undefined;
+
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
     const stepNum = `${i + 1}/${script.steps.length}`;
 
     if (i > 0 && step.type === "click") {
       const previousStep = script.steps[i - 1];
+      if (
+        urlBeforeLastClick &&
+        previousStep.type === "click" &&
+        clickMatchLikelyNavigates(previousStep.match)
+      ) {
+        await waitForUrlChangeAfterClick(tabId, urlBeforeLastClick);
+      }
+
       const alreadyWaited =
         previousStep.type === "waitFor" &&
         elementMatchesEqual(previousStep.match, step.match);
@@ -240,7 +250,13 @@ export async function runMacroScript(
     }
 
     if (scriptStepNeedsSettle(step)) {
-      await settleAfterStep(tabId, urlBeforeStep);
+      await settleAfterStep(tabId, urlBeforeStep, {
+        expectNavigation:
+          step.type === "click" && clickMatchLikelyNavigates(step.match),
+      });
+      if (urlBeforeStep) {
+        urlBeforeLastClick = urlBeforeStep;
+      }
     }
   }
 }

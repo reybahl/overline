@@ -1,13 +1,19 @@
 import { getTabUrl } from "@/background/capture";
 import { createLogger } from "@/shared/logger";
 import {
+  IN_PAGE_SETTLE_MS,
   MATCH_POLL_INTERVAL_MS,
   PAGE_SETTLE_MS,
   TAB_LOAD_TIMEOUT_MS,
   URL_CHANGE_DETECT_MS,
 } from "@/shared/timing";
 
-export { PAGE_SETTLE_MS, STEP_WAIT_FOR_MS, TAB_LOAD_TIMEOUT_MS } from "@/shared/timing";
+export {
+  IN_PAGE_SETTLE_MS,
+  PAGE_SETTLE_MS,
+  STEP_WAIT_FOR_MS,
+  TAB_LOAD_TIMEOUT_MS,
+} from "@/shared/timing";
 
 const log = createLogger("settle");
 
@@ -60,23 +66,50 @@ async function waitForUrlChange(
   return false;
 }
 
+export async function waitForUrlChangeAfterClick(
+  tabId: number,
+  urlBeforeClick: string,
+  timeoutMs = TAB_LOAD_TIMEOUT_MS,
+): Promise<boolean> {
+  const navigated = await waitForUrlChange(tabId, urlBeforeClick, timeoutMs);
+  if (navigated) {
+    log.debug("navigation detected", { tabId, urlBefore: urlBeforeClick });
+    await delay(PAGE_SETTLE_MS);
+  }
+  return navigated;
+}
+
+export type SettleOptions = {
+  /** When true, briefly poll for URL change (extended wait runs before the next step if needed). */
+  expectNavigation?: boolean;
+};
+
 export async function settleAfterStep(
   tabId: number,
   urlBeforeStep?: string,
+  options?: SettleOptions,
 ): Promise<void> {
-  if (urlBeforeStep) {
+  const expectNavigation = options?.expectNavigation ?? false;
+
+  if (urlBeforeStep && expectNavigation) {
     const navigated = await waitForUrlChange(
       tabId,
       urlBeforeStep,
       URL_CHANGE_DETECT_MS,
     );
-    log.debug("after click", { tabId, navigated, urlBefore: urlBeforeStep });
+    log.debug("after click", { tabId, navigated, urlBefore: urlBeforeStep, expectNavigation: true });
     if (navigated) {
       await delay(PAGE_SETTLE_MS);
+      return;
     }
+    await delay(IN_PAGE_SETTLE_MS);
     return;
   }
 
+  if (urlBeforeStep) {
+    log.debug("after click", { tabId, inPage: true, urlBefore: urlBeforeStep });
+  }
+
   await waitForTabLoad(tabId);
-  await delay(PAGE_SETTLE_MS);
+  await delay(IN_PAGE_SETTLE_MS);
 }
