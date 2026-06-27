@@ -1,12 +1,12 @@
 import { relayLogEntry } from "@/background/log-relay";
-import { runMacro } from "@/background/play";
-import { startAgenticRecordSession } from "@/background/record-session";
-import { cancelPendingRecordSession } from "@/background/recording-session";
+import { runMacro } from "@/background/playback/play";
+import { startAgenticRecordSession } from "@/background/recording/record-session";
+import { cancelPendingRecordSession } from "@/background/recording/recording-session";
 import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut } from "@/shared/shortcut";
 import { validateRunScopePattern } from "@/shared/run-scope";
-import { getMacros, getPendingRecord, saveMacros } from "@/shared/storage";
+import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
 import {
   getActiveTab,
   getRestrictedPageMessage,

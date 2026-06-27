@@ -1,7 +1,7 @@
 import {
   clearPendingRecord,
   getPendingRecord,
-} from "@/shared/storage";
+} from "@/shared/clients/storage";
 
 export const RECORDING_CANCELLED_MESSAGE = "Recording cancelled.";
 

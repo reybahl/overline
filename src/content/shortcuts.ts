@@ -1,8 +1,8 @@
-import { sendBackgroundMessage } from "@/shared/background-client";
+import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import {
   getShortcutMap,
   subscribePatchStorage,
-} from "@/shared/storage";
+} from "@/shared/clients/storage";
 import {
   eventToShortcut,
   isEditableTarget,

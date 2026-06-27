@@ -6,7 +6,7 @@ import {
 } from "@/background/cdp/driver";
 import { trustedClick } from "@/background/cdp/input";
 import { sendContentMessage } from "@/background/inject";
-import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/tab-settle";
+import { settleAfterStep, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import { elementMatchesEqual } from "@/shared/script-match";

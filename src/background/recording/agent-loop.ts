@@ -1,8 +1,8 @@
 import { captureDomInTab, getTabUrl } from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
-import { assertRecordingSessionActive } from "@/background/recording-session";
-import { settleAfterStep } from "@/background/tab-settle";
-import { getNextStep } from "@/background/worker";
+import { assertRecordingSessionActive } from "@/background/recording/recording-session";
+import { settleAfterStep } from "@/background/playback/tab-settle";
+import { getNextStep } from "@/background/recording/worker";
 import { createLogger } from "@/shared/logger";
 import {
   toRecordedStep,
