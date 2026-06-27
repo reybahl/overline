@@ -137,6 +137,17 @@ function matchesAccessibleLabel(el: Element, expected: string): boolean {
   return matchesText(el, expected);
 }
 
+function readPressed(el: Element): boolean | undefined {
+  const value = el.getAttribute("aria-pressed");
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
 function matchesElement(el: Element, match: ElementMatch): boolean {
   const criteria = normalizeElementMatch(match);
 
@@ -166,6 +177,13 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
 
   if (criteria.testId && getTestId(el) !== criteria.testId) {
     return false;
+  }
+
+  if (criteria.pressed !== undefined) {
+    const pressed = readPressed(el);
+    if (pressed !== criteria.pressed) {
+      return false;
+    }
   }
 
   const href = getHref(el);
@@ -203,7 +221,8 @@ function matchesElement(el: Element, match: ElementMatch): boolean {
     criteria.hrefContains ||
     criteria.hrefPattern ||
     criteria.hrefFromPathSegment !== undefined ||
-    criteria.testId;
+    criteria.testId ||
+    criteria.pressed !== undefined;
 
   return Boolean(hasCriteria);
 }

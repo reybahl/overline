@@ -56,11 +56,17 @@ function allowedFieldsFromDemo(demo: ElementMatch): Set<MatchField> {
     allowed.add("hrefSuffix");
     allowed.add("hrefContains");
     allowed.add("hrefPattern");
-    allowed.add("hrefFromPathSegment");
+    // Fragment hrefs (#…) are not pathname segments — hrefFromPathSegment never applies.
+    if (!demo.hrefSuffix.startsWith("#")) {
+      allowed.add("hrefFromPathSegment");
+    }
     allowed.add("tag");
   }
   if (demo.id && isStableId(demo.id)) {
     allowed.add("id");
+  }
+  if (demo.pressed !== undefined) {
+    allowed.add("pressed");
   }
 
   return allowed;

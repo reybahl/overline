@@ -46,6 +46,21 @@ function stableHref(el: Element): string | undefined {
   return normalizeHrefSuffix(href);
 }
 
+function readAriaBoolean(el: Element, attr: string): boolean | undefined {
+  const value = el.getAttribute(attr);
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
+function readPressed(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-pressed");
+}
+
 export function deriveElementMatch(el: Element): ElementMatch {
   if (el.id && isStableId(el.id)) {
     return { id: el.id };
@@ -70,14 +85,24 @@ export function deriveElementMatch(el: Element): ElementMatch {
     match.text = text.slice(0, MAX_TEXT_LENGTH);
   }
 
-  if (!match.text) {
-    const ariaLabel = getAccessibleName(el);
-    if (ariaLabel) {
-      match.ariaLabel = ariaLabel;
-    }
+  const ariaLabel = getAccessibleName(el);
+  if (ariaLabel) {
+    match.ariaLabel = ariaLabel;
   }
 
-  if (match.hrefSuffix || match.text || match.ariaLabel || match.testId || match.tag) {
+  const pressed = readPressed(el);
+  if (pressed !== undefined) {
+    match.pressed = pressed;
+  }
+
+  if (
+    match.hrefSuffix ||
+    match.text ||
+    match.ariaLabel ||
+    match.pressed !== undefined ||
+    match.testId ||
+    match.tag
+  ) {
     return match;
   }
 

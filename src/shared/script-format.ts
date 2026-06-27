@@ -8,6 +8,7 @@ function formatMatch(match: ElementMatch): string {
   if (match.text) parts.push(`text="${match.text}"`);
   if (match.textContains) parts.push(`text~="${match.textContains}"`);
   if (match.testId) parts.push(`testid="${match.testId}"`);
+  if (match.pressed !== undefined) parts.push(`pressed=${match.pressed}`);
   if (match.hrefSuffix) parts.push(`href*="${match.hrefSuffix}"`);
   if (match.hrefContains) parts.push(`href~="${match.hrefContains}"`);
   if (match.hrefPattern) parts.push(`href=/ ${match.hrefPattern} /`);

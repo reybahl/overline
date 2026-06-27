@@ -17,6 +17,8 @@ export const ElementMatchSchema = z.object({
    */
   hrefFromPathSegment: z.number().int().nonnegative().optional(),
   testId: z.string().min(1).optional(),
+  /** aria-pressed — for toggle buttons (false = not engaged). */
+  pressed: z.boolean().optional(),
 });
 
 const ScriptStepLabelSchema = z.object({

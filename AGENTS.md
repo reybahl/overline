@@ -17,19 +17,27 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - `done: true` only when intent is fully satisfied on the current page, never on an intermediate stop, never before at least one action.
 - Missing control → `waitFor`, not `done` with a substitute target.
 - Store `pageUrl` on click/fill steps — compile href rules depend on it.
+- Toggle intents: click only controls in the target state (ariaLabel / pressed / checked). Never click the opposite toggle state.
+- **First in state:** walk captured elements in order; click the first whose state matches — not the expanded/topmost file.
 
 ## Capture (`deriveElementMatch`)
 
 - Stable `id` only when `isStableId` — then early return with `{ id }` only.
-- Otherwise capture **all** of tag, testId, href, text, ariaLabel together. Do not early-return on testId alone and skip href/text.
-- `hrefSuffix` = pathname + search (not full absolute URL).
+- Otherwise capture **all** of tag, testId, href, text, ariaLabel, pressed together. Do not early-return on testId alone and skip href/text.
+- `hrefSuffix` = pathname + search (not full absolute URL). Fragment hashes (`#…`) kept as-is.
+
+## DOM capture (`captureDom`)
+
+- Cap 80 elements; **list toggle controls (aria-pressed / checked) before other interactives** so per-file state buttons are visible to the recorder even when the first diff is expanded.
 
 ## Compile
 
 - Translate demo `recordedMatch`; never add fields absent from that step (especially `testId`, `ariaLabel`, `textContains`).
 - Unstable ids (React `useId`, `_r_*`, Radix, long hex) → drop `id`; use text/aria/href from the same capture.
 - Text with counts/badges → `textContains` with static words only.
-- **hrefFromPathSegment:** bare `/{segmentN}` from this step's `pageUrl`, no query — no text fields.
+- **hrefFromPathSegment:** bare `/{segmentN}` from this step's `pageUrl`, no query — no text fields. Never for fragment/hash hrefs (`#…`).
+- **Fragment/hash hrefs** (`#…`): `hrefContains` with static `#` prefix (through trailing hyphen before slug); never `hrefFromPathSegment`.
+- When `recordedMatch.ariaLabel` and `recordedMatch.text` differ, compile `ariaLabel` only — state lives in aria.
 - **Query/tab hrefs** (`?tab=…`): `hrefPattern`, never `hrefFromPathSegment`.
 - Scoped paths: `hrefPattern` preserving segment count.
 - Never combine `hrefFromPathSegment` with `hrefPattern` or text fields.
@@ -39,7 +47,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 ## Sanitize (`sanitizeCompiledScript`)
 
 - **Ground to demo:** drop any match field not present on (or generalizable from) that step's `recordedMatch`. This is the guardrail against compile hallucinations — not more prompt text.
-- Allowed generalizations: demo `text` → `text`/`textContains`; demo `hrefSuffix` → `hrefPattern`/`hrefFromPathSegment`/`hrefContains`/`hrefSuffix`; demo `testId` → `testId` only; stable demo `id` → `id`.
+- Allowed generalizations: demo `text` → `text`/`textContains`; demo `hrefSuffix` → `hrefPattern`/`hrefFromPathSegment`/`hrefContains`/`hrefSuffix` (not `hrefFromPathSegment` when demo href is `#…`); demo `testId` → `testId` only; stable demo `id` → `id`; demo `pressed` → `pressed`.
 - Strip unstable `id`.
 - Strip `text`/`textContains` when `hrefFromPathSegment` is set.
 - Strip `hrefFromPathSegment` when `hrefPattern` is set.
@@ -80,3 +88,4 @@ Constants (`shared/timing.ts`): `IN_PAGE_SETTLE_MS` 250, `PAGE_SETTLE_MS` 750, `
 
 - **Multi-hop + query tab:** click scoped repo link (`hrefFromPathSegment: 0`), then tab link (`hrefPattern: "\\?tab=…"` only — no invented `testId`). Playback must navigation-wait after step 1, not after step 2.
 - **In-page menu:** open dropdown/button, then copy — no 20s URL wait between steps; ~250ms settle only.
+- **PR viewed toggle:** first unviewed file → one click `ariaLabel: "Not Viewed"` + `pressed: false`; recorder sees all file toggles in capture order.

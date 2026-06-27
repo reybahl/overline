@@ -267,61 +267,88 @@ function readChecked(el: Element): boolean | undefined {
   return readAriaBoolean(el, "aria-checked");
 }
 
+function isToggleElement(el: Element): boolean {
+  return readPressed(el) !== undefined || readChecked(el) !== undefined;
+}
+
+function buildDomEntry(element: Element): DomElement | null {
+  const role = getRole(element);
+  if (!isInteractiveElement(element, role) || isHidden(element)) {
+    return null;
+  }
+
+  const built = buildSelector(element);
+  if (!built) {
+    return null;
+  }
+
+  const tag = element.tagName.toLowerCase();
+  const fieldValue = getFieldValue(element);
+  const text = getText(element) || fieldValue.slice(0, 200);
+  const ariaLabel = getAccessibleName(element);
+  const placeholder = getPlaceholder(element);
+
+  if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue)) {
+    return null;
+  }
+
+  const controlKind = inferControlKind(element, role);
+  const expanded = readExpanded(element);
+  const hasPopup = readHasPopup(element);
+  const selected = readSelected(element);
+  const pressed = readPressed(element);
+  const checked = readChecked(element);
+
+  return {
+    tag,
+    role,
+    text,
+    selector: built.selector,
+    ariaLabel,
+    placeholder,
+    idStable: built.idStable,
+    ...(controlKind ? { controlKind } : {}),
+    ...(expanded !== undefined ? { expanded } : {}),
+    ...(hasPopup ? { hasPopup } : {}),
+    ...(selected !== undefined ? { selected } : {}),
+    ...(pressed !== undefined ? { pressed } : {}),
+    ...(checked !== undefined ? { checked } : {}),
+  };
+}
+
 export function captureDom(): DomElement[] {
   const elements = document.querySelectorAll(INTERACTIVE_SELECTOR);
-  const results: DomElement[] = [];
+  const toggles: Element[] = [];
+  const others: Element[] = [];
 
   for (const element of elements) {
+    const role = getRole(element);
+    if (!isInteractiveElement(element, role) || isHidden(element)) {
+      continue;
+    }
+
+    if (!buildSelector(element)) {
+      continue;
+    }
+
+    if (isToggleElement(element)) {
+      toggles.push(element);
+    } else {
+      others.push(element);
+    }
+  }
+
+  const results: DomElement[] = [];
+
+  for (const element of [...toggles, ...others]) {
     if (results.length >= MAX_ELEMENTS) {
       break;
     }
 
-    const role = getRole(element);
-    if (!isInteractiveElement(element, role)) {
-      continue;
+    const entry = buildDomEntry(element);
+    if (entry) {
+      results.push(entry);
     }
-
-    if (isHidden(element)) {
-      continue;
-    }
-
-    const built = buildSelector(element);
-    if (!built) {
-      continue;
-    }
-
-    const tag = element.tagName.toLowerCase();
-    const fieldValue = getFieldValue(element);
-    const text = getText(element) || fieldValue.slice(0, 200);
-    const ariaLabel = getAccessibleName(element);
-    const placeholder = getPlaceholder(element);
-
-    if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue)) {
-      continue;
-    }
-
-    const controlKind = inferControlKind(element, role);
-    const expanded = readExpanded(element);
-    const hasPopup = readHasPopup(element);
-    const selected = readSelected(element);
-    const pressed = readPressed(element);
-    const checked = readChecked(element);
-
-    results.push({
-      tag,
-      role,
-      text,
-      selector: built.selector,
-      ariaLabel,
-      placeholder,
-      idStable: built.idStable,
-      ...(controlKind ? { controlKind } : {}),
-      ...(expanded !== undefined ? { expanded } : {}),
-      ...(hasPopup ? { hasPopup } : {}),
-      ...(selected !== undefined ? { selected } : {}),
-      ...(pressed !== undefined ? { pressed } : {}),
-      ...(checked !== undefined ? { checked } : {}),
-    });
   }
 
   return results;

@@ -29,6 +29,8 @@ const DOM_ELEMENT_RULES = [
   "- Each element has role, controlKind, idStable — use these to pick controls, not visible text alone",
   "- Duplicate labels (e.g. two \"Code\" elements): use controlKind — dropdown-trigger/disclosure for menus and dropdowns, nav-tab for repo section tabs, link for navigation",
   "- State fields show the result of prior clicks: selected/pressed/checked true or expanded true means that control is ALREADY active — do not click it again, move to the next part of the intent",
+  "- Toggle controls: read ariaLabel and pressed/checked — click only the state that matches the intent (e.g. 'not viewed' → ariaLabel \"Not Viewed\" and pressed false). Never click the opposite state (Viewed, pressed true) — that hits the wrong file or undoes progress",
+  "- For 'first matching state' intents (first not viewed, first unchecked): walk elements in listed order, skip non-matches, click the first match — not the expanded or topmost file section",
   "- Prefer selectors where idStable is true",
   "- If menu or panel items are missing from the page state, click the dropdown-trigger or disclosure that opens them first — do not give up",
 ];
@@ -42,6 +44,7 @@ const RECORD_AGENT_RULES = [
   "- Set done: true only when the intent is fully satisfied on the current page — not an intermediate stop",
   "- Never set done: true before recording at least one action",
   "- If a required control is missing, use waitFor — do not mark done or substitute unrelated controls",
+  "- Take the fewest steps — do not click jump/anchor links to scroll to a control that is already in the DOM",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -114,9 +117,12 @@ function buildCompileScriptPrompt(
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
     "- Stable semantic ids → keep id",
     "- text with counts/badges → textContains with static words only",
+    "- When recordedMatch.ariaLabel and recordedMatch.text differ, use ariaLabel only (state lives in aria, not visible label)",
+    "- When recordedMatch.pressed or checked is set on a toggle, include it in the replay match",
     "",
     "Href (use THIS step's pageUrl + recordedMatch.hrefSuffix):",
     "- Bare /{segmentN} matching pageUrl segment N, no query → hrefFromPathSegment: N (no text)",
+    "- Fragment/hash hrefSuffix (#…) → hrefContains with static # prefix through trailing hyphen; never hrefFromPathSegment",
     "- Query tabs (?tab=…) → hrefPattern \\\\?tab=… (+ textContains if ambiguous)",
     "- Scoped paths (/org/repo/pulls) → hrefPattern preserving segment count",
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
