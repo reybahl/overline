@@ -11,7 +11,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
-import { findMacroForUrl, macroMatchesUrl } from "@/shared/macro-match";
+import { macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut } from "@/shared/shortcut";
 import { validateRunScopePattern } from "@/shared/run-scope";
 import {
@@ -58,12 +58,6 @@ chrome.commands.onCommand.addListener(async (command) => {
         await togglePatchOverlay(tab.id, tab.url);
         break;
       }
-      case "record-macro":
-        log.warn("use patch overlay to record macros");
-        break;
-      case "run-macro":
-        await handleRunMacro();
-        break;
       default:
         log.warn("unknown command", { command });
     }
@@ -171,11 +165,6 @@ async function handleMessage(
 
       return { ok: true, macros };
     }
-    case "RECORD_MACRO":
-      throw new Error("Use the Patch overlay to record macros.");
-    case "RUN_MACRO":
-      await handleRunMacro();
-      return { ok: true };
     case "RUN_MACRO_BY_ID":
       await handleRunMacroById(message.macroId, sender?.tab?.id);
       return { ok: true };
@@ -265,21 +254,4 @@ async function handleRunMacroById(
 
   await runMacro(resolvedTabId, macro);
   log.info("ran macro via shortcut", { macro: macro.name });
-}
-
-async function handleRunMacro(): Promise<void> {
-  const tab = await requireInjectableActiveTab();
-  const url = tab.url;
-  if (!url) {
-    throw new Error("No active tab URL found.");
-  }
-
-  const [macros, settings] = await Promise.all([getMacros(), getSettings()]);
-  const macro = findMacroForUrl(macros, url, settings.currentMacroId);
-  if (!macro) {
-    throw new Error("No macro matches this page. Record one on this URL first.");
-  }
-
-  await runMacro(tab.id!, macro);
-  log.info("ran macro", { macro: macro.name, url });
 }

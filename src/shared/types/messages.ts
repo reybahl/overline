@@ -5,13 +5,11 @@ import type { PendingRecord } from "@/shared/types/pending-record";
 import type { Settings } from "@/shared/types/settings";
 
 export type BackgroundMessage =
-  | { type: "RECORD_MACRO" }
   | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
   | { type: "START_AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
   | { type: "GET_PENDING_RECORD" }
   | { type: "CLEAR_PENDING_RECORD" }
   | { type: "CANCEL_PENDING_RECORD" }
-  | { type: "RUN_MACRO" }
   | { type: "RUN_MACRO_BY_ID"; macroId: string }
   | { type: "EXECUTE_MACRO"; tabId: number; macroId: string }
   | { type: "GET_SETTINGS" }
@@ -40,7 +38,6 @@ export type ContentMessage =
       match: import("@/shared/types/script").ElementMatch;
       index?: number;
     }
-  | { type: "RUN_MACRO"; macro: Macro }
   | { type: "PING" }
   | { type: "TOGGLE_PATCH_OVERLAY" }
   | { type: "CLOSE_PATCH_OVERLAY" };

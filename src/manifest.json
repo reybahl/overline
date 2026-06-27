@@ -44,12 +44,6 @@
         "mac": "Command+Shift+P"
       },
       "description": "Open Patch"
-    },
-    "record-macro": {
-      "description": "Record a new macro"
-    },
-    "run-macro": {
-      "description": "Run the current macro"
     }
   }
 }
