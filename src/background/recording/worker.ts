@@ -3,7 +3,7 @@ import type { z } from "zod";
 
 import type { DomElement } from "@/content/dom-capture";
 import {
-  buildDemoElementHints,
+  buildDemoScriptForCompile,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
 import { getLlmEnv, llmConfigHint } from "@/shared/env";
@@ -94,73 +94,65 @@ function buildCompileScriptPrompt(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
-  referenceElements: DomElement[],
 ): string {
-  const demoHints = buildDemoElementHints(demoSteps, referenceElements);
+  const demoScript = buildDemoScriptForCompile(demoSteps);
 
   return [
-    "You compile a browser automation demo into a generalized click-based script that runs deterministically on similar pages.",
+    "You generalize a recorded browser automation demo into a replay script.",
+    "Your job is a translator: convert each demo step's specific recordedMatch into a durable match for future runs.",
+    "Do NOT discover targets from scratch — every output step must correspond to one demo step below.",
     "",
     `User intent: "${intent}"`,
     `Recording started on: ${startUrl}`,
     `Recording ended on: ${endUrl}`,
-    `Demo steps (brittle — do not copy unstable ids): ${JSON.stringify(
-      demoSteps.map((step) => ({
-        type: step.type,
-        selector: step.selector,
-        value: step.value,
-      })),
-    )}`,
     "",
-    "Demo steps resolved against reference DOM (USE THIS — do not invent fields):",
-    JSON.stringify(demoHints, null, 2),
-    "",
-    "Reference DOM at compile time (only use values that appear here):",
-    JSON.stringify(referenceElements, null, 2),
+    "Demo script (specific matches captured at click time — your input):",
+    JSON.stringify(demoScript, null, 2),
     "",
     "Return a script with version 1 and an ordered steps array.",
     "",
-    "Anti-hallucination rules (critical):",
-    "- NEVER put ariaLabel in a match unless resolvedElement.ariaLabel or reference DOM ariaLabel is non-empty for that control",
-    "- If a control only has text (ariaLabel empty), use match.text — NOT match.ariaLabel",
-    "- NEVER invent id, testId, ariaLabel, or text that is not shown in reference DOM or demo hints",
-    "- Duplicate visible labels (e.g. two \"Code\" controls): use tag + text + controlKind — nav-tab is role link on #code-tab, dropdown is tag button with controlKind dropdown-trigger",
-    "- For dropdown/menu intents: click tag button with text, NOT #code-tab and NOT ariaLabel unless present in DOM",
-    "- waitFor must target the NEXT menu item or panel content you will click — NOT the same match as the dropdown trigger you just clicked",
-    "- id values must be bare element ids (e.g. issues-tab) — never prefix with #",
-    "- Only add script steps that correspond to demo actions or intent clauses you can ground in reference DOM",
+    "Role (critical):",
+    "- One output step per demo step, same order — do not add, drop, or merge steps",
+    "- Each output match must generalize the corresponding demo recordedMatch — never invent unrelated ids, tags, or text",
+    "- Visible text with dynamic counts/badges → use textContains with static label words only, not the full string with numbers",
+    "- hrefSuffix with instance-specific paths → generalize to hrefContains or hrefPattern when intent implies any similar item (e.g. latest row: hrefPattern + index 0)",
+    "- When intent names a specific item (e.g. switch to main), keep a specific match — do not over-generalize",
     "",
-    "Critical: the script must implement EVERY part of the user intent, in order.",
-    "If the intent says \"go to issues, then click the latest issue\", the script must have:",
-    "  1) a step that opens the Issues section/tab,",
-    "  2) a step that clicks the first/top issue in that list (index 0), using a match for issue rows — not nav links.",
-    "Add a short label on each step describing which part of the intent it fulfills.",
+    "Element id stability (critical):",
+    "- recordedMatch.id may be an auto-generated framework id that will NOT exist on replay",
+    "- UNSTABLE ids — omit match.id; generalize from other fields on the SAME recordedMatch:",
+    "  React useId (_r_*, :r*:), React Aria, Radix, Headless UI prefixes, long hex/uuid blobs, ids with no readable words",
+    "- STABLE ids — keep match.id unchanged; do not replace with ambiguous visible text:",
+    "  semantic kebab-case/snake_case names (ref-picker-repos-header-ref-selector, js-issues-search, pull-requests-tab)",
+    "- When recordedMatch.id looks unstable: use text, textContains, testId, ariaLabel, or href from that same recordedMatch — never invent text absent from recordedMatch",
+    "- When recordedMatch.id looks stable: keep match.id even if visible text exists (e.g. branch button labeled \"test\")",
+    "- If recordedMatch has only an unstable id and no other fields, keep match.id as last resort",
     "",
-    "Allowed step types (clicks only — no navigate steps):",
+    "Allowed transforms on recordedMatch:",
+    "- id → id (only when stable semantic id)",
+    "- unstable id → text, textContains, testId, ariaLabel, or hrefContains/hrefPattern from the same recordedMatch",
+    "- text → textContains (strip volatile counts/badges)",
+    "- hrefSuffix → hrefContains or hrefPattern; add index: 0 for first/latest/top when intent requires it",
+    "- testId → testId (unchanged)",
+    "",
+    "Forbidden:",
+    "- Adding steps not present in the demo script",
+    "- match fields that do not generalize from that step's recordedMatch",
+    "- Using tag when recordedMatch had no tag and text/id/href already identify the target",
+    "- waitFor on a different target than the next click's match",
+    "",
+    "Allowed step types:",
     '- click: { type: "click", label?, match: { id?, tag?, ariaLabel?, text?, textContains?, hrefSuffix?, hrefContains?, hrefPattern?, testId? }, index?: 0 }',
-    "  · index 0 = first matching element (use for latest/first/top item in a list after reaching the list page).",
-    "  · id: ONLY when idStable is true in reference DOM (e.g. issues-tab). Never use unstable React ids (_R_…). Never prefix id with #.",
-    "  · hrefPattern: regex on href path, e.g. \"/issues/\\\\d+\" matches issue links but not the Issues tab (/issues with no number).",
-    "  · testId: data-testid when present in reference DOM.",
-    "  · Match priority: stable id > testId > ariaLabel (if non-empty in DOM) > text > hrefPattern",
-    "  · For repo section tabs: match.id from stable ids like issues-tab",
-    "  · For dropdown triggers: match.tag \"button\" + match.text from reference DOM",
     '- fill: { type: "fill", label?, match: {...}, value: "..." }',
-    '- wait: { type: "wait", label?, ms: 500 }',
+    '- wait: { type: "wait", label?, ms: number }',
     `- waitFor: { type: "waitFor", label?, match: {...}, timeoutMs?: ${DEFAULT_SCRIPT_WAIT_FOR_MS} }`,
     "",
-    "Reliability (required for multi-step flows):",
-    "- After opening a dropdown or panel, insert waitFor for the NEXT click target (e.g. CLI tab), not the trigger button",
-    `- Prefer click → waitFor → click; use timeoutMs ${DEFAULT_SCRIPT_WAIT_FOR_MS}`,
+    "Multi-step flows:",
+    "- After opening a dropdown or panel, you may insert waitFor before the next click",
+    "- waitFor match must equal the next click's match",
+    `- Prefer click → waitFor → click when needed; timeoutMs ${DEFAULT_SCRIPT_WAIT_FOR_MS}`,
     "",
-    "Rules:",
-    "- Never emit navigate steps — click links and buttons instead",
-    "- One script step per logical intent clause",
-    "- Generalize: strip instance-specific issue/PR numbers unless the intent names them",
-    "- Never use hrefContains \"/issues/\" alone for the final click — use hrefPattern \"/issues/\\\\d+\"",
-    "- Labels must describe the intent part",
-    "- Keep the script minimal",
-    "- Each match object must include at least one matching criterion that exists in reference DOM",
+    "Labels: short description of which part of the intent each step fulfills.",
   ].join("\n");
 }
 
@@ -225,20 +217,23 @@ export async function compileMacroScript(
   startUrl: string,
   endUrl: string,
   demoSteps: MacroStep[],
-  referenceElements: DomElement[],
 ): Promise<MacroScript> {
-  const prompt = buildCompileScriptPrompt(
-    intent,
-    startUrl,
-    endUrl,
-    demoSteps,
-    referenceElements,
+  const missingMatches = demoSteps.filter(
+    (step) =>
+      (step.type === "click" || step.type === "fill") && !step.recordedMatch,
   );
+  if (missingMatches.length > 0) {
+    log.warn("demo steps missing recordedMatch", {
+      count: missingMatches.length,
+    });
+  }
+
+  const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
   const script = await generateObjectWithModels<MacroScript>(
     MacroScriptSchema,
     prompt,
   );
-  return sanitizeCompiledScript(script, referenceElements, demoSteps);
+  return sanitizeCompiledScript(script);
 }
 
 function buildRunScopePrompt(

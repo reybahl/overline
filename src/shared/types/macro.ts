@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { deriveUrlPattern } from "@/shared/macro-match";
-import { MacroScriptSchema, type MacroScript } from "@/shared/types/script";
+import {
+  ElementMatchSchema,
+  MacroScriptSchema,
+  type MacroScript,
+} from "@/shared/types/script";
 
 export const MacroStepTypeSchema = z.enum([
   "click",
@@ -19,6 +23,7 @@ export const MacroStepSchema = z.object({
   type: MacroStepTypeSchema,
   selector: z.string().optional(),
   value: z.string().optional(),
+  recordedMatch: ElementMatchSchema.optional(),
   timestamp: z.number().int().nonnegative(),
 });
 

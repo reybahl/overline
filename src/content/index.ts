@@ -31,9 +31,10 @@ function initializeContentScript(): void {
           sendResponse({ ok: true });
           return false;
         case "EXECUTE_STEPS":
+          // demo steps during agentic recording, not playback
           void executeSteps(message.steps)
-            .then(() => {
-              sendResponse({ ok: true });
+            .then((matches) => {
+              sendResponse({ ok: true, matches });
             })
             .catch((error: unknown) => {
               const errorMessage =

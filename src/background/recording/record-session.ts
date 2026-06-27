@@ -1,4 +1,4 @@
-import { captureDomInTab, getTabUrl } from "@/background/capture";
+import { getTabUrl } from "@/background/capture";
 import { runAgenticRecord } from "@/background/recording/record";
 import {
   assertRecordingSessionActive,
@@ -68,6 +68,9 @@ async function finishAgenticRecordSession(
       run,
       stepCount: result.macro.steps.length,
       endUrl,
+      recordedMatches: result.macro.steps
+        .filter((step) => step.type === "click" || step.type === "fill")
+        .map((step) => step.recordedMatch),
     });
 
     let current = await getPendingRecord();
@@ -80,13 +83,11 @@ async function finishAgenticRecordSession(
 
     await assertRecordingSessionActive();
 
-    const referenceElements = await captureDomInTab(tabId);
     const script = await compileMacroScript(
       intent,
       startUrl,
       endUrl,
       result.macro.steps,
-      referenceElements,
     );
 
     log.info("script compiled", { run, scriptSteps: script.steps.length });

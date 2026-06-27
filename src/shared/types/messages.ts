@@ -71,5 +71,9 @@ export type ContentMessage =
 export type ContentPoint = { x: number; y: number };
 
 export type ContentResponse =
-  | { ok: true; point?: ContentPoint }
+  | {
+      ok: true;
+      point?: ContentPoint;
+      matches?: (ElementMatch | null)[];
+    }
   | { ok: false; error: string };
