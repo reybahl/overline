@@ -33,6 +33,57 @@ function stripPathSegmentWithHrefPattern(match: ElementMatch): ElementMatch {
   return rest;
 }
 
+type MatchField = keyof ElementMatch;
+
+/** Fields compile may emit when generalizing this demo capture. */
+function allowedFieldsFromDemo(demo: ElementMatch): Set<MatchField> {
+  const allowed = new Set<MatchField>();
+
+  if (demo.tag) {
+    allowed.add("tag");
+  }
+  if (demo.testId) {
+    allowed.add("testId");
+  }
+  if (demo.ariaLabel) {
+    allowed.add("ariaLabel");
+  }
+  if (demo.text || demo.textContains) {
+    allowed.add("text");
+    allowed.add("textContains");
+  }
+  if (demo.hrefSuffix) {
+    allowed.add("hrefSuffix");
+    allowed.add("hrefContains");
+    allowed.add("hrefPattern");
+    allowed.add("hrefFromPathSegment");
+    allowed.add("tag");
+  }
+  if (demo.id && isStableId(demo.id)) {
+    allowed.add("id");
+  }
+
+  return allowed;
+}
+
+/** Drop compile fields that were not present on (or generalizable from) the demo step. */
+function constrainMatchToDemo(
+  demo: ElementMatch,
+  match: ElementMatch,
+): ElementMatch {
+  const allowed = allowedFieldsFromDemo(demo);
+  const constrained: ElementMatch = {};
+
+  for (const key of Object.keys(match) as MatchField[]) {
+    const value = match[key];
+    if (allowed.has(key) && value !== undefined) {
+      (constrained as Record<MatchField, ElementMatch[MatchField]>)[key] = value;
+    }
+  }
+
+  return constrained;
+}
+
 export type DemoScriptStep = {
   type: MacroStep["type"];
   value?: string;
@@ -55,19 +106,32 @@ export function buildDemoScriptForCompile(
 }
 
 /**
- * Deterministic post-compile pass. Assumes the compile LLM output is correct;
- * only applies structural fixes (normalize ids, strip unstable ids, sync waitFor).
+ * Deterministic post-compile pass: ground each step's match to demo `recordedMatch`,
+ * then apply structural fixes (normalize ids, strip unstable ids, sync waitFor).
  */
-export function sanitizeCompiledScript(script: MacroScript): MacroScript {
+export function sanitizeCompiledScript(
+  script: MacroScript,
+  demoSteps?: DemoScriptStep[],
+): MacroScript {
   const clickMatchByIndex = new Map<number, ElementMatch>();
+  let demoIndex = 0;
 
   const steps = script.steps.map((step, index) => {
     if (step.type !== "click" && step.type !== "waitFor" && step.type !== "fill") {
       return step;
     }
 
-    let match = stripPathSegmentWithHrefPattern(
-      stripTextWithPathSegment(stripUnstableId(normalizeElementMatch(step.match))),
+    const demo =
+      demoSteps && (step.type === "click" || step.type === "fill")
+        ? demoSteps[demoIndex++]
+        : undefined;
+
+    let match = normalizeElementMatch(step.match);
+    if (demo?.recordedMatch) {
+      match = constrainMatchToDemo(demo.recordedMatch, match);
+    }
+    match = stripPathSegmentWithHrefPattern(
+      stripTextWithPathSegment(stripUnstableId(match)),
     );
 
     if (step.type === "click") {

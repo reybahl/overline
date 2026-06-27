@@ -9,7 +9,7 @@ import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import type { Macro, MacroStep } from "@/shared/types/macro";
-import { elementMatchesEqual, clickMatchLikelyNavigates } from "@/shared/script-match";
+import { clickMatchLikelyNavigates, elementMatchesEqual } from "@/shared/script-match";
 import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
@@ -250,10 +250,7 @@ export async function runMacroScript(
     }
 
     if (scriptStepNeedsSettle(step)) {
-      await settleAfterStep(tabId, urlBeforeStep, {
-        expectNavigation:
-          step.type === "click" && clickMatchLikelyNavigates(step.match),
-      });
+      await settleAfterStep(tabId, urlBeforeStep);
       if (urlBeforeStep) {
         urlBeforeLastClick = urlBeforeStep;
       }

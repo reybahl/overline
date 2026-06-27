@@ -68,7 +68,6 @@ async function finishAgenticRecordSession(
       run,
       stepCount: result.macro.steps.length,
       endUrl,
-      planGoal: result.plan.goal,
       recordedMatches: result.macro.steps
         .filter((step) => step.type === "click" || step.type === "fill")
         .map((step) => step.recordedMatch),
@@ -89,7 +88,6 @@ async function finishAgenticRecordSession(
       startUrl,
       endUrl,
       result.macro.steps,
-      result.plan,
     );
 
     log.info("script compiled", {

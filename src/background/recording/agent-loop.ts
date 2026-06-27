@@ -2,13 +2,12 @@ import { captureDomInTab, getTabUrl } from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep } from "@/background/playback/tab-settle";
 import { assertRecordingSessionActive } from "@/background/recording/recording-session";
-import { buildRecordingPlan, getNextStep } from "@/background/recording/worker";
+import { getNextStep } from "@/background/recording/worker";
 import { createLogger } from "@/shared/logger";
 import {
   toRecordedStep,
   type MacroGenerationStep,
   type MacroStep,
-  type RecordingPlan,
 } from "@/shared/types/macro";
 
 const log = createLogger("agent");
@@ -28,7 +27,6 @@ export type AgentLoopOptions = {
 export type AgentLoopResult = {
   steps: MacroStep[];
   reasoning: string[];
-  plan: RecordingPlan;
   macroName?: string;
 };
 
@@ -92,7 +90,9 @@ async function executeAndRecordStep(
     return { ok: false, error: response.error };
   }
 
-  step.pageUrl = urlBeforeStep;
+  if (step.type === "click" || step.type === "fill") {
+    step.pageUrl = urlBeforeStep;
+  }
 
   step.recordedMatch = response.matches?.[0] ?? undefined;
   await settleAfterStep(tabId, urlBeforeStep);
@@ -117,12 +117,6 @@ export async function runAgentLoop(
   let lastFailedSignature: string | undefined;
   let consecutiveFailedProposals = 0;
   let exitReason: string | undefined;
-
-  onProgress?.("Planning…");
-  const plan = await buildRecordingPlan(intent);
-
-  log.info("recording plan", { goal: plan.goal });
-
   let macroName: string | undefined;
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
@@ -134,7 +128,6 @@ export async function runAgentLoop(
     const elements = await captureDomInTab(tabId);
     const turnResult = await getNextStep(
       intent,
-      plan,
       stepsTaken.map((step) => ({
         type: step.type,
         selector: step.selector,
@@ -273,5 +266,5 @@ export async function runAgentLoop(
     throw new Error(`Recording finished without any steps. ${detail}`);
   }
 
-  return { steps: stepsTaken, reasoning, plan, macroName };
+  return { steps: stepsTaken, reasoning, macroName };
 }

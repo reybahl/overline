@@ -63,13 +63,6 @@ export const MacroGenerationStepSchema = z.object({
 
 export type MacroGenerationStep = z.infer<typeof MacroGenerationStepSchema>;
 
-/** End-goal reminder for the recorder — nothing else. */
-export const RecordingPlanSchema = z.object({
-  goal: z.string().min(1),
-});
-
-export type RecordingPlan = z.infer<typeof RecordingPlanSchema>;
-
 export const CompiledMacroOutputSchema = z.object({
   script: MacroScriptSchema,
   description: z.string().min(1),

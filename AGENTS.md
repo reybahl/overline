@@ -1,74 +1,82 @@
-# Patch — agent notes
+# Patch — do not regress
 
-Architecture and regression traps for the recording → compile → playback pipeline.
+Recording → compile → playback. Trust the LLM for recording and compile; enforce correctness with thin deterministic sanitize + playback timing. No site-specific hacks.
 
-## Pipeline roles
+## Pipeline shape
 
-| Phase | Job |
-|---|---|
-| **Brief (`goal` only)** | One sentence end-state reminder for the recorder — not steps, avoid lists, or doneWhen |
-| **Recorder** | Discover clicks turn-by-turn from live DOM; mark done when goal is reached |
-| **Compile** | 1:1 generalize demo steps → script + description; never drop navigation steps |
-| **Run scope** | One **start page type** only (from `startUrl` / first step `pageUrl`) — not repo OR profile |
-| **Post-compile sanitize** | Structural only: strip unstable ids, strip text with `hrefFromPathSegment`, strip `hrefFromPathSegment` when `hrefPattern` is set |
-| **Playback** | Execute script; pre-click `waitFor` for next target after prior step settles |
+- **Recorder:** one LLM turn per click from live DOM + user intent. No separate recording plan (`steps`, `avoid`, `doneWhen`) or plan LLM call.
+- **Compile:** one output click/fill per demo step — same count, same order. Never drop navigation hops. Generalize each step's `recordedMatch`; do not invent targets.
+- **Sanitize:** deterministic post-compile only — not a second LLM pass.
+- **Run scope:** one start page type from `startUrl` / first step `pageUrl`, not `endUrl`. Same path segment count; slugs → `[^/]+`.
+- **Playback:** pre-click `waitFor` for the next target; navigation wait only when the previous click match has href fields.
 
-## Recording plan — keep minimal
+## Recording
 
-The brief is only `{ goal }`. Do not re-add `steps`, `avoid`, or `doneWhen` — they caused contradictory instructions (e.g. listing the profile link in `avoid` while the recorder needed to click it).
-
-## Compile rules (do not regress)
-
-- **One output step per demo step** — same count, same order. Navigation hops (repo → profile) are required, not detours.
-- **`hrefFromPathSegment`** — when demo `pageUrl` is multi-segment and clicked href is bare `/{segmentN}` with **no query string**. Omit `text` / `textContains`.
-- **Tab/query links** (`?tab=followers`) — use `hrefPattern: "\\?tab=followers"` (+ `textContains` if needed). Never `hrefFromPathSegment` on query hrefs. Never combine `hrefFromPathSegment` + `hrefPattern`.
-- **`testId`** — only when that demo step's `recordedMatch` had `testId`. Never invent (e.g. `followers-tab`).
-- **Description** — compile generates generalized `macro.description`, not the recorder.
+- Never emit `navigate` — click links and buttons.
+- Never navigate backwards.
+- `done: true` only when intent is fully satisfied on the current page, never on an intermediate stop, never before at least one action.
+- Missing control → `waitFor`, not `done` with a substitute target.
+- Store `pageUrl` on click/fill steps — compile href rules depend on it.
 
 ## Capture (`deriveElementMatch`)
 
-- Collect **href + text + testId together** — no early return on `testId` alone.
-- Store `hrefSuffix` as pathname + search (not full absolute URL).
+- Stable `id` only when `isStableId` — then early return with `{ id }` only.
+- Otherwise capture **all** of tag, testId, href, text, ariaLabel together. Do not early-return on testId alone and skip href/text.
+- `hrefSuffix` = pathname + search (not full absolute URL).
 
-## Playback — navigation vs in-page UI
+## Compile
 
-### Followers macro fix (regression trap)
+- Translate demo `recordedMatch`; never add fields absent from that step (especially `testId`, `ariaLabel`, `textContains`).
+- Unstable ids (React `useId`, `_r_*`, Radix, long hex) → drop `id`; use text/aria/href from the same capture.
+- Text with counts/badges → `textContains` with static words only.
+- **hrefFromPathSegment:** bare `/{segmentN}` from this step's `pageUrl`, no query — no text fields.
+- **Query/tab hrefs** (`?tab=…`): `hrefPattern`, never `hrefFromPathSegment`.
+- Scoped paths: `hrefPattern` preserving segment count.
+- Never combine `hrefFromPathSegment` with `hrefPattern` or text fields.
+- Do not insert extra `waitFor` steps — playback owns timing between actions.
+- Description from compile with generalized roles ("the owner", "the current repository") — not raw intent, session URLs, or slugs.
 
-Symptom: step 1 runs, step 2 `waitFor` times out on repo page.
+## Sanitize (`sanitizeCompiledScript`)
 
-Cause: pre-click wait for step 2 ran before navigation from step 1 finished.
+- **Ground to demo:** drop any match field not present on (or generalizable from) that step's `recordedMatch`. This is the guardrail against compile hallucinations — not more prompt text.
+- Allowed generalizations: demo `text` → `text`/`textContains`; demo `hrefSuffix` → `hrefPattern`/`hrefFromPathSegment`/`hrefContains`/`hrefSuffix`; demo `testId` → `testId` only; stable demo `id` → `id`.
+- Strip unstable `id`.
+- Strip `text`/`textContains` when `hrefFromPathSegment` is set.
+- Strip `hrefFromPathSegment` when `hrefPattern` is set.
+- Sync `waitFor` step match to the next click's match after the above.
 
-Fixes (all required):
+## Playback timing (critical)
 
-1. **`waitForUrlChangeAfterClick`** — before step N pre-click wait, poll up to 20s for URL change from step N−1 — **only when previous click match has href navigation fields** (`hrefFromPathSegment`, `hrefPattern`, `hrefContains`, `hrefSuffix`). Never after button/dropdown clicks.
-2. **`settleAfterStep`** — in-page clicks (`expectNavigation: false`): no URL poll, **250ms** `IN_PAGE_SETTLE_MS`. Href clicks: 400ms URL peek only; full navigation wait is `waitForUrlChangeAfterClick` before the next step.
-3. Do **not** use a multi-second `URL_CHANGE_DETECT_MS` on every click — that regressed dropdown macros (~3s stall per step).
+Order for step N click (N > 0):
 
-### Pre-click wait
+1. If step N−1 was a click and `clickMatchLikelyNavigates(step N−1 match)` → `waitForUrlChangeAfterClick` (poll up to 20s, then `PAGE_SETTLE_MS` = 750ms).
+2. Unless step N−1 was `waitFor` with the same match → `waitForScriptMatchInTab` for step N's target (poll up to 20s; instant if already in DOM).
+3. Click.
+4. `settleAfterStep` = `waitForTabLoad` + `IN_PAGE_SETTLE_MS` (250ms). **No URL poll here.**
 
-After each click step, `runMacroScript` waits for the **next** step's match before clicking (unless previous step was an explicit `waitFor` with the same match). Returns immediately (`ms: 0`) when the target is already in the DOM. Only polls up to 20s when the target appears late (e.g. dropdown still opening).
+Rules:
 
-### Run scope
+- **Href navigation** (match has `hrefFromPathSegment`, `hrefPattern`, `hrefContains`, or `hrefSuffix`): step 1 above runs before the next step. Required for multi-page hops (e.g. repo link → owner profile).
+- **In-page clicks** (buttons, menus, copy): step 1 must **not** run — otherwise every step blocks ~20s waiting for a URL that never changes.
+- `clickMatchLikelyNavigates` keys off href fields on the match, not tag or text alone.
+- Pre-click `waitFor` resolves immediately when the element is already present; polling is only for UI still opening.
 
-Macro runs from **one page shape**. Example: recorded from repo → `^https://github\.com/[^/]+/[^/]+(?:/.*)?$` — not profile URLs.
+Constants (`shared/timing.ts`): `IN_PAGE_SETTLE_MS` 250, `PAGE_SETTLE_MS` 750, `TAB_LOAD_TIMEOUT_MS` / `STEP_WAIT_FOR_MS` 20_000, `MATCH_STABLE_POLLS` 3.
 
-## Example: View Author Followers (from repo)
+## Match execution
 
-```json
-[
-  { "type": "click", "match": { "tag": "a", "hrefFromPathSegment": 0 } },
-  { "type": "click", "match": { "tag": "a", "textContains": "followers", "hrefPattern": "\\?tab=followers" } }
-]
-```
+- `hrefPattern` tested against link pathname + search.
+- `hrefFromPathSegment`: link pathname must equal `/${pageSegmentAt(N)}`.
 
-## Example: Copy GitHub CLI (in-page dropdown)
+## Removed — do not re-add
 
-```json
-[
-  { "type": "click", "match": { "tag": "button", "text": "Code" } },
-  { "type": "click", "match": { "tag": "a", "textContains": "GitHub CLI" } },
-  { "type": "click", "match": { "tag": "button", "ariaLabel": "Copy command to clipboard" } }
-]
-```
+- Recording plan LLM + `steps`/`avoid`/`doneWhen` machinery.
+- `expectNavigation` / URL-poll settle branch on every click.
+- Compile prompt rules that inject playback timing (`waitFor` between steps).
+- Compile dropping demo steps or merging navigation hops.
+- Prompt-only guardrails without demo-grounded sanitize.
 
-No href fields on step 1 → no navigation wait before step 2. Pre-click wait for "GitHub CLI" should resolve quickly once the Code menu opens.
+## Smoke checks (GitHub — regression traps, not product focus)
+
+- **Multi-hop + query tab:** click scoped repo link (`hrefFromPathSegment: 0`), then tab link (`hrefPattern: "\\?tab=…"` only — no invented `testId`). Playback must navigation-wait after step 1, not after step 2.
+- **In-page menu:** open dropdown/button, then copy — no 20s URL wait between steps; ~250ms settle only.

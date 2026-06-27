@@ -1,10 +1,9 @@
 import { runAgentLoop } from "@/background/recording/agent-loop";
-import { createMacroPreview, type Macro, type RecordingPlan } from "@/shared/types/macro";
+import { createMacroPreview, type Macro } from "@/shared/types/macro";
 
 export type AgenticRecordResult = {
   macro: Macro;
   reasoning: string[];
-  plan: RecordingPlan;
 };
 
 export async function runAgenticRecord(
@@ -24,6 +23,5 @@ export async function runAgenticRecord(
       intent,
     }),
     reasoning: result.reasoning,
-    plan: result.plan,
   };
 }
