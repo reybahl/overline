@@ -1,7 +1,7 @@
 import { captureDomInTab, getTabUrl } from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
-import { assertRecordingSessionActive } from "@/background/recording/recording-session";
 import { settleAfterStep } from "@/background/playback/tab-settle";
+import { assertRecordingSessionActive } from "@/background/recording/recording-session";
 import { getNextStep } from "@/background/recording/worker";
 import { createLogger } from "@/shared/logger";
 import {
@@ -74,6 +74,35 @@ function wouldOscillate(steps: MacroStep[], next: MacroGenerationStep): boolean 
   return nextSig === prevSig && nextSig !== lastSig;
 }
 
+type StepExecution = { ok: true } | { ok: false; error: string };
+
+async function executeAndRecordStep(
+  tabId: number,
+  step: MacroStep,
+): Promise<StepExecution> {
+  const urlBeforeStep =
+    step.type === "click" ? await getTabUrl(tabId) : undefined;
+
+  const response = await sendContentMessage(tabId, {
+    type: "EXECUTE_STEPS",
+    steps: [step],
+  });
+
+  if (!response.ok) {
+    return { ok: false, error: response.error };
+  }
+
+  step.recordedMatch = response.matches?.[0] ?? undefined;
+  await settleAfterStep(tabId, urlBeforeStep);
+  return { ok: true };
+}
+
+function describeRunningStep(index: number, step: MacroStep): string {
+  return `Running step ${index}: ${step.type}${
+    step.selector ? ` ${step.selector}` : ""
+  }${step.value ? ` → ${step.value}` : ""}`;
+}
+
 export async function runAgentLoop(
   options: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
@@ -143,6 +172,25 @@ export async function runAgentLoop(
         continue;
       }
 
+      const finalStep = turnResult.step;
+      const isNewAction =
+        Boolean(finalStep.selector) &&
+        finalStep.type !== "navigate" &&
+        !isRepeatedStep(stepsTaken, finalStep) &&
+        !wouldOscillate(stepsTaken, finalStep);
+
+      if (isNewAction) {
+        const step = toRecordedStep(finalStep);
+        stepsTaken.push(step);
+        onProgress?.(describeRunningStep(stepsTaken.length, step));
+
+        const exec = await executeAndRecordStep(tabId, step);
+        if (!exec.ok) {
+          stepsTaken.pop();
+          lastError = exec.error;
+        }
+      }
+
       exitReason = "model marked intent complete";
       break;
     }
@@ -184,22 +232,12 @@ export async function runAgentLoop(
     const step = toRecordedStep(turnResult.step);
     stepsTaken.push(step);
 
-    onProgress?.(
-      `Running step ${stepsTaken.length}: ${step.type}${
-        step.selector ? ` ${step.selector}` : ""
-      }${step.value ? ` → ${step.value}` : ""}`,
-    );
+    onProgress?.(describeRunningStep(stepsTaken.length, step));
 
-    const urlBeforeStep =
-      step.type === "click" ? await getTabUrl(tabId) : undefined;
+    const exec = await executeAndRecordStep(tabId, step);
 
-    const response = await sendContentMessage(tabId, {
-      type: "EXECUTE_STEPS",
-      steps: [step],
-    });
-
-    if (!response.ok) {
-      lastError = response.error;
+    if (!exec.ok) {
+      lastError = exec.error;
       stepsTaken.pop();
 
       const failedSignature = stepSignature(turnResult.step);
@@ -212,7 +250,6 @@ export async function runAgentLoop(
 
       if (consecutiveFailedProposals >= MAX_CONSECUTIVE_REPEATS) {
         exitReason = "step execution failed repeatedly";
-        lastError = response.error;
         break;
       }
 
@@ -221,8 +258,6 @@ export async function runAgentLoop(
 
     lastFailedSignature = undefined;
     consecutiveFailedProposals = 0;
-
-    await settleAfterStep(tabId, urlBeforeStep);
   }
 
   if (stepsTaken.length === 0) {

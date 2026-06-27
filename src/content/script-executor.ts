@@ -1,6 +1,7 @@
 import { INTERACTIVE_SELECTOR } from "@/shared/interactive-selector";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 import { getAccessibleName } from "@/content/accessible-name";
+import { getVisibleText } from "@/content/element-text";
 import { isVisible } from "@/content/visibility";
 import { normalizeElementMatch } from "@/shared/script-match";
 import { createLogger } from "@/shared/logger";
@@ -25,11 +26,6 @@ function delay(ms: number): Promise<void> {
 
 function isHidden(el: Element): boolean {
   return !isVisible(el);
-}
-
-function getVisibleText(el: Element): string {
-  const text = (el as HTMLElement).innerText ?? el.textContent ?? "";
-  return text.trim().replace(/\s+/g, " ");
 }
 
 function getHref(el: Element): string {

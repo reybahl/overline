@@ -1,4 +1,6 @@
+import { deriveElementMatch } from "@/content/derive-element-match";
 import type { MacroStep } from "@/shared/types/macro";
+import type { ElementMatch } from "@/shared/types/script";
 
 const ELEMENT_NOT_FOUND =
   "Couldn't find element — try re-recording this macro.";
@@ -53,27 +55,35 @@ async function waitForSelector(selector: string, timeoutMs: number): Promise<voi
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
-async function executeStep(step: MacroStep): Promise<void> {
+async function executeStep(step: MacroStep): Promise<ElementMatch | null> {
   switch (step.type) {
     case "click": {
       const element = requireElement(requireSelector(step.selector));
+      const match = deriveElementMatch(element);
       element.click();
-      return;
+      return match;
     }
     case "type":
     case "fill": {
       const element = requireElement(requireSelector(step.selector));
+      const match = deriveElementMatch(element);
       fillElement(element, step.value ?? "");
-      return;
+      return match;
+    }
+    case "scroll": {
+      const element = requireElement(requireSelector(step.selector));
+      const match = deriveElementMatch(element);
+      element.scrollIntoView({ block: "center", inline: "nearest" });
+      return match;
     }
     case "confirm": {
       window.confirm(step.value ?? "Continue?");
-      return;
+      return null;
     }
     case "wait": {
       const ms = Number.parseInt(step.value ?? "0", 10);
       await delay(Number.isNaN(ms) ? 0 : ms);
-      return;
+      return null;
     }
     case "waitFor": {
       const timeout = Number.parseInt(step.value ?? "5000", 10);
@@ -81,7 +91,7 @@ async function executeStep(step: MacroStep): Promise<void> {
         requireSelector(step.selector),
         Number.isNaN(timeout) ? 5000 : timeout,
       );
-      return;
+      return null;
     }
     case "navigate": {
       const target = step.value ?? step.selector;
@@ -89,12 +99,7 @@ async function executeStep(step: MacroStep): Promise<void> {
         throw new Error("Navigate step is missing a URL.");
       }
       window.location.href = target;
-      return;
-    }
-    case "scroll": {
-      const element = requireElement(requireSelector(step.selector));
-      element.scrollIntoView({ block: "center", inline: "nearest" });
-      return;
+      return null;
     }
     default: {
       const _exhaustive: never = step.type;
@@ -103,8 +108,12 @@ async function executeStep(step: MacroStep): Promise<void> {
   }
 }
 
-export async function executeSteps(steps: MacroStep[]): Promise<void> {
+export async function executeSteps(
+  steps: MacroStep[],
+): Promise<(ElementMatch | null)[]> {
+  const matches: (ElementMatch | null)[] = [];
   for (const step of steps) {
-    await executeStep(step);
+    matches.push(await executeStep(step));
   }
+  return matches;
 }
