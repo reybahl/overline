@@ -9,6 +9,13 @@
   margin-bottom: var(--patch-space-5);
 }
 
+.patch-options-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--patch-space-4);
+}
+
 .patch-page--options .patch-stack--loose {
   gap: var(--patch-space-2);
 }
