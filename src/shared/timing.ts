@@ -1,11 +1,11 @@
-/** Extra pause after tab load or URL change before interacting again. */
-export const PAGE_SETTLE_MS = 750;
-
 /** Max time to wait for a full tab navigation to finish. */
 export const TAB_LOAD_TIMEOUT_MS = 20_000;
 
-/** Brief window after a click to see if navigation started; avoids blocking on in-page UI. */
-export const URL_CHANGE_DETECT_MS = 400;
+/** Extra pause after a full page navigation. */
+export const PAGE_SETTLE_MS = 750;
+
+/** Brief pause after in-page clicks (dropdowns, tabs, copy buttons). */
+export const IN_PAGE_SETTLE_MS = 250;
 
 /** Default timeout when waiting for an element match during playback. */
 export const STEP_WAIT_FOR_MS = 20_000;

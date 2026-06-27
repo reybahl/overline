@@ -19,3 +19,13 @@ export function elementMatchesEqual(a: ElementMatch, b: ElementMatch): boolean {
     JSON.stringify(normalizeElementMatch(b))
   );
 }
+
+/** True when a click match targets a link href — likely a full navigation, not in-page UI. */
+export function clickMatchLikelyNavigates(match: ElementMatch): boolean {
+  return (
+    match.hrefFromPathSegment !== undefined ||
+    Boolean(match.hrefPattern) ||
+    Boolean(match.hrefContains) ||
+    Boolean(match.hrefSuffix)
+  );
+}

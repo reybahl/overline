@@ -21,7 +21,6 @@ export async function runAgenticRecord(
   return {
     macro: createMacroPreview(result.macroName ?? intent, result.steps, startUrl, {
       intent,
-      description: result.macroDescription,
     }),
     reasoning: result.reasoning,
   };

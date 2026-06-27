@@ -28,7 +28,6 @@ export type AgentLoopResult = {
   steps: MacroStep[];
   reasoning: string[];
   macroName?: string;
-  macroDescription?: string;
 };
 
 function stepSignature(step: MacroGenerationStep): string {
@@ -80,8 +79,7 @@ async function executeAndRecordStep(
   tabId: number,
   step: MacroStep,
 ): Promise<StepExecution> {
-  const urlBeforeStep =
-    step.type === "click" ? await getTabUrl(tabId) : undefined;
+  const urlBeforeStep = await getTabUrl(tabId);
 
   const response = await sendContentMessage(tabId, {
     type: "EXECUTE_STEPS",
@@ -90,6 +88,10 @@ async function executeAndRecordStep(
 
   if (!response.ok) {
     return { ok: false, error: response.error };
+  }
+
+  if (step.type === "click" || step.type === "fill") {
+    step.pageUrl = urlBeforeStep;
   }
 
   step.recordedMatch = response.matches?.[0] ?? undefined;
@@ -111,12 +113,11 @@ export async function runAgentLoop(
   const stepsTaken: MacroStep[] = [];
   const reasoning: string[] = [];
   let lastError: string | undefined;
-  let macroName: string | undefined;
-  let macroDescription: string | undefined;
   let consecutiveRepeats = 0;
   let lastFailedSignature: string | undefined;
   let consecutiveFailedProposals = 0;
   let exitReason: string | undefined;
+  let macroName: string | undefined;
 
   for (let turn = 0; turn < maxTurns; turn += 1) {
     await assertRecordingSessionActive();
@@ -156,10 +157,6 @@ export async function runAgentLoop(
 
     if (turnResult.macroName) {
       macroName = turnResult.macroName;
-    }
-
-    if (turnResult.macroDescription) {
-      macroDescription = turnResult.macroDescription;
     }
 
     lastError = undefined;
@@ -269,5 +266,5 @@ export async function runAgentLoop(
     throw new Error(`Recording finished without any steps. ${detail}`);
   }
 
-  return { steps: stepsTaken, reasoning, macroName, macroDescription };
+  return { steps: stepsTaken, reasoning, macroName };
 }
