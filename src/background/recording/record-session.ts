@@ -1,15 +1,15 @@
 import { captureDomInTab, getTabUrl } from "@/background/capture";
-import { runAgenticRecord } from "@/background/record";
+import { runAgenticRecord } from "@/background/recording/record";
 import {
   assertRecordingSessionActive,
   isRecordingCancelledError,
-} from "@/background/recording-session";
-import { compileMacroScript, inferRunScope } from "@/background/worker";
+} from "@/background/recording/recording-session";
+import { compileMacroScript, inferRunScope } from "@/background/recording/worker";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
   getPendingRecord,
   savePendingRecord,
-} from "@/shared/storage";
+} from "@/shared/clients/storage";
 import type { Macro } from "@/shared/types/macro";
 
 const log = createLogger("record");

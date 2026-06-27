@@ -12,3 +12,52 @@
 .patch-page--options .patch-stack--loose {
   gap: var(--patch-space-2);
 }
+
+.patch-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--patch-space-7);
+}
+
+.patch-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  background: var(--patch-overlay-scrim);
+  cursor: default;
+}
+
+.patch-dialog__panel {
+  position: relative;
+  width: min(100%, 360px);
+  border-radius: var(--patch-radius-lg);
+  background: var(--patch-bg);
+  box-shadow: var(--patch-shadow-lg);
+  padding: var(--patch-space-7);
+}
+
+.patch-dialog__title {
+  margin: 0 0 var(--patch-space-3);
+  font-size: var(--patch-text-base);
+  font-weight: 600;
+}
+
+.patch-dialog__message {
+  margin: 0 0 var(--patch-space-7);
+  font-size: var(--patch-text-sm);
+  color: var(--patch-fg-secondary);
+}
+
+.patch-dialog__actions {
+  display: flex;
+  gap: var(--patch-space-2);
+}
+
+.patch-dialog__actions .patch-btn {
+  flex: 1;
+}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { ConfirmDialog } from "@/ui/ConfirmDialog";
-import { sendBackgroundMessage } from "@/shared/background-client";
+import { ConfirmDialog } from "@/options/ConfirmDialog";
+import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
 import { formatScriptStep } from "@/shared/script-format";
 import {

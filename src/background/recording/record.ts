@@ -1,4 +1,4 @@
-import { runAgentLoop } from "@/background/agent-loop";
+import { runAgentLoop } from "@/background/recording/agent-loop";
 import { createMacroPreview, type Macro } from "@/shared/types/macro";
 
 export type AgenticRecordResult = {
