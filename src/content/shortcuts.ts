@@ -1,3 +1,4 @@
+import { sendBackgroundMessage } from "@/shared/background-client";
 import {
   eventToShortcut,
   isEditableTarget,
@@ -44,10 +45,10 @@ async function refreshShortcutMap(): Promise<void> {
 }
 
 async function triggerMacroByShortcut(macroId: string): Promise<void> {
-  const message = { type: "RUN_MACRO_BY_ID", macroId };
+  const message = { type: "RUN_MACRO_BY_ID", macroId } as const;
 
   try {
-    await chrome.runtime.sendMessage(message);
+    await sendBackgroundMessage(message);
     return;
   } catch {
     // Service worker may still be waking on a cold tab.
@@ -57,7 +58,7 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
     window.setTimeout(resolve, 50);
   });
 
-  await chrome.runtime.sendMessage(message);
+  await sendBackgroundMessage(message);
 }
 
 async function resolveMacroId(shortcut: string): Promise<string | undefined> {

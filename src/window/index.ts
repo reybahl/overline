@@ -2,11 +2,8 @@ import "@/ui/index.css";
 
 import type { DomElement } from "@/content/dom-capture";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import { sendBackgroundMessage } from "@/shared/background-client";
 import type { PendingRecord } from "@/shared/types/pending-record";
-import type {
-  BackgroundMessage,
-  BackgroundResponse,
-} from "@/shared/types/messages";
 import { formatScriptStep } from "@/shared/script-format";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
 import { RECORDING_CANCELLED_MESSAGE } from "@/background/recording-session";
@@ -403,12 +400,6 @@ function renderMacroList(highlightMacroId?: string): void {
   }
 }
 
-async function sendBackgroundMessage(
-  message: BackgroundMessage,
-): Promise<BackgroundResponse> {
-  return chrome.runtime.sendMessage(message);
-}
-
 async function refreshMacros(preferredMacroId?: string): Promise<void> {
   const tab = await getActiveTab();
   currentTabUrl = tab.url ?? "";
@@ -419,7 +410,7 @@ async function refreshMacros(preferredMacroId?: string): Promise<void> {
     throw new Error(macrosResponse.error);
   }
 
-  savedMacros = macrosResponse.macros ?? [];
+  savedMacros = macrosResponse.macros;
   pageMacros = currentTabUrl
     ? getMacrosForUrl(savedMacros, currentTabUrl)
     : [];
@@ -640,7 +631,7 @@ async function handleCancelRecording(): Promise<void> {
     if (!response.ok) {
       throw new Error(response.error);
     }
-    applyPendingRecord(response.pendingRecord ?? null);
+    applyPendingRecord(response.pendingRecord);
     setStatus(RECORDING_CANCELLED_MESSAGE);
     searchInput.focus();
   } catch (error) {

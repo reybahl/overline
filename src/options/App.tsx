@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/ui/ConfirmDialog";
-import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
+import { sendBackgroundMessage } from "@/shared/background-client";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
 import { formatScriptStep } from "@/shared/script-format";
 import {
@@ -23,12 +23,6 @@ function formatStep(step: MacroStep, index: number): string {
     }
   }
   return parts.join(" · ");
-}
-
-async function sendBackgroundMessage(
-  message: BackgroundMessage,
-): Promise<BackgroundResponse> {
-  return chrome.runtime.sendMessage(message);
 }
 
 type ShortcutEditorProps = {
@@ -74,7 +68,7 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
           return;
         }
 
-        onSaved(response.macros ?? []);
+        onSaved(response.macros);
         setListening(false);
       })();
     };
@@ -100,7 +94,7 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
       return;
     }
 
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
   }
 
   return (
@@ -172,7 +166,7 @@ function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps
     }
 
     onError(null);
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
     setDirty(false);
   }
 
@@ -265,7 +259,7 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
     }
 
     onError(null);
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
     setDirty(false);
   }
 
@@ -456,7 +450,7 @@ export default function App() {
           throw new Error(macrosResponse.error);
         }
 
-        setMacros(macrosResponse.macros ?? []);
+        setMacros(macrosResponse.macros);
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to load macros";
@@ -485,7 +479,7 @@ export default function App() {
       return;
     }
 
-    setMacros(response.macros ?? []);
+    setMacros(response.macros);
   }
 
   if (loading) {

@@ -7,7 +7,6 @@ import {
 import { compileMacroScript, inferRunScope } from "@/background/worker";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
-  clearPendingRecord,
   getPendingRecord,
   savePendingRecord,
 } from "@/shared/storage";
@@ -140,10 +139,6 @@ async function finishAgenticRecordSession(
   } finally {
     clearRunId();
   }
-}
-
-export async function discardPendingRecordSession(): Promise<void> {
-  await clearPendingRecord();
 }
 
 async function attachRunScope(
