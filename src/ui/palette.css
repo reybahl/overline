@@ -141,7 +141,10 @@
   margin: var(--patch-space-2) var(--patch-space-6) var(--patch-space-4);
 }
 
-.patch-shell--palette .patch-section,
+.patch-shell--palette .patch-section {
+  margin: var(--patch-space-4) var(--patch-space-6) var(--patch-space-4);
+}
+
 .patch-shell--palette .patch-code {
   margin: var(--patch-space-4) var(--patch-space-6) 0;
 }

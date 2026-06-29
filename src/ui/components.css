@@ -416,6 +416,16 @@ select.patch-input {
   margin-bottom: var(--patch-space-3);
 }
 
+.patch-section__actions {
+  display: flex;
+  gap: var(--patch-space-3);
+  margin-top: var(--patch-space-5);
+}
+
+.patch-section__actions > .patch-btn {
+  flex: 1;
+}
+
 .patch-list {
   margin: 0 0 var(--patch-space-5);
   padding-left: 18px;
