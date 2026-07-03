@@ -8,11 +8,18 @@ import { trustedClick } from "@/background/cdp/input";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
-import type { Macro, MacroStep } from "@/shared/types/macro";
 import { clickMatchLikelyNavigates, elementMatchesEqual } from "@/shared/script-match";
+import { stepNeedsTrustedClick } from "@/shared/trusted-click";
+import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
+
+/** Lazy CDP session — attach only when a trusted-click step runs. */
+type CdpSession = {
+  tabId: number;
+  ready: boolean;
+};
 
 /**
  * Bring the target tab to the foreground before playback. Many interactions
@@ -35,17 +42,22 @@ async function focusTabForPlayback(tabId: number): Promise<void> {
 }
 
 /**
- * Try to take a debugger session so clicks can be dispatched as trusted input.
- * Returns false (instead of throwing) when CDP is unavailable — e.g. the user
- * has DevTools open on the tab — so playback can fall back to synthetic clicks.
+ * Attach the debugger on first trusted-click step. Returns false when CDP is
+ * unavailable (e.g. DevTools open on the tab) so playback can fall back.
  */
-async function tryAttachDebugger(tabId: number): Promise<boolean> {
+async function ensureCdp(session: CdpSession): Promise<boolean> {
+  if (session.ready) {
+    return true;
+  }
+
   try {
-    await attachDebugger(tabId);
+    await attachDebugger(session.tabId);
+    session.ready = true;
+    log.debug("CDP attached for trusted click", { tabId: session.tabId });
     return true;
   } catch (error) {
     log.warn("CDP unavailable, using synthetic clicks", {
-      tabId,
+      tabId: session.tabId,
       error: error instanceof Error ? error.message : String(error),
     });
     return false;
@@ -73,25 +85,26 @@ async function resolveClickPointInTab(
 }
 
 /**
- * Click a compiled step. Prefers a trusted CDP click (required for clipboard /
- * focus-gated actions); falls back to a synthetic content-script click if CDP is
- * unavailable or the trusted path fails.
+ * Click a compiled step. Uses CDP only when the step needs trusted input;
+ * otherwise dispatches a synthetic content-script click (no debugger attach).
  */
 async function clickScriptStep(
   tabId: number,
   step: ScriptClickStep,
-  cdpReady: boolean,
+  cdpSession: CdpSession,
 ): Promise<void> {
-  if (cdpReady) {
-    try {
-      const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
-      await trustedClick(tabId, point);
-      return;
-    } catch (error) {
-      log.warn("trusted click failed, falling back to synthetic", {
-        label: step.label,
-        error: error instanceof Error ? error.message : String(error),
-      });
+  if (stepNeedsTrustedClick(step)) {
+    if (await ensureCdp(cdpSession)) {
+      try {
+        const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
+        await trustedClick(tabId, point);
+        return;
+      } catch (error) {
+        log.warn("trusted click failed, falling back to synthetic", {
+          label: step.label,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
@@ -193,7 +206,7 @@ async function waitForScriptMatchInTab(
 export async function runMacroScript(
   tabId: number,
   script: MacroScript,
-  cdpReady = false,
+  cdpSession: CdpSession,
 ): Promise<void> {
   let urlBeforeLastClick: string | undefined;
 
@@ -228,7 +241,7 @@ export async function runMacroScript(
 
     try {
       if (step.type === "click") {
-        await clickScriptStep(tabId, step, cdpReady);
+        await clickScriptStep(tabId, step, cdpSession);
       } else {
         const response = await sendContentMessage(tabId, {
           type: "EXECUTE_SCRIPT",
@@ -268,18 +281,17 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     mode: macro.script ? "script" : "steps",
   });
 
-  let cdpReady = false;
+  const cdpSession: CdpSession = { tabId, ready: false };
   try {
     await closePatchOverlay(tabId);
     await focusTabForPlayback(tabId);
-    cdpReady = await tryAttachDebugger(tabId);
 
     if (macro.script) {
-      await runMacroScript(tabId, macro.script, cdpReady);
+      await runMacroScript(tabId, macro.script, cdpSession);
     } else {
       await runMacroSteps(tabId, macro.steps);
     }
-    log.info("run finished", { run, macroName: macro.name });
+    log.info("run finished", { run, macroName: macro.name, cdpUsed: cdpSession.ready });
   } catch (error) {
     log.error("run failed", {
       run,
@@ -288,7 +300,7 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     });
     throw error;
   } finally {
-    if (cdpReady) {
+    if (cdpSession.ready) {
       await detachDebugger(tabId);
     }
     clearRunId();

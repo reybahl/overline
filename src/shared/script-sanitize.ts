@@ -1,5 +1,6 @@
 import { normalizeElementMatch } from "@/shared/script-match";
 import { isStableId } from "@/shared/stable-id";
+import { matchNeedsTrustedClick } from "@/shared/trusted-click";
 import type { MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript } from "@/shared/types/script";
 
@@ -142,6 +143,10 @@ export function sanitizeCompiledScript(
 
     if (step.type === "click") {
       clickMatchByIndex.set(index, match);
+      const trustedClick =
+        demo?.recordedMatch !== undefined &&
+        matchNeedsTrustedClick(demo.recordedMatch);
+      return trustedClick ? { ...step, match, trustedClick: true } : { ...step, match };
     }
 
     if (step.type === "waitFor") {
