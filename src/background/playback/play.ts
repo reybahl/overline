@@ -9,17 +9,32 @@ import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import { clickMatchLikelyNavigates, elementMatchesEqual } from "@/shared/script-match";
-import { stepNeedsTrustedClick } from "@/shared/trusted-click";
+import {
+  type ClickExecutionMode,
+  type ClickPostcondition,
+  clickExecutionMode,
+  getClickPostconditions,
+  isSafeForCdpRetry,
+  learnTrustedClick,
+} from "@/shared/trusted-click";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
 
-/** Lazy CDP session — attach only when a trusted-click step runs. */
-type CdpSession = {
+/** Lazy CDP session — attach only when trusted input is required. */
+interface CdpSession {
   tabId: number;
   ready: boolean;
-};
+}
+
+/** Skips redundant pre-click waits when the prior click already verified them. */
+interface ClickVerificationSkip {
+  navigation: boolean;
+  nextMatch: boolean;
+}
+
+const EMPTY_CLICK_SKIP: ClickVerificationSkip = { navigation: false, nextMatch: false };
 
 /**
  * Bring the target tab to the foreground before playback. Many interactions
@@ -84,30 +99,10 @@ async function resolveClickPointInTab(
   return response.point;
 }
 
-/**
- * Click a compiled step. Uses CDP only when the step needs trusted input;
- * otherwise dispatches a synthetic content-script click (no debugger attach).
- */
-async function clickScriptStep(
+async function syntheticClickScriptStep(
   tabId: number,
   step: ScriptClickStep,
-  cdpSession: CdpSession,
 ): Promise<void> {
-  if (stepNeedsTrustedClick(step)) {
-    if (await ensureCdp(cdpSession)) {
-      try {
-        const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
-        await trustedClick(tabId, point);
-        return;
-      } catch (error) {
-        log.warn("trusted click failed, falling back to synthetic", {
-          label: step.label,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  }
-
   const response = await sendContentMessage(tabId, {
     type: "EXECUTE_SCRIPT",
     steps: [step],
@@ -115,6 +110,33 @@ async function clickScriptStep(
   if (!response.ok) {
     throw new Error(response.error);
   }
+}
+
+async function trustedClickScriptStep(
+  tabId: number,
+  step: ScriptClickStep,
+  cdpSession: CdpSession,
+): Promise<void> {
+  if (!(await ensureCdp(cdpSession))) {
+    throw new Error("CDP unavailable for trusted click.");
+  }
+
+  const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
+  await trustedClick(tabId, point);
+}
+
+async function dispatchClick(
+  tabId: number,
+  step: ScriptClickStep,
+  mode: ClickExecutionMode,
+  cdpSession: CdpSession,
+): Promise<void> {
+  if (mode === "trusted") {
+    await trustedClickScriptStep(tabId, step, cdpSession);
+    return;
+  }
+
+  await syntheticClickScriptStep(tabId, step);
 }
 
 function stepNeedsElement(step: MacroStep): boolean {
@@ -203,12 +225,153 @@ async function waitForScriptMatchInTab(
   }
 }
 
+async function tryWaitForScriptMatchInTab(
+  tabId: number,
+  match: ElementMatch,
+  timeoutMs = STEP_WAIT_FOR_MS,
+): Promise<boolean> {
+  try {
+    await waitForScriptMatchInTab(tabId, match, timeoutMs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function postconditionKinds(
+  postconditions: ClickPostcondition[],
+): { needsNavigation: boolean; needsNextMatch: boolean } {
+  return {
+    needsNavigation: postconditions.some((entry) => entry.kind === "navigation"),
+    needsNextMatch: postconditions.some((entry) => entry.kind === "nextMatch"),
+  };
+}
+
+function verifiedSkipFlags(
+  postconditions: ClickPostcondition[],
+  verified: ClickVerificationSkip,
+): ClickVerificationSkip {
+  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
+  return {
+    navigation: needsNavigation && verified.navigation,
+    nextMatch: needsNextMatch && verified.nextMatch,
+  };
+}
+
+async function checkClickPostconditions(
+  tabId: number,
+  postconditions: ClickPostcondition[],
+): Promise<ClickVerificationSkip> {
+  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
+  let navigation = !needsNavigation;
+  let nextMatch = !needsNextMatch;
+
+  for (const postcondition of postconditions) {
+    if (postcondition.kind === "navigation") {
+      navigation = await waitForUrlChangeAfterClick(tabId, postcondition.urlBefore);
+      if (!navigation) {
+        return { navigation: false, nextMatch: false };
+      }
+      continue;
+    }
+
+    nextMatch = await tryWaitForScriptMatchInTab(tabId, postcondition.match);
+    if (!nextMatch) {
+      return { navigation, nextMatch: false };
+    }
+  }
+
+  return { navigation, nextMatch };
+}
+
+async function assertClickPostconditions(
+  tabId: number,
+  postconditions: ClickPostcondition[],
+): Promise<ClickVerificationSkip> {
+  const verified = await checkClickPostconditions(tabId, postconditions);
+  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
+
+  if (needsNavigation && !verified.navigation) {
+    throw new Error("Navigation did not occur after trusted click.");
+  }
+  if (needsNextMatch && !verified.nextMatch) {
+    throw new Error("Next target did not appear after trusted click.");
+  }
+
+  return verifiedSkipFlags(postconditions, verified);
+}
+
+/**
+ * Synthetic-first click with CDP fallback when observable postconditions fail.
+ * Returns skip flags so the next step can omit redundant pre-click waits.
+ */
+async function executeClickWithVerification(
+  tabId: number,
+  step: ScriptClickStep,
+  stepIndex: number,
+  script: MacroScript,
+  cdpSession: CdpSession,
+  urlBeforeClick: string | undefined,
+): Promise<ClickVerificationSkip> {
+  const postconditions = getClickPostconditions(
+    script.steps,
+    stepIndex,
+    urlBeforeClick,
+  );
+  const mode = clickExecutionMode(step);
+
+  await dispatchClick(tabId, step, mode, cdpSession);
+  await settleAfterStep(tabId, urlBeforeClick);
+
+  if (mode === "trusted" || postconditions.length === 0) {
+    return EMPTY_CLICK_SKIP;
+  }
+
+  const verified = await checkClickPostconditions(tabId, postconditions);
+  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
+  const allSatisfied =
+    (!needsNavigation || verified.navigation) &&
+    (!needsNextMatch || verified.nextMatch);
+
+  if (allSatisfied) {
+    return verifiedSkipFlags(postconditions, verified);
+  }
+
+  if (!isSafeForCdpRetry(step)) {
+    log.debug("skipping CDP retry — no safe postcondition for toggle click", {
+      label: step.label,
+      step: stepIndex + 1,
+    });
+    return EMPTY_CLICK_SKIP;
+  }
+
+  if (!(await ensureCdp(cdpSession))) {
+    log.warn("postcondition missed after synthetic click; CDP unavailable", {
+      label: step.label,
+      step: stepIndex + 1,
+    });
+    return EMPTY_CLICK_SKIP;
+  }
+
+  log.info("retrying click with CDP after missed postcondition", {
+    label: step.label,
+    step: stepIndex + 1,
+  });
+  learnTrustedClick(step);
+
+  await dispatchClick(tabId, step, "trusted", cdpSession);
+  await settleAfterStep(tabId, urlBeforeClick);
+
+  return assertClickPostconditions(tabId, postconditions);
+}
+
 export async function runMacroScript(
   tabId: number,
   script: MacroScript,
   cdpSession: CdpSession,
 ): Promise<void> {
   let urlBeforeLastClick: string | undefined;
+  let priorClickSkip = EMPTY_CLICK_SKIP;
 
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
@@ -217,6 +380,7 @@ export async function runMacroScript(
     if (i > 0 && step.type === "click") {
       const previousStep = script.steps[i - 1];
       if (
+        !priorClickSkip.navigation &&
         urlBeforeLastClick &&
         previousStep.type === "click" &&
         clickMatchLikelyNavigates(previousStep.match)
@@ -225,14 +389,17 @@ export async function runMacroScript(
       }
 
       const alreadyWaited =
-        previousStep.type === "waitFor" &&
-        elementMatchesEqual(previousStep.match, step.match);
+        priorClickSkip.nextMatch ||
+        (previousStep.type === "waitFor" &&
+          elementMatchesEqual(previousStep.match, step.match));
 
       if (!alreadyWaited) {
         log.debug("pre-click wait", { step: stepNum, type: step.type, label: step.label });
         await waitForScriptMatchInTab(tabId, step.match);
       }
     }
+
+    priorClickSkip = EMPTY_CLICK_SKIP;
 
     const urlBeforeStep =
       step.type === "click" ? await getTabUrl(tabId) : undefined;
@@ -241,7 +408,17 @@ export async function runMacroScript(
 
     try {
       if (step.type === "click") {
-        await clickScriptStep(tabId, step, cdpSession);
+        priorClickSkip = await executeClickWithVerification(
+          tabId,
+          step,
+          i,
+          script,
+          cdpSession,
+          urlBeforeStep,
+        );
+        if (urlBeforeStep) {
+          urlBeforeLastClick = urlBeforeStep;
+        }
       } else {
         const response = await sendContentMessage(tabId, {
           type: "EXECUTE_SCRIPT",
@@ -249,6 +426,10 @@ export async function runMacroScript(
         });
         if (!response.ok) {
           throw new Error(response.error);
+        }
+
+        if (scriptStepNeedsSettle(step)) {
+          await settleAfterStep(tabId, urlBeforeStep);
         }
       }
     } catch (error) {
@@ -260,13 +441,6 @@ export async function runMacroScript(
         error: message,
       });
       throw new Error(message);
-    }
-
-    if (scriptStepNeedsSettle(step)) {
-      await settleAfterStep(tabId, urlBeforeStep);
-      if (urlBeforeStep) {
-        urlBeforeLastClick = urlBeforeStep;
-      }
     }
   }
 }
@@ -288,6 +462,7 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
 
     if (macro.script) {
       await runMacroScript(tabId, macro.script, cdpSession);
+      // TODO: persist learned trustedClick flags when CDP fallback succeeds during a run.
     } else {
       await runMacroSteps(tabId, macro.steps);
     }
