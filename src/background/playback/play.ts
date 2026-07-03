@@ -1,40 +1,21 @@
 import { closePatchOverlay } from "@/background/overlay";
 import { getTabUrl } from "@/background/capture";
 import {
-  attachDebugger,
-  detachDebugger,
-} from "@/background/cdp/driver";
-import { trustedClick } from "@/background/cdp/input";
+  createCdpSession,
+  detachCdpSession,
+  EMPTY_CLICK_SKIP,
+  executeScriptClick,
+  type ClickVerificationSkip,
+  type CdpSession,
+} from "@/background/cdp/trusted-click-fallback";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import { clickMatchLikelyNavigates, elementMatchesEqual } from "@/shared/script-match";
-import {
-  type ClickExecutionMode,
-  type ClickPostcondition,
-  clickExecutionMode,
-  getClickPostconditions,
-  isSafeForCdpRetry,
-  learnTrustedClick,
-} from "@/shared/trusted-click";
 import type { Macro, MacroStep } from "@/shared/types/macro";
-import type { ElementMatch, MacroScript, ScriptClickStep, ScriptStep } from "@/shared/types/script";
+import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 
 const log = createLogger("play");
-
-/** Lazy CDP session — attach only when trusted input is required. */
-interface CdpSession {
-  tabId: number;
-  ready: boolean;
-}
-
-/** Skips redundant pre-click waits when the prior click already verified them. */
-interface ClickVerificationSkip {
-  navigation: boolean;
-  nextMatch: boolean;
-}
-
-const EMPTY_CLICK_SKIP: ClickVerificationSkip = { navigation: false, nextMatch: false };
 
 /**
  * Bring the target tab to the foreground before playback. Many interactions
@@ -54,89 +35,6 @@ async function focusTabForPlayback(tabId: number): Promise<void> {
       error: error instanceof Error ? error.message : String(error),
     });
   }
-}
-
-/**
- * Attach the debugger on first trusted-click step. Returns false when CDP is
- * unavailable (e.g. DevTools open on the tab) so playback can fall back.
- */
-async function ensureCdp(session: CdpSession): Promise<boolean> {
-  if (session.ready) {
-    return true;
-  }
-
-  try {
-    await attachDebugger(session.tabId);
-    session.ready = true;
-    log.debug("CDP attached for trusted click", { tabId: session.tabId });
-    return true;
-  } catch (error) {
-    log.warn("CDP unavailable, using synthetic clicks", {
-      tabId: session.tabId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return false;
-  }
-}
-
-/** Ask the content script for the viewport center of a click target. */
-async function resolveClickPointInTab(
-  tabId: number,
-  match: ElementMatch,
-  index: number,
-): Promise<{ x: number; y: number }> {
-  const response = await sendContentMessage(tabId, {
-    type: "RESOLVE_CLICK_TARGET",
-    match,
-    index,
-  });
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-  if (!response.point) {
-    throw new Error("No coordinates returned for click target.");
-  }
-  return response.point;
-}
-
-async function syntheticClickScriptStep(
-  tabId: number,
-  step: ScriptClickStep,
-): Promise<void> {
-  const response = await sendContentMessage(tabId, {
-    type: "EXECUTE_SCRIPT",
-    steps: [step],
-  });
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-}
-
-async function trustedClickScriptStep(
-  tabId: number,
-  step: ScriptClickStep,
-  cdpSession: CdpSession,
-): Promise<void> {
-  if (!(await ensureCdp(cdpSession))) {
-    throw new Error("CDP unavailable for trusted click.");
-  }
-
-  const point = await resolveClickPointInTab(tabId, step.match, step.index ?? 0);
-  await trustedClick(tabId, point);
-}
-
-async function dispatchClick(
-  tabId: number,
-  step: ScriptClickStep,
-  mode: ClickExecutionMode,
-  cdpSession: CdpSession,
-): Promise<void> {
-  if (mode === "trusted") {
-    await trustedClickScriptStep(tabId, step, cdpSession);
-    return;
-  }
-
-  await syntheticClickScriptStep(tabId, step);
 }
 
 function stepNeedsElement(step: MacroStep): boolean {
@@ -225,153 +123,13 @@ async function waitForScriptMatchInTab(
   }
 }
 
-async function tryWaitForScriptMatchInTab(
-  tabId: number,
-  match: ElementMatch,
-  timeoutMs = STEP_WAIT_FOR_MS,
-): Promise<boolean> {
-  try {
-    await waitForScriptMatchInTab(tabId, match, timeoutMs);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function postconditionKinds(
-  postconditions: ClickPostcondition[],
-): { needsNavigation: boolean; needsNextMatch: boolean } {
-  return {
-    needsNavigation: postconditions.some((entry) => entry.kind === "navigation"),
-    needsNextMatch: postconditions.some((entry) => entry.kind === "nextMatch"),
-  };
-}
-
-function verifiedSkipFlags(
-  postconditions: ClickPostcondition[],
-  verified: ClickVerificationSkip,
-): ClickVerificationSkip {
-  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
-  return {
-    navigation: needsNavigation && verified.navigation,
-    nextMatch: needsNextMatch && verified.nextMatch,
-  };
-}
-
-async function checkClickPostconditions(
-  tabId: number,
-  postconditions: ClickPostcondition[],
-): Promise<ClickVerificationSkip> {
-  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
-  let navigation = !needsNavigation;
-  let nextMatch = !needsNextMatch;
-
-  for (const postcondition of postconditions) {
-    if (postcondition.kind === "navigation") {
-      navigation = await waitForUrlChangeAfterClick(tabId, postcondition.urlBefore);
-      if (!navigation) {
-        return { navigation: false, nextMatch: false };
-      }
-      continue;
-    }
-
-    nextMatch = await tryWaitForScriptMatchInTab(tabId, postcondition.match);
-    if (!nextMatch) {
-      return { navigation, nextMatch: false };
-    }
-  }
-
-  return { navigation, nextMatch };
-}
-
-async function assertClickPostconditions(
-  tabId: number,
-  postconditions: ClickPostcondition[],
-): Promise<ClickVerificationSkip> {
-  const verified = await checkClickPostconditions(tabId, postconditions);
-  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
-
-  if (needsNavigation && !verified.navigation) {
-    throw new Error("Navigation did not occur after trusted click.");
-  }
-  if (needsNextMatch && !verified.nextMatch) {
-    throw new Error("Next target did not appear after trusted click.");
-  }
-
-  return verifiedSkipFlags(postconditions, verified);
-}
-
-/**
- * Synthetic-first click with CDP fallback when observable postconditions fail.
- * Returns skip flags so the next step can omit redundant pre-click waits.
- */
-async function executeClickWithVerification(
-  tabId: number,
-  step: ScriptClickStep,
-  stepIndex: number,
-  script: MacroScript,
-  cdpSession: CdpSession,
-  urlBeforeClick: string | undefined,
-): Promise<ClickVerificationSkip> {
-  const postconditions = getClickPostconditions(
-    script.steps,
-    stepIndex,
-    urlBeforeClick,
-  );
-  const mode = clickExecutionMode(step);
-
-  await dispatchClick(tabId, step, mode, cdpSession);
-  await settleAfterStep(tabId, urlBeforeClick);
-
-  if (mode === "trusted" || postconditions.length === 0) {
-    return EMPTY_CLICK_SKIP;
-  }
-
-  const verified = await checkClickPostconditions(tabId, postconditions);
-  const { needsNavigation, needsNextMatch } = postconditionKinds(postconditions);
-  const allSatisfied =
-    (!needsNavigation || verified.navigation) &&
-    (!needsNextMatch || verified.nextMatch);
-
-  if (allSatisfied) {
-    return verifiedSkipFlags(postconditions, verified);
-  }
-
-  if (!isSafeForCdpRetry(step)) {
-    log.debug("skipping CDP retry — no safe postcondition for toggle click", {
-      label: step.label,
-      step: stepIndex + 1,
-    });
-    return EMPTY_CLICK_SKIP;
-  }
-
-  if (!(await ensureCdp(cdpSession))) {
-    log.warn("postcondition missed after synthetic click; CDP unavailable", {
-      label: step.label,
-      step: stepIndex + 1,
-    });
-    return EMPTY_CLICK_SKIP;
-  }
-
-  log.info("retrying click with CDP after missed postcondition", {
-    label: step.label,
-    step: stepIndex + 1,
-  });
-  learnTrustedClick(step);
-
-  await dispatchClick(tabId, step, "trusted", cdpSession);
-  await settleAfterStep(tabId, urlBeforeClick);
-
-  return assertClickPostconditions(tabId, postconditions);
-}
-
 export async function runMacroScript(
   tabId: number,
   script: MacroScript,
   cdpSession: CdpSession,
 ): Promise<void> {
   let urlBeforeLastClick: string | undefined;
-  let priorClickSkip = EMPTY_CLICK_SKIP;
+  let priorClickSkip: ClickVerificationSkip = EMPTY_CLICK_SKIP;
 
   for (let i = 0; i < script.steps.length; i++) {
     const step = script.steps[i];
@@ -408,14 +166,12 @@ export async function runMacroScript(
 
     try {
       if (step.type === "click") {
-        priorClickSkip = await executeClickWithVerification(
-          tabId,
-          step,
-          i,
+        priorClickSkip = await executeScriptClick(tabId, step, {
           script,
-          cdpSession,
-          urlBeforeStep,
-        );
+          stepIndex: i,
+          urlBefore: urlBeforeStep,
+          session: cdpSession,
+        });
         if (urlBeforeStep) {
           urlBeforeLastClick = urlBeforeStep;
         }
@@ -455,14 +211,13 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     mode: macro.script ? "script" : "steps",
   });
 
-  const cdpSession: CdpSession = { tabId, ready: false };
+  const cdpSession = createCdpSession(tabId);
   try {
     await closePatchOverlay(tabId);
     await focusTabForPlayback(tabId);
 
     if (macro.script) {
       await runMacroScript(tabId, macro.script, cdpSession);
-      // TODO: persist learned trustedClick flags when CDP fallback succeeds during a run.
     } else {
       await runMacroSteps(tabId, macro.steps);
     }
@@ -475,9 +230,7 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     });
     throw error;
   } finally {
-    if (cdpSession.ready) {
-      await detachDebugger(tabId);
-    }
+    await detachCdpSession(cdpSession);
     clearRunId();
   }
 }

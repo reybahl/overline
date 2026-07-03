@@ -68,7 +68,7 @@ Rules:
 - **In-page clicks** (buttons, menus, copy): step 1 must **not** run — otherwise every step blocks ~20s waiting for a URL that never changes.
 - `clickMatchLikelyNavigates` keys off href fields on the match, not tag or text alone.
 - Pre-click `waitFor` resolves immediately when the element is already present; polling is only for UI still opening.
-- **CDP attach:** synthetic `.click()` first; attach lazily only when a click has `trustedClick: true` or when an observable postcondition (href navigation / next target) fails and a CDP retry is safe. Do not use label heuristics.
+- **CDP attach:** synthetic `.click()` first via `play.ts`; lazy CDP retry lives in `trusted-click-fallback.ts` when `trustedClick` is set or observable postconditions (href navigation / next target) fail. Do not use label heuristics.
 
 Constants (`shared/timing.ts`): `IN_PAGE_SETTLE_MS` 250, `PAGE_SETTLE_MS` 750, `TAB_LOAD_TIMEOUT_MS` / `STEP_WAIT_FOR_MS` 20_000, `MATCH_STABLE_POLLS` 3.
 
