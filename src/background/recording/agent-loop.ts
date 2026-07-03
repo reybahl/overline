@@ -1,11 +1,20 @@
-import { captureDomInTab, getTabUrl } from "@/background/capture";
+import {
+  captureDomInTab,
+  getTabUrl,
+  listInteractivesInTab,
+  searchInteractivesInTab,
+} from "@/background/capture";
 import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep } from "@/background/playback/tab-settle";
 import { assertRecordingSessionActive } from "@/background/recording/recording-session";
-import { getNextStep } from "@/background/recording/worker";
+import {
+  AgentTurnValidationError,
+  getNextStep,
+} from "@/background/recording/worker";
 import { createLogger } from "@/shared/logger";
 import {
   toRecordedStep,
+  type AgentTurn,
   type MacroGenerationStep,
   type MacroStep,
 } from "@/shared/types/macro";
@@ -126,17 +135,31 @@ export async function runAgentLoop(
 
     const url = await getTabUrl(tabId);
     const elements = await captureDomInTab(tabId);
-    const turnResult = await getNextStep(
-      intent,
-      stepsTaken.map((step) => ({
-        type: step.type,
-        selector: step.selector,
-        value: step.value,
-      })),
-      elements,
-      url,
-      lastError,
-    );
+    let turnResult: AgentTurn;
+    try {
+      turnResult = await getNextStep(
+        intent,
+        stepsTaken.map((step) => ({
+          type: step.type,
+          selector: step.selector,
+          value: step.value,
+        })),
+        elements,
+        url,
+        {
+          searchElements: (query, options) =>
+            searchInteractivesInTab(tabId, query, options),
+          listElements: (options) => listInteractivesInTab(tabId, options),
+        },
+        lastError,
+      );
+    } catch (error) {
+      if (error instanceof AgentTurnValidationError) {
+        lastError = error.message;
+        continue;
+      }
+      throw error;
+    }
 
     await assertRecordingSessionActive();
 

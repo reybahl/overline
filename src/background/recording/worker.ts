@@ -1,7 +1,6 @@
-import { generateObject } from "ai";
-import type { z } from "zod";
+import { generateObject, generateText, Output, tool } from "ai";
+import { z } from "zod";
 
-import type { DomElement } from "@/content/dom-capture";
 import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
@@ -12,6 +11,12 @@ import {
   resolveLanguageModel,
 } from "@/shared/llm-model";
 import { createLogger } from "@/shared/logger";
+import type {
+  DomElement,
+  ListInteractivesOptions,
+  ListInteractivesResult,
+  SearchInteractivesOptions,
+} from "@/shared/types/dom";
 import {
   AgentTurnSchema,
   CompiledMacroOutputSchema,
@@ -25,6 +30,43 @@ import {
 
 const log = createLogger("llm");
 
+const AGENT_TOOL_CALL_LIMIT = 6;
+const AGENT_MAX_STEPS = AGENT_TOOL_CALL_LIMIT + 1;
+const TOOL_RESULT_LIMIT = 20;
+
+const SearchElementsToolSchema = z.object({
+  query: z
+    .string()
+    .min(1)
+    .describe("Rough search terms from the user intent. Exact text is not required."),
+  limit: z.number().int().min(1).max(TOOL_RESULT_LIMIT).optional(),
+  controlKind: z.string().min(1).optional(),
+});
+
+const ListElementsToolSchema = z.object({
+  offset: z.number().int().min(0).optional(),
+  limit: z.number().int().min(1).max(TOOL_RESULT_LIMIT).optional(),
+  controlKind: z.string().min(1).optional(),
+  toggleFirst: z.boolean().optional(),
+});
+
+export type RecorderElementLookup = {
+  searchElements: (
+    query: string,
+    options?: SearchInteractivesOptions,
+  ) => Promise<DomElement[]>;
+  listElements: (
+    options?: ListInteractivesOptions,
+  ) => Promise<ListInteractivesResult>;
+};
+
+export class AgentTurnValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AgentTurnValidationError";
+  }
+}
+
 const DOM_ELEMENT_RULES = [
   "- Each element has role, controlKind, idStable — use these to pick controls, not visible text alone",
   "- Duplicate labels (e.g. two \"Code\" elements): use controlKind — dropdown-trigger/disclosure for menus and dropdowns, nav-tab for repo section tabs, link for navigation",
@@ -36,8 +78,14 @@ const DOM_ELEMENT_RULES = [
 ];
 
 const RECORD_AGENT_RULES = [
-  "- Emit the single next action from the current page state toward the intent",
-  "- Only use selectors from the current page state; do not invent selectors",
+  "- Emit the single next action from the default context and retrieved search/list results toward the intent",
+  "- The default context is intentionally small and is not the full page state",
+  "- Use searchElements with rough terms from the intent — exact text is not required",
+  "- You may call searchElements multiple times per turn with different queries — broaden, shorten, or rephrase if the first search misses",
+  "- If searchElements returns nothing, try a broader or alternate query before listElements or waitFor",
+  "- Use listElements only when search is too vague or repeated broader searches miss",
+  "- Only use selectors returned by searchElements, listElements, or the default context; do not invent selectors",
+  "- Search results with equal score are in document order — for first-match state intents, pick the first matching result",
   "- Use step types: click, type, fill, confirm, wait, waitFor, scroll",
   "- Never use navigate — click links and buttons instead",
   "- Never navigate backwards",
@@ -79,8 +127,12 @@ function buildAgentTurnPrompt(
     `Steps so far: ${JSON.stringify(stepsSoFar)}`,
     lastError ? `Last step failed: ${lastError}` : "",
     "",
-    "Current page state:",
+    "Default page context (small slice; use tools to search the full interactive index):",
     JSON.stringify(elements, null, 2),
+    "",
+    "Available tools:",
+    "- searchElements({ query, limit?, controlKind? }): searches all indexed interactives with forgiving deterministic matching",
+    "- listElements({ offset?, limit?, controlKind?, toggleFirst? }): browses a small page of indexed interactives",
     "",
     "What is the single next step?",
     ...RECORD_AGENT_RULES,
@@ -165,11 +217,158 @@ async function generateObjectWithModels<T>(
     : new Error("All configured models failed.");
 }
 
+function addAllowedSelectors(
+  allowedSelectors: Set<string>,
+  elements: DomElement[],
+): void {
+  for (const element of elements) {
+    allowedSelectors.add(element.selector);
+  }
+}
+
+function validateAgentTurnSelector(
+  turn: AgentTurn,
+  allowedSelectors: Set<string>,
+): void {
+  const selector = turn.step.selector;
+  if (!selector || allowedSelectors.has(selector)) {
+    return;
+  }
+
+  throw new AgentTurnValidationError(
+    "The selected selector was not returned by default context, searchElements, or listElements. Search or list the target first, then use that exact selector.",
+  );
+}
+
+function normalizeToolLimit(limit: number | undefined): number {
+  return Math.min(Math.max(Math.floor(limit ?? TOOL_RESULT_LIMIT), 1), TOOL_RESULT_LIMIT);
+}
+
+function normalizeToolOffset(offset: number | undefined): number {
+  return Math.max(Math.floor(offset ?? 0), 0);
+}
+
+function createRecorderTools(
+  lookup: RecorderElementLookup,
+  allowedSelectors: Set<string>,
+) {
+  let toolCallsUsed = 0;
+
+  const reserveToolCall = (toolName: string): boolean => {
+    if (toolCallsUsed >= AGENT_TOOL_CALL_LIMIT) {
+      log.warn("recorder tool budget exhausted", { toolName });
+      return false;
+    }
+
+    toolCallsUsed += 1;
+    return true;
+  };
+
+  return {
+    getToolCallsUsed: () => toolCallsUsed,
+    tools: {
+      searchElements: tool({
+        description:
+          "Search the full interactive DOM index with forgiving deterministic matching. Use rough terms; exact button or link text is not required.",
+        parameters: SearchElementsToolSchema,
+        execute: async (args) => {
+          if (!reserveToolCall("searchElements")) {
+            return [];
+          }
+
+          const elements = await lookup.searchElements(args.query, {
+            limit: normalizeToolLimit(args.limit),
+            controlKind: args.controlKind,
+          });
+          addAllowedSelectors(allowedSelectors, elements);
+          return elements;
+        },
+      }),
+      listElements: tool({
+        description:
+          "Browse a small page of the full interactive DOM index when search is too vague. Equal-order results preserve document order unless toggleFirst is true.",
+        parameters: ListElementsToolSchema,
+        execute: async (args) => {
+          const offset = normalizeToolOffset(args.offset);
+          const limit = normalizeToolLimit(args.limit);
+
+          if (!reserveToolCall("listElements")) {
+            return {
+              elements: [],
+              total: 0,
+              offset,
+              limit,
+            } satisfies ListInteractivesResult;
+          }
+
+          const result = await lookup.listElements({
+            offset,
+            limit,
+            controlKind: args.controlKind,
+            toggleFirst: args.toggleFirst,
+          });
+          addAllowedSelectors(allowedSelectors, result.elements);
+          return result;
+        },
+      }),
+    },
+  };
+}
+
+async function generateAgentTurnWithModels(
+  prompt: string,
+  elements: DomElement[],
+  lookup: RecorderElementLookup,
+): Promise<AgentTurn> {
+  const env = getLlmEnv();
+  if (!env) {
+    throw new Error(`LLM not configured.\n${llmConfigHint()}`);
+  }
+
+  const models = buildModelFallbackChain(env.model);
+  let lastError: unknown;
+
+  for (const modelRef of models) {
+    const allowedSelectors = new Set<string>();
+    addAllowedSelectors(allowedSelectors, elements);
+    const recorderTools = createRecorderTools(lookup, allowedSelectors);
+
+    try {
+      const result = await generateText({
+        model: resolveLanguageModel(modelRef),
+        prompt,
+        tools: recorderTools.tools,
+        maxSteps: AGENT_MAX_STEPS,
+        experimental_output: Output.object({ schema: AgentTurnSchema }),
+        experimental_prepareStep: async () =>
+          recorderTools.getToolCallsUsed() >= AGENT_TOOL_CALL_LIMIT
+            ? { toolChoice: "none" as const }
+            : undefined,
+      });
+      const turn = AgentTurnSchema.parse(result.experimental_output);
+      validateAgentTurnSelector(turn, allowedSelectors);
+      return turn;
+    } catch (error) {
+      lastError = error;
+      log.warn("agent model failed, trying next", {
+        model: modelRef,
+        toolCallsUsed: recorderTools.getToolCallsUsed(),
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("All configured models failed.");
+}
+
 export async function getNextStep(
   intent: string,
   stepsSoFar: MacroGenerationStep[],
   elements: DomElement[],
   url: string,
+  lookup: RecorderElementLookup,
   lastError?: string,
 ): Promise<AgentTurn> {
   if (elements.length === 0) {
@@ -178,7 +377,7 @@ export async function getNextStep(
 
   const prompt = buildAgentTurnPrompt(intent, stepsSoFar, elements, url, lastError);
 
-  return generateObjectWithModels<AgentTurn>(AgentTurnSchema, prompt);
+  return generateAgentTurnWithModels(prompt, elements, lookup);
 }
 
 export async function compileMacroScript(

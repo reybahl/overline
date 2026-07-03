@@ -1,4 +1,3 @@
-import type { DomElement } from "@/content/dom-capture";
 import { captureOutputEl } from "@/window/palette/elements";
 import { setBusy, setStatus } from "@/window/palette/ui";
 import {
@@ -6,6 +5,7 @@ import {
   getRestrictedPageMessage,
   isInjectableUrl,
 } from "@/shared/tab";
+import type { DomElement } from "@/shared/types/dom";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
