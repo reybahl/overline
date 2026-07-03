@@ -142,6 +142,7 @@ export function sanitizeCompiledScript(
 
     if (step.type === "click") {
       clickMatchByIndex.set(index, match);
+      return { ...step, match };
     }
 
     if (step.type === "waitFor") {

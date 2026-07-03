@@ -68,6 +68,7 @@ Rules:
 - **In-page clicks** (buttons, menus, copy): step 1 must **not** run — otherwise every step blocks ~20s waiting for a URL that never changes.
 - `clickMatchLikelyNavigates` keys off href fields on the match, not tag or text alone.
 - Pre-click `waitFor` resolves immediately when the element is already present; polling is only for UI still opening.
+- **CDP attach:** synthetic `.click()` first via `play.ts`; lazy CDP retry lives in `trusted-click-fallback.ts` when `trustedClick` is set or observable postconditions (href navigation / next target) fail. Do not use label heuristics.
 
 Constants (`shared/timing.ts`): `IN_PAGE_SETTLE_MS` 250, `PAGE_SETTLE_MS` 750, `TAB_LOAD_TIMEOUT_MS` / `STEP_WAIT_FOR_MS` 20_000, `MATCH_STABLE_POLLS` 3.
 
@@ -89,3 +90,15 @@ Constants (`shared/timing.ts`): `IN_PAGE_SETTLE_MS` 250, `PAGE_SETTLE_MS` 750, `
 - **Multi-hop + query tab:** click scoped repo link (`hrefFromPathSegment: 0`), then tab link (`hrefPattern: "\\?tab=…"` only — no invented `testId`). Playback must navigation-wait after step 1, not after step 2.
 - **In-page menu:** open dropdown/button, then copy — no 20s URL wait between steps; ~250ms settle only.
 - **PR viewed toggle:** first unviewed file → one click `ariaLabel: "Not Viewed"` + `pressed: false`; recorder sees all file toggles in capture order.
+
+## Commit messages
+
+Follow [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) — all lowercase.
+
+Format: `type[optional scope]: description`
+
+- `feat` — new feature
+- `fix` — bug fix
+- `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `build` — when they fit better
+
+Keep the subject line short. Optional body after a blank line. Breaking changes: `type!:` or footer `breaking change:`.

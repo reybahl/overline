@@ -29,6 +29,8 @@ export const ScriptClickStepSchema = ScriptStepLabelSchema.extend({
   type: z.literal("click"),
   match: ElementMatchSchema,
   index: z.number().int().nonnegative().optional(),
+  /** When true, playback uses CDP trusted input (saved scripts or in-run learn). */
+  trustedClick: z.boolean().optional(),
 });
 
 export const ScriptFillStepSchema = ScriptStepLabelSchema.extend({
