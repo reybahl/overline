@@ -4,19 +4,10 @@ import { isStableId } from "@/shared/stable-id";
 import type { ElementMatch } from "@/shared/types/script";
 
 /**
- * Derive a robust, replayable {@link ElementMatch} from a *live* element at the
- * moment it is interacted with during recording.
+ * Derive a replayable {@link ElementMatch} from a live element at click time.
  *
- * This is the counterpart to selector capture: because the element is present in
- * the DOM right now (e.g. an open menu item that disappears once the menu
- * closes), we can read its real signals and pick the most stable one — instead
- * of trying to reconstruct a match later from a reference snapshot where the
- * element no longer exists.
- *
- * Priority (most → least stable): stable id, data-testid, anchor href, visible
- * text, accessible name. Visible text is preferred over accessible name because
- * accessible-name composition can drop whitespace between inline label spans
- * (e.g. "main default" → "maindefault"), which would not match what a user sees.
+ * Returns multiple fields when available (e.g. href + text + testId) so compile can
+ * choose the right generalization strategy. Stable id alone still wins early return.
  */
 const MATCHABLE_TAGS = new Set(["a", "button", "input", "select", "textarea"]);
 
@@ -25,6 +16,21 @@ const MAX_TEXT_LENGTH = 120;
 function matchableTag(el: Element): ElementMatch["tag"] | undefined {
   const tag = el.tagName.toLowerCase();
   return MATCHABLE_TAGS.has(tag) ? (tag as ElementMatch["tag"]) : undefined;
+}
+
+/** Pathname + search relative to the page — easier for compile to count segments. */
+function normalizeHrefSuffix(href: string): string {
+  if (href.startsWith("#")) {
+    return href;
+  }
+
+  try {
+    const resolved = new URL(href, window.location.href);
+    const path = resolved.pathname + resolved.search;
+    return path || href;
+  } catch {
+    return href;
+  }
 }
 
 function stableHref(el: Element): string | undefined {
@@ -37,7 +43,22 @@ function stableHref(el: Element): string | undefined {
     return undefined;
   }
 
-  return href;
+  return normalizeHrefSuffix(href);
+}
+
+function readAriaBoolean(el: Element, attr: string): boolean | undefined {
+  const value = el.getAttribute(attr);
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  return undefined;
+}
+
+function readPressed(el: Element): boolean | undefined {
+  return readAriaBoolean(el, "aria-pressed");
 }
 
 export function deriveElementMatch(el: Element): ElementMatch {
@@ -46,27 +67,44 @@ export function deriveElementMatch(el: Element): ElementMatch {
   }
 
   const tag = matchableTag(el);
-  const base: ElementMatch = tag ? { tag } : {};
+  const match: ElementMatch = tag ? { tag } : {};
 
   const testId = el.getAttribute("data-testid")?.trim();
   if (testId) {
-    return { ...base, testId };
+    match.testId = testId;
   }
 
   const href = stableHref(el);
   if (href) {
-    return { ...base, tag: "a", hrefSuffix: href };
+    match.hrefSuffix = href;
+    match.tag = "a";
   }
 
   const text = getVisibleText(el);
   if (text) {
-    return { ...base, text: text.slice(0, MAX_TEXT_LENGTH) };
+    match.text = text.slice(0, MAX_TEXT_LENGTH);
   }
 
   const ariaLabel = getAccessibleName(el);
   if (ariaLabel) {
-    return { ...base, ariaLabel };
+    match.ariaLabel = ariaLabel;
   }
 
-  return base;
+  const pressed = readPressed(el);
+  if (pressed !== undefined) {
+    match.pressed = pressed;
+  }
+
+  if (
+    match.hrefSuffix ||
+    match.text ||
+    match.ariaLabel ||
+    match.pressed !== undefined ||
+    match.testId ||
+    match.tag
+  ) {
+    return match;
+  }
+
+  return match;
 }

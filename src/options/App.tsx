@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 
-import { ConfirmDialog } from "@/ui/ConfirmDialog";
-import type { BackgroundMessage, BackgroundResponse } from "@/shared/types/messages";
+import { ConfirmDialog } from "@/options/ConfirmDialog";
+import { sendBackgroundMessage } from "@/shared/clients/background-client";
+import { saveMacros } from "@/shared/clients/storage";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
 import { formatScriptStep } from "@/shared/script-format";
 import {
@@ -23,12 +24,6 @@ function formatStep(step: MacroStep, index: number): string {
     }
   }
   return parts.join(" · ");
-}
-
-async function sendBackgroundMessage(
-  message: BackgroundMessage,
-): Promise<BackgroundResponse> {
-  return chrome.runtime.sendMessage(message);
 }
 
 type ShortcutEditorProps = {
@@ -74,7 +69,7 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
           return;
         }
 
-        onSaved(response.macros ?? []);
+        onSaved(response.macros);
         setListening(false);
       })();
     };
@@ -100,7 +95,7 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
       return;
     }
 
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
   }
 
   return (
@@ -172,7 +167,7 @@ function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps
     }
 
     onError(null);
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
     setDirty(false);
   }
 
@@ -265,7 +260,7 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
     }
 
     onError(null);
-    onSaved(response.macros ?? []);
+    onSaved(response.macros);
     setDirty(false);
   }
 
@@ -363,7 +358,7 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
         {macro.script ? (
           <details className="patch-disclosure">
             <summary>
-              {macro.script.steps.length} compiled script step
+              {macro.script.steps.length} script step
               {macro.script.steps.length === 1 ? "" : "s"}
             </summary>
             <ol className="patch-list--stack">
@@ -383,17 +378,14 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
               </pre>
             </details>
           </details>
-        ) : null}
+        ) : (
+          <p className="patch-text-muted">No compiled script — re-record this macro.</p>
+        )}
 
         <details className="patch-disclosure">
           <summary>
-            {macro.script
-              ? `${macro.steps.length} demo ${
-                  macro.steps.length === 1 ? "step" : "steps"
-                } (reference)`
-              : `${macro.steps.length} ${
-                  macro.steps.length === 1 ? "step" : "steps"
-                }`}
+            {macro.steps.length} demo {macro.steps.length === 1 ? "step" : "steps"}{" "}
+            (recording reference)
           </summary>
           <ol className="patch-list--stack">
             {macro.steps.map((step, index) => (
@@ -446,6 +438,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
+  const [clearAllPending, setClearAllPending] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -456,7 +449,7 @@ export default function App() {
           throw new Error(macrosResponse.error);
         }
 
-        setMacros(macrosResponse.macros ?? []);
+        setMacros(macrosResponse.macros);
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to load macros";
@@ -485,7 +478,21 @@ export default function App() {
       return;
     }
 
-    setMacros(response.macros ?? []);
+    setMacros(response.macros);
+  }
+
+  async function confirmClearAll(): Promise<void> {
+    setClearAllPending(false);
+
+    try {
+      await saveMacros([]);
+      setMacros([]);
+      setShortcutError(null);
+    } catch (clearError) {
+      const message =
+        clearError instanceof Error ? clearError.message : "Failed to clear macros";
+      setShortcutError(message);
+    }
   }
 
   if (loading) {
@@ -508,10 +515,25 @@ export default function App() {
     <>
       <main className="patch-page patch-page--options">
       <header className="patch-page-header">
-        <h1 className="patch-header__title patch-header__title--lg">Patch</h1>
-        <p className="patch-header__subtitle">
-          Saved macros, shortcuts, and run scope.
-        </p>
+        <div className="patch-options-header">
+          <div>
+            <h1 className="patch-header__title patch-header__title--lg">Patch</h1>
+            <p className="patch-header__subtitle">
+              Saved macros, shortcuts, and run scope.
+            </p>
+          </div>
+          {macros.length > 0 ? (
+            <button
+              type="button"
+              className="patch-btn patch-btn--sm patch-btn--destructive"
+              onClick={() => {
+                setClearAllPending(true);
+              }}
+            >
+              Clear all
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {shortcutError ? (
@@ -539,6 +561,23 @@ export default function App() {
         </ul>
       )}
       </main>
+
+      <ConfirmDialog
+        open={clearAllPending}
+        title="Clear all macros?"
+        message={`All ${macros.length} saved macro${
+          macros.length === 1 ? "" : "s"
+        } will be permanently removed.`}
+        confirmLabel="Clear all"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={() => {
+          void confirmClearAll();
+        }}
+        onCancel={() => {
+          setClearAllPending(false);
+        }}
+      />
 
       <ConfirmDialog
         open={macroPendingDelete !== null}

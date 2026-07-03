@@ -55,12 +55,6 @@ async function waitForSelector(selector: string, timeoutMs: number): Promise<voi
   throw new Error(ELEMENT_NOT_FOUND);
 }
 
-/**
- * Execute a single recorded step. For steps that resolve a concrete element,
- * the element's {@link ElementMatch} is derived *before* acting (the action may
- * navigate or remove the element) and returned so the recorder can build a
- * deterministic, replayable script from exactly what was interacted with.
- */
 async function executeStep(step: MacroStep): Promise<ElementMatch | null> {
   switch (step.type) {
     case "click": {

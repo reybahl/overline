@@ -1,17 +1,15 @@
 import { getTabUrl } from "@/background/capture";
-import { runAgenticRecord } from "@/background/record";
+import { runAgenticRecord } from "@/background/recording/record";
 import {
   assertRecordingSessionActive,
   isRecordingCancelledError,
-} from "@/background/recording-session";
-import { inferRunScope } from "@/background/worker";
-import { buildScriptFromDemo } from "@/shared/build-script";
+} from "@/background/recording/recording-session";
+import { compileMacroScript, inferRunScope } from "@/background/recording/worker";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
-  clearPendingRecord,
   getPendingRecord,
   savePendingRecord,
-} from "@/shared/storage";
+} from "@/shared/clients/storage";
 import type { Macro } from "@/shared/types/macro";
 
 const log = createLogger("record");
@@ -70,21 +68,33 @@ async function finishAgenticRecordSession(
       run,
       stepCount: result.macro.steps.length,
       endUrl,
+      recordedMatches: result.macro.steps
+        .filter((step) => step.type === "click" || step.type === "fill")
+        .map((step) => step.recordedMatch),
     });
 
     let current = await getPendingRecord();
     if (current?.status === "recording") {
       await savePendingRecord({
         ...current,
-        progress: "Building replayable script…",
+        progress: "Compiling generalized script…",
       });
     }
 
     await assertRecordingSessionActive();
 
-    const script = buildScriptFromDemo(result.macro.steps);
+    const compiled = await compileMacroScript(
+      intent,
+      startUrl,
+      endUrl,
+      result.macro.steps,
+    );
 
-    log.info("script built", { run, scriptSteps: script.steps.length });
+    log.info("script compiled", {
+      run,
+      scriptSteps: compiled.script.steps.length,
+      description: compiled.description,
+    });
 
     await assertRecordingSessionActive();
 
@@ -99,7 +109,12 @@ async function finishAgenticRecordSession(
     await assertRecordingSessionActive();
 
     const macro = await attachRunScope(
-      { ...result.macro, script, intent },
+      {
+        ...result.macro,
+        script: compiled.script,
+        description: compiled.description,
+        intent,
+      },
       intent,
       startUrl,
       endUrl,
@@ -134,10 +149,6 @@ async function finishAgenticRecordSession(
   } finally {
     clearRunId();
   }
-}
-
-export async function discardPendingRecordSession(): Promise<void> {
-  await clearPendingRecord();
 }
 
 async function attachRunScope(

@@ -10,7 +10,15 @@ export const ElementMatchSchema = z.object({
   hrefContains: z.string().min(1).optional(),
   /** Regex tested against the anchor href, e.g. "/issues/\\d+" for issue links. */
   hrefPattern: z.string().min(1).optional(),
+  /**
+   * Match a link whose href pathname equals `/${segment}` where segment is taken
+   * from the current page URL pathname at playback time (0 = first segment).
+   * Use when the clicked link is tied to a parent scope of the current page.
+   */
+  hrefFromPathSegment: z.number().int().nonnegative().optional(),
   testId: z.string().min(1).optional(),
+  /** aria-pressed — for toggle buttons (false = not engaged). */
+  pressed: z.boolean().optional(),
 });
 
 const ScriptStepLabelSchema = z.object({
@@ -21,6 +29,8 @@ export const ScriptClickStepSchema = ScriptStepLabelSchema.extend({
   type: z.literal("click"),
   match: ElementMatchSchema,
   index: z.number().int().nonnegative().optional(),
+  /** When true, playback uses CDP trusted input (saved scripts or in-run learn). */
+  trustedClick: z.boolean().optional(),
 });
 
 export const ScriptFillStepSchema = ScriptStepLabelSchema.extend({

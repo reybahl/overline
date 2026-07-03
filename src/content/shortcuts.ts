@@ -1,15 +1,13 @@
+import { sendBackgroundMessage } from "@/shared/clients/background-client";
+import {
+  getShortcutMap,
+  subscribePatchStorage,
+} from "@/shared/clients/storage";
 import {
   eventToShortcut,
   isEditableTarget,
   normalizeShortcut,
 } from "@/shared/shortcut";
-
-const MACROS_STORAGE_KEY = "patch:macros";
-
-type StoredMacro = {
-  id?: string;
-  shortcut?: string;
-};
 
 declare global {
   interface Window {
@@ -19,35 +17,15 @@ declare global {
 
 let shortcutToMacroId = new Map<string, string>();
 
-function loadShortcutMap(raw: unknown): void {
-  if (!Array.isArray(raw)) {
-    shortcutToMacroId = new Map();
-    return;
-  }
-
-  const nextMap = new Map<string, string>();
-  for (const entry of raw) {
-    const macro = entry as StoredMacro;
-    if (!macro.id || !macro.shortcut) {
-      continue;
-    }
-
-    nextMap.set(normalizeShortcut(macro.shortcut), macro.id);
-  }
-
-  shortcutToMacroId = nextMap;
-}
-
 async function refreshShortcutMap(): Promise<void> {
-  const result = await chrome.storage.local.get(MACROS_STORAGE_KEY);
-  loadShortcutMap(result[MACROS_STORAGE_KEY]);
+  shortcutToMacroId = await getShortcutMap();
 }
 
 async function triggerMacroByShortcut(macroId: string): Promise<void> {
-  const message = { type: "RUN_MACRO_BY_ID", macroId };
+  const message = { type: "RUN_MACRO_BY_ID", macroId } as const;
 
   try {
-    await chrome.runtime.sendMessage(message);
+    await sendBackgroundMessage(message);
     return;
   } catch {
     // Service worker may still be waking on a cold tab.
@@ -57,7 +35,7 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
     window.setTimeout(resolve, 50);
   });
 
-  await chrome.runtime.sendMessage(message);
+  await sendBackgroundMessage(message);
 }
 
 async function resolveMacroId(shortcut: string): Promise<string | undefined> {
@@ -105,12 +83,10 @@ function initializeShortcutsContentScript(): void {
     );
   });
 
-  chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName !== "local" || !(MACROS_STORAGE_KEY in changes)) {
-      return;
+  subscribePatchStorage((change) => {
+    if (change.macros) {
+      void refreshShortcutMap();
     }
-
-    loadShortcutMap(changes[MACROS_STORAGE_KEY]?.newValue);
   });
 }
 

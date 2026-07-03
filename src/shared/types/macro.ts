@@ -24,6 +24,8 @@ export const MacroStepSchema = z.object({
   selector: z.string().optional(),
   value: z.string().optional(),
   recordedMatch: ElementMatchSchema.optional(),
+  /** Page URL when the step was executed — helps compile generalize href matches. */
+  pageUrl: z.string().url().optional(),
   timestamp: z.number().int().nonnegative(),
 });
 
@@ -61,12 +63,18 @@ export const MacroGenerationStepSchema = z.object({
 
 export type MacroGenerationStep = z.infer<typeof MacroGenerationStepSchema>;
 
+export const CompiledMacroOutputSchema = z.object({
+  script: MacroScriptSchema,
+  description: z.string().min(1),
+});
+
+export type CompiledMacroOutput = z.infer<typeof CompiledMacroOutputSchema>;
+
 export const AgentTurnSchema = z.object({
   step: MacroGenerationStepSchema,
   done: z.boolean(),
   reasoning: z.string().optional(),
   macroName: z.string().optional(),
-  macroDescription: z.string().optional(),
 });
 
 export type AgentTurn = z.infer<typeof AgentTurnSchema>;

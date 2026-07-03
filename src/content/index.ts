@@ -31,6 +31,7 @@ function initializeContentScript(): void {
           sendResponse({ ok: true });
           return false;
         case "EXECUTE_STEPS":
+          // demo steps during agentic recording, not playback
           void executeSteps(message.steps)
             .then((matches) => {
               sendResponse({ ok: true, matches });
@@ -65,23 +66,6 @@ function initializeContentScript(): void {
             .catch((error: unknown) => {
               const errorMessage =
                 error instanceof Error ? error.message : "Failed to locate element";
-              sendResponse({ ok: false, error: errorMessage });
-            });
-          return true;
-        case "RUN_MACRO":
-          void (async () => {
-            if (message.macro.script) {
-              await executeScript(message.macro.script);
-              return;
-            }
-            await executeSteps(message.macro.steps);
-          })()
-            .then(() => {
-              sendResponse({ ok: true });
-            })
-            .catch((error: unknown) => {
-              const errorMessage =
-                error instanceof Error ? error.message : "Failed to run macro";
               sendResponse({ ok: false, error: errorMessage });
             });
           return true;

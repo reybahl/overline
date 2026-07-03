@@ -1,4 +1,4 @@
-import { runAgentLoop } from "@/background/agent-loop";
+import { runAgentLoop } from "@/background/recording/agent-loop";
 import { createMacroPreview, type Macro } from "@/shared/types/macro";
 
 export type AgenticRecordResult = {
@@ -21,7 +21,6 @@ export async function runAgenticRecord(
   return {
     macro: createMacroPreview(result.macroName ?? intent, result.steps, startUrl, {
       intent,
-      description: result.macroDescription,
     }),
     reasoning: result.reasoning,
   };
