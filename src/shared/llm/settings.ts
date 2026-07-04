@@ -1,49 +1,61 @@
 import { z } from "zod";
 
-import type { LlmProvider } from "@/shared/llm/providers";
+import { LLM_PROVIDERS, type LlmProvider } from "@/shared/llm/providers";
 
-const sharedPersistedFields = {
+type StandardLlmProvider = Exclude<LlmProvider, "openai-compatible">;
+
+const standardProviderSchema = z.enum(
+  LLM_PROVIDERS.filter(
+    (provider): provider is StandardLlmProvider => provider !== "openai-compatible",
+  ) as [StandardLlmProvider, ...StandardLlmProvider[]],
+);
+
+const persistedFields = {
   modelId: z.string().min(1),
   apiKey: z.string().min(1),
   updatedAt: z.number(),
-};
+} as const;
 
-const OpenAiSettingsSchema = z.object({
-  provider: z.literal("openai" satisfies LlmProvider),
-  ...sharedPersistedFields,
-});
+const draftFields = {
+  modelId: z.string().min(1),
+  apiKey: z.string().optional(),
+} as const;
 
-const AnthropicSettingsSchema = z.object({
-  provider: z.literal("anthropic" satisfies LlmProvider),
-  ...sharedPersistedFields,
-});
-
-const XaiSettingsSchema = z.object({
-  provider: z.literal("xai" satisfies LlmProvider),
-  ...sharedPersistedFields,
-});
-
-const GeminiSettingsSchema = z.object({
-  provider: z.literal("gemini" satisfies LlmProvider),
-  ...sharedPersistedFields,
-});
-
-const OpenAiCompatibleSettingsSchema = z.object({
-  provider: z.literal("openai-compatible" satisfies LlmProvider),
-  ...sharedPersistedFields,
+const openAiCompatibleFields = {
   baseURL: z.string().url(),
   name: z.string().min(1).default("openai-compatible"),
-});
+} as const;
 
-export const LlmSettingsSchema = z.discriminatedUnion("provider", [
-  OpenAiSettingsSchema,
-  AnthropicSettingsSchema,
-  XaiSettingsSchema,
-  GeminiSettingsSchema,
-  OpenAiCompatibleSettingsSchema,
-]);
+function llmSettingsSchema<const F extends Record<string, z.ZodTypeAny>>(fields: F) {
+  return z.union([
+    z.object({
+      provider: standardProviderSchema,
+      ...fields,
+    }),
+    z.object({
+      provider: z.literal("openai-compatible"),
+      ...fields,
+      ...openAiCompatibleFields,
+    }),
+  ]);
+}
 
-export type LlmSettings = z.infer<typeof LlmSettingsSchema>;
+type LlmSettingsForProvider<
+  P extends LlmProvider,
+  Fields extends { modelId: string },
+> = Fields &
+  (P extends "openai-compatible"
+    ? { provider: P; baseURL: string; name: string }
+    : { provider: P });
+
+export type LlmSettings = LlmSettingsForProvider<
+  LlmProvider,
+  { modelId: string; apiKey: string; updatedAt: number }
+>;
+
+export const LlmSettingsSchema = llmSettingsSchema(
+  persistedFields,
+) as z.ZodType<LlmSettings>;
 
 /** Settings safe to return to the options page (apiKey masked). */
 export type LlmSettingsPublic = {
@@ -64,41 +76,18 @@ export function toPublicLlmSettings(settings: LlmSettings): LlmSettingsPublic {
   return {
     ...rest,
     apiKeyMasked: maskApiKey(apiKey),
-  };
+  } as LlmSettingsPublic;
 }
 
-const draftFields = {
-  modelId: z.string().min(1),
-  apiKey: z.string().optional(),
-};
+export type LlmSettingsDraft = LlmSettingsForProvider<
+  LlmProvider,
+  { modelId: string; apiKey?: string | undefined }
+>;
 
 /** Draft from the options UI — apiKey optional when updating existing config. */
-export const LlmSettingsDraftSchema = z.discriminatedUnion("provider", [
-  z.object({
-    provider: z.literal("openai" satisfies LlmProvider),
-    ...draftFields,
-  }),
-  z.object({
-    provider: z.literal("anthropic" satisfies LlmProvider),
-    ...draftFields,
-  }),
-  z.object({
-    provider: z.literal("xai" satisfies LlmProvider),
-    ...draftFields,
-  }),
-  z.object({
-    provider: z.literal("gemini" satisfies LlmProvider),
-    ...draftFields,
-  }),
-  z.object({
-    provider: z.literal("openai-compatible" satisfies LlmProvider),
-    ...draftFields,
-    baseURL: z.string().url(),
-    name: z.string().min(1).default("openai-compatible"),
-  }),
-]);
-
-export type LlmSettingsDraft = z.infer<typeof LlmSettingsDraftSchema>;
+export const LlmSettingsDraftSchema = llmSettingsSchema(
+  draftFields,
+) as z.ZodType<LlmSettingsDraft>;
 
 export function mergeLlmSettingsDraft(
   draft: LlmSettingsDraft,
@@ -109,20 +98,10 @@ export function mergeLlmSettingsDraft(
     throw new Error("API key is required.");
   }
 
-  const updatedAt = Date.now();
   const { apiKey: _removed, ...rest } = draft;
-
-  if (rest.provider === "openai-compatible") {
-    return LlmSettingsSchema.parse({
-      ...rest,
-      apiKey,
-      updatedAt,
-    });
-  }
-
   return LlmSettingsSchema.parse({
     ...rest,
     apiKey,
-    updatedAt,
+    updatedAt: Date.now(),
   });
 }
