@@ -199,7 +199,7 @@ export function applyInferredMacroSignature(
     return standalone(script);
   }
 
-  let steps = [...MacroScriptSchema.parse(script).steps];
+  const steps = [...MacroScriptSchema.parse(script).steps];
   try {
     for (const patch of inferred.patches) {
       steps[patch.stepIndex] = writeField(
