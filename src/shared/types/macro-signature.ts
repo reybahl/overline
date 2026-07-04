@@ -9,10 +9,12 @@ export const MacroParamNameSchema = z
 export const MacroParamTypeSchema = z.enum(["string", "number"]);
 
 export const MacroParamSchema = z.object({
-  name: MacroParamNameSchema,
-  label: z.string().min(1),
-  description: z.string().optional(),
-  type: MacroParamTypeSchema,
+  name: MacroParamNameSchema.describe(
+    "camelCase param id used in templates as {{name}}",
+  ),
+  label: z.string().min(1).describe("Short human label for the runtime prompt"),
+  description: z.string().optional().describe("Optional helper text for the prompt"),
+  type: MacroParamTypeSchema.describe("number for PR/issue ids; string for text search"),
 });
 
 export const MacroSignatureSchema = z.object({
@@ -33,21 +35,37 @@ export const MacroScriptPatchFieldSchema = z.enum([
 ]);
 
 export const MacroParamPatchSchema = z.object({
-  stepIndex: z.number().int().nonnegative(),
-  field: MacroScriptPatchFieldSchema,
-  /** Full field value after parameterization, containing {{paramName}}. */
-  template: z.string().min(1),
+  stepIndex: z
+    .number()
+    .int()
+    .nonnegative()
+    .describe("Index in the compiled script steps array"),
+  field: MacroScriptPatchFieldSchema.describe(
+    "Script field to replace with template; use match.hrefContains for PR links when href is in recordedMatch",
+  ),
+  template: z
+    .string()
+    .min(1)
+    .describe(
+      "Full new field value containing {{paramName}}, e.g. /pull/{{prNumber}} or issue_{{prNumber}}_link",
+    ),
 });
 
 /** LLM output for post-compile signature inference. */
 export const InferredMacroSignatureSchema = z.discriminatedUnion("standalone", [
   z.object({
-    standalone: z.literal(true),
+    standalone: z
+      .literal(true)
+      .describe("Macro needs no runtime user input — use only when intent does NOT mark user-provided values"),
     params: z.array(MacroParamSchema).length(0),
     patches: z.array(MacroParamPatchSchema).length(0),
   }),
   z.object({
-    standalone: z.literal(false),
+    standalone: z
+      .literal(false)
+      .describe(
+        "Intent explicitly marks user-provided value(s) — declare params and patch script fields with {{param}} templates",
+      ),
     params: z.array(MacroParamSchema).min(1),
     patches: z.array(MacroParamPatchSchema).min(1),
   }),

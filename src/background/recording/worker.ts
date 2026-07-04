@@ -176,7 +176,8 @@ function buildCompileScriptPrompt(
     "- One output click/fill step per demo step — same count, same order",
     "- Generalize each recordedMatch; never add fields absent from that step's recordedMatch (especially testId)",
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
-    "- Stable semantic ids → keep id",
+    "- Stable semantic ids → keep id UNLESS intent marks that value as user-provided at run time (see below)",
+    "- When intent marks a user-provided slot (PR number, search term, etc.) and recordedMatch has hrefSuffix/hrefContains/text with the demo literal: include that href/text field with the demo literal — do not rely on id alone when id embeds the literal (e.g. issue_1973_link)",
     "- text with counts/badges → textContains with static words only",
     "- When recordedMatch.ariaLabel and recordedMatch.text differ, use ariaLabel only (state lives in aria, not visible label)",
     "- When recordedMatch.pressed or checked is set on a toggle, include it in the replay match",
@@ -193,6 +194,60 @@ function buildCompileScriptPrompt(
     "- Runtime parameterization ({{param}} templates) is applied in a later pass",
   ].join("\n");
 }
+
+const MACRO_SIGNATURE_RULES = [
+  "You are defining the function signature for a browser macro script template.",
+  "",
+  "Return standalone: false when the intent EXPLICITLY says the user will supply a value at run time.",
+  'Explicit signals include: "I give you", "I will input", "as input", "at playback", "each run", "user provides", "where X is".',
+  "When those signals are present AND a demo/compiled field contains the example literal, you MUST return standalone: false with params and patches.",
+  "",
+  "Return standalone: true ONLY when:",
+  "- Intent describes a fixed action with no user-supplied slot, OR",
+  "- Intent mentions a user slot but no compiled or recordedMatch field contains the demo literal to template",
+  "",
+  "Never infer params from demo values alone when intent does not mark them as user-provided.",
+];
+
+const MACRO_SIGNATURE_PATCH_RULES = [
+  "patches replace one script field with a template containing {{paramName}}",
+  "Allowed fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
+  "template is the FULL new string for that field",
+  "Correlate the demo literal from recordedMatch or fill value with the param named in intent (PR number → prNumber, search text → searchTerm)",
+  "When recordedMatch has hrefSuffix/hrefContains with the demo number or text, prefer match.hrefContains or match.hrefSuffix over match.id",
+  "When compiled script only has match.id embedding the demo number (e.g. issue_1973_link), patch match.id to issue_{{prNumber}}_link",
+  "Every declared param must appear in at least one patch template",
+];
+
+const MACRO_SIGNATURE_EXAMPLE = [
+  "Example — intent: \"click PR #X where X is the number I give you as input\"",
+  "Compiled step 0: { type: \"click\", match: { id: \"issue_1973_link\" } }",
+  "Demo recordedMatch: { hrefSuffix: \"/pull/1973\", ... }",
+  "Correct output:",
+  JSON.stringify(
+    {
+      standalone: false,
+      params: [
+        {
+          name: "prNumber",
+          label: "PR number",
+          type: "number",
+          description: "Pull request number to open",
+        },
+      ],
+      patches: [
+        {
+          stepIndex: 0,
+          field: "match.hrefContains",
+          template: "/pull/{{prNumber}}",
+        },
+      ],
+    },
+    null,
+    2,
+  ),
+  "Alternate when href is absent from recordedMatch: patch match.id to \"issue_{{prNumber}}_link\"",
+];
 
 function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {
   return script.steps.map((step, stepIndex) => {
@@ -223,41 +278,22 @@ function buildMacroSignaturePrompt(
   const demoScript = buildDemoScriptForCompile(demoSteps);
 
   return [
-    "Decide whether this macro is a standalone script or a parameterized function with runtime user inputs.",
-    "",
-    "CRITICAL: Only declare params when the user's intent EXPLICITLY marks a value they will provide at run time.",
-    "If unsure, return standalone: true. Never infer parameters from recorded demo values alone.",
+    ...MACRO_SIGNATURE_RULES,
     "",
     `Intent: "${intent}"`,
     "",
-    "Compiled script (use stepIndex + field for patches):",
+    "Compiled script (stepIndex + field for patches):",
     JSON.stringify(summarizeScriptForSignature(script), null, 2),
     "",
-    "Demo steps (recorded literals + recordedMatch):",
+    "Demo steps (recorded literals + recordedMatch — use to find which field holds the demo literal):",
     JSON.stringify(demoScript, null, 2),
     "",
+    "Patch rules:",
+    ...MACRO_SIGNATURE_PATCH_RULES.map((rule) => `- ${rule}`),
+    "",
+    ...MACRO_SIGNATURE_EXAMPLE,
+    "",
     "Return standalone, params, and patches.",
-    "",
-    "Create params ONLY when intent clearly signals user-provided values, e.g.:",
-    '- "PR #X, I will input X at playback"',
-    '- "search for TERM where TERM is something I\'ll type each run"',
-    '- "filter by N (user provides)"',
-    "",
-    "Do NOT create params when:",
-    "- Intent describes a fixed action with no user-supplied slot",
-    "- A demo literal appears but intent never said the user supplies it",
-    "- You would have to guess what the variable is",
-    "",
-    "When standalone: false:",
-    "- params: name (camelCase), label (prompt title), optional description, type string|number",
-    "- patches: replace a templatable script field with a template containing {{paramName}}",
-    "- Allowed patch fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
-    "- template is the full new field value, e.g. \"/pull/{{prNumber}}\" or \"{{searchTerm}}\" or \"issue_{{prNumber}}_link\"",
-    "- Prefer href/text fields over brittle ids when the demo literal appears there",
-    "- Bind only slots the intent marked as user-provided; correlate with demo recordedMatch / fill value",
-    "",
-    "When standalone: true: return empty params and patches arrays.",
-    "If intent asks for a param but no compiled field can be templated for the demo literal, return standalone: true.",
   ].join("\n");
 }
 
@@ -568,6 +604,12 @@ export async function inferMacroSignature(
       standalone: inferred.standalone,
       paramCount: applied.signature.params.length,
       patchCount: inferred.standalone ? 0 : inferred.patches.length,
+      ...(inferred.standalone
+        ? {}
+        : {
+            params: inferred.params.map((param) => param.name),
+            patches: inferred.patches,
+          }),
     });
     return applied;
   } catch (error) {
