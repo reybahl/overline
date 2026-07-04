@@ -22,7 +22,7 @@ function resolveModelSelection(
   modelId: string,
 ): ModelSelection {
   const catalogIds = LLM_CATALOG[provider].map((entry) => entry.id);
-  if (catalogIds.includes(modelId)) {
+  if (catalogIds.some((id) => id === modelId)) {
     return { kind: "catalog", modelId };
   }
   return { kind: "custom", modelId };
@@ -250,7 +250,7 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
             {catalog.map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.label}
-                {entry.note ? ` — ${entry.note}` : ""}
+                {"note" in entry && entry.note ? ` — ${entry.note}` : ""}
               </option>
             ))}
             <option value={CUSTOM_MODEL_VALUE}>Custom model ID…</option>

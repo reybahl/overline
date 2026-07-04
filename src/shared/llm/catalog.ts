@@ -7,7 +7,10 @@ export type LlmCatalogEntry = {
   note?: string;
 };
 
-export const LLM_CATALOG: Record<LlmProvider, readonly LlmCatalogEntry[]> = {
+type CatalogModelId<C extends readonly { readonly id: string }[]> =
+  C[number]["id"];
+
+export const LLM_CATALOG = {
   openai: [
     {
       id: "gpt-5.5",
@@ -76,16 +79,17 @@ export const LLM_CATALOG: Record<LlmProvider, readonly LlmCatalogEntry[]> = {
     { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash-Lite" },
   ],
   "openai-compatible": [],
-};
+} as const satisfies Record<LlmProvider, readonly LlmCatalogEntry[]>;
 
-export const LLM_DEFAULT_MODEL: Record<
-  Exclude<LlmProvider, "openai-compatible">,
-  string
-> = {
+export const LLM_DEFAULT_MODEL = {
   openai: "gpt-5.4-mini",
   anthropic: "claude-sonnet-5",
   xai: "grok-4.3",
   gemini: "gemini-3.5-flash",
+} as const satisfies {
+  [P in Exclude<LlmProvider, "openai-compatible">]: CatalogModelId<
+    (typeof LLM_CATALOG)[P]
+  >;
 };
 
 export function defaultModelForProvider(provider: LlmProvider): string {
