@@ -9,7 +9,8 @@
     "dev:watch": "vite build --watch",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "test": "bun test"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",

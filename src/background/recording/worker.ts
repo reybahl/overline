@@ -1,6 +1,7 @@
 import { generateObject, generateText, Output, tool } from "ai";
 import { z } from "zod";
 
+import { applyInferredMacroInputs } from "@/shared/macro-input";
 import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
@@ -27,6 +28,12 @@ import {
   type MacroStep,
   type RunScope,
 } from "@/shared/types/macro";
+import {
+  InferredMacroInputsSchema,
+  STANDALONE_MACRO_INPUT_SCHEMA,
+  type MacroInputSchema,
+} from "@/shared/types/macro-input";
+import type { MacroScript } from "@/shared/types/script";
 
 const log = createLogger("llm");
 
@@ -92,6 +99,8 @@ const RECORD_AGENT_RULES = [
   "- Never set done: true before recording at least one action",
   "- If a required control is missing, use waitFor — do not mark done or substitute unrelated controls",
   "- Take the fewest steps — do not click jump/anchor links to scroll to a control that is already in the DOM",
+  "- When the intent marks a value the user will provide at run time (e.g. \"X is something I'll type each run\"), use a realistic example from the page for fill/type values — never use {{placeholders}} in step values during recording",
+  "- Pick demo fill values that complete the flow (search returns results, PR exists, etc.) — e.g. repo name from the URL or visible page content",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -179,6 +188,61 @@ function buildCompileScriptPrompt(
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
     "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
+    "- Keep fill values as the recorded demo literals — runtime parameterization is applied in a later pass",
+  ].join("\n");
+}
+
+function summarizeScriptStepsForInputInference(script: MacroScript): Record<string, unknown>[] {
+  return script.steps.map((step, stepIndex) => ({
+    stepIndex,
+    type: step.type,
+    ...(step.type === "fill" ? { value: step.value } : {}),
+    ...(step.label ? { label: step.label } : {}),
+  }));
+}
+
+function buildMacroInputSchemaPrompt(
+  intent: string,
+  script: MacroScript,
+  demoSteps: MacroStep[],
+): string {
+  const demoFills = buildDemoScriptForCompile(demoSteps).filter(
+    (step) => step.type === "fill",
+  );
+
+  return [
+    "Decide whether this macro needs runtime user inputs for fill steps.",
+    "",
+    "CRITICAL: Only declare inputs when the user's intent EXPLICITLY marks a value they will provide at run time.",
+    "If unsure, return standalone: true. Never infer parameters from recorded demo values alone.",
+    "",
+    `Intent: "${intent}"`,
+    "",
+    "Compiled script steps (use stepIndex for fillBindings):",
+    JSON.stringify(summarizeScriptStepsForInputInference(script), null, 2),
+    "",
+    "Demo fill steps (recorded literals during the session):",
+    JSON.stringify(demoFills, null, 2),
+    "",
+    "Return standalone, inputs, and fillBindings.",
+    "",
+    "Create inputs ONLY when intent clearly signals user-provided values, e.g.:",
+    '- "search for X where X is something I\'ll type each run"',
+    '- "go to PR #N — I\'ll enter N every time"',
+    '- "filter by TERM (user provides)"',
+    "",
+    "Do NOT create inputs when:",
+    "- Intent describes a fixed action with no user-supplied slot",
+    "- A fill happened during recording but intent never said the user supplies that value",
+    "- You would have to guess what the variable is",
+    "",
+    "When standalone: false:",
+    "- inputs: name (camelCase), label (palette field title), optional description, type string|number",
+    "- fillBindings: stepIndex must target a fill step in the compiled script; inputName must match an inputs entry",
+    "- Patch target: fill.value becomes {{inputName}} at playback — only bind fills the intent marked as user-provided",
+    "",
+    "When standalone: true: return empty inputs and fillBindings arrays.",
+    "If intent asks for an input but the compiled script has no fill step to bind, return standalone: true.",
   ].join("\n");
 }
 
@@ -465,4 +529,35 @@ export async function inferRunScope(
 ): Promise<RunScope> {
   const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps);
   return generateObjectWithModels(RunScopeSchema, prompt);
+}
+
+export type InferredMacroInputResult = {
+  script: MacroScript;
+  inputSchema: MacroInputSchema;
+};
+
+export async function inferMacroInputSchema(
+  intent: string,
+  script: MacroScript,
+  demoSteps: MacroStep[],
+): Promise<InferredMacroInputResult> {
+  const prompt = buildMacroInputSchemaPrompt(intent, script, demoSteps);
+
+  try {
+    const inferred = await generateObjectWithModels(
+      InferredMacroInputsSchema,
+      prompt,
+    );
+    const applied = applyInferredMacroInputs(script, inferred);
+    log.info("input schema inferred", {
+      standalone: inferred.standalone,
+      inputCount: applied.inputSchema.inputs.length,
+    });
+    return applied;
+  } catch (error) {
+    log.warn("input schema inference failed, using standalone", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { script, inputSchema: STANDALONE_MACRO_INPUT_SCHEMA };
+  }
 }

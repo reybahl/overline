@@ -1,4 +1,5 @@
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import { macroNeedsInputs } from "@/shared/macro-input";
 import { formatScriptStep } from "@/shared/script-format";
 import {
   reviewPanelEl,
@@ -34,7 +35,12 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
         macro.script.steps.length === 1 ? "" : "s"
       }`
     : "";
-  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${scopeSummary}${
+  const inputSummary = macroNeedsInputs(macro)
+    ? ` · ${macro.inputSchema!.inputs.length} runtime input${
+        macro.inputSchema!.inputs.length === 1 ? "" : "s"
+      }`
+    : "";
+  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${inputSummary}${scopeSummary}${
     reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""
   }`;
 
@@ -44,6 +50,21 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
     const intentItem = document.createElement("li");
     intentItem.textContent = `Intent: "${macro.intent}"`;
     reviewStepsEl.appendChild(intentItem);
+  }
+
+  if (macroNeedsInputs(macro)) {
+    const inputsLabel = document.createElement("li");
+    inputsLabel.textContent = "Runtime inputs:";
+    reviewStepsEl.appendChild(inputsLabel);
+
+    reviewStepsEl.append(
+      ...macro.inputSchema!.inputs.map((input) => {
+        const item = document.createElement("li");
+        const detail = input.description ? ` — ${input.description}` : "";
+        item.textContent = `${input.label} (${input.type}) · {{${input.name}}}${detail}`;
+        return item;
+      }),
+    );
   }
 
   if (macro.script) {
