@@ -248,6 +248,16 @@ function normalizeToolOffset(offset: number | undefined): number {
   return Math.max(Math.floor(offset ?? 0), 0);
 }
 
+function summarizeElementsForLog(elements: DomElement[]): Record<string, unknown>[] {
+  return elements.slice(0, 5).map((element) => ({
+    selector: element.selector,
+    role: element.role,
+    controlKind: element.controlKind,
+    text: element.text,
+    ariaLabel: element.ariaLabel,
+  }));
+}
+
 function createRecorderTools(
   lookup: RecorderElementLookup,
   allowedSelectors: Set<string>,
@@ -272,16 +282,38 @@ function createRecorderTools(
           "Search the full interactive DOM index with forgiving deterministic matching. Use rough terms; exact button or link text is not required.",
         parameters: SearchElementsToolSchema,
         execute: async (args) => {
+          const limit = normalizeToolLimit(args.limit);
+
           if (!reserveToolCall("searchElements")) {
             return [];
           }
 
-          const elements = await lookup.searchElements(args.query, {
-            limit: normalizeToolLimit(args.limit),
+          log.info("recorder searchElements tool call", {
+            query: args.query,
+            limit,
             controlKind: args.controlKind,
+            toolCallsUsed,
           });
-          addAllowedSelectors(allowedSelectors, elements);
-          return elements;
+
+          try {
+            const elements = await lookup.searchElements(args.query, {
+              limit,
+              controlKind: args.controlKind,
+            });
+            addAllowedSelectors(allowedSelectors, elements);
+            log.info("recorder searchElements tool result", {
+              query: args.query,
+              resultCount: elements.length,
+              preview: summarizeElementsForLog(elements),
+            });
+            return elements;
+          } catch (error) {
+            log.warn("recorder searchElements tool failed", {
+              query: args.query,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
         },
       }),
       listElements: tool({
@@ -301,14 +333,38 @@ function createRecorderTools(
             } satisfies ListInteractivesResult;
           }
 
-          const result = await lookup.listElements({
+          log.info("recorder listElements tool call", {
             offset,
             limit,
             controlKind: args.controlKind,
             toggleFirst: args.toggleFirst,
+            toolCallsUsed,
           });
-          addAllowedSelectors(allowedSelectors, result.elements);
-          return result;
+
+          try {
+            const result = await lookup.listElements({
+              offset,
+              limit,
+              controlKind: args.controlKind,
+              toggleFirst: args.toggleFirst,
+            });
+            addAllowedSelectors(allowedSelectors, result.elements);
+            log.info("recorder listElements tool result", {
+              offset: result.offset,
+              limit: result.limit,
+              total: result.total,
+              resultCount: result.elements.length,
+              preview: summarizeElementsForLog(result.elements),
+            });
+            return result;
+          } catch (error) {
+            log.warn("recorder listElements tool failed", {
+              offset,
+              limit,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            throw error;
+          }
         },
       }),
     },
