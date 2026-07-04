@@ -18,8 +18,8 @@ export async function captureDomInTab(tabId: number): Promise<DomElement[]> {
     target: { tabId },
     func: () => {
       const capture = (
-        globalThis as { __patchCaptureDom?: () => DomElement[] }
-      ).__patchCaptureDom;
+        globalThis as { __olCaptureDom?: () => DomElement[] }
+      ).__olCaptureDom;
       return capture?.() ?? [];
     },
   });

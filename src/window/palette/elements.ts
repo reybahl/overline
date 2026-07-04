@@ -1,7 +1,7 @@
 export function requireElement<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) {
-    throw new Error(`Patch markup is missing #${id}`);
+    throw new Error(`Overline markup is missing #${id}`);
   }
   return element as T;
 }

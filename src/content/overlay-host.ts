@@ -1,13 +1,13 @@
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import {
-  PATCH_PANEL_CLOSE_MESSAGE,
-  PATCH_PANEL_RESIZE_MESSAGE,
-  PATCH_SHELL_MAX_HEIGHT,
-  PATCH_SHELL_WIDTH,
+  PANEL_CLOSE_MESSAGE,
+  PANEL_RESIZE_MESSAGE,
+  UI_SHELL_MAX_HEIGHT,
+  UI_SHELL_WIDTH,
 } from "@/ui/tokens";
 
-const OVERLAY_HOST_ID = "patch-overlay-host";
-const OVERLAY_STYLE_ID = "patch-overlay-styles";
+const OVERLAY_HOST_ID = "ui-overlay-host";
+const OVERLAY_STYLE_ID = "ui-overlay-styles";
 const PANEL_PATH = "src/window/index.html";
 
 /* Color values mirror src/ui/tokens.css */
@@ -22,8 +22,8 @@ const overlayStyles = `
   background: rgb(15 15 15 / 28%);
 }
 
-#${OVERLAY_HOST_ID} .patch-overlay-panel {
-  width: ${PATCH_SHELL_WIDTH}px;
+#${OVERLAY_HOST_ID} .ui-overlay-panel {
+  width: ${UI_SHELL_WIDTH}px;
   background: #ffffff;
   border-radius: 12px;
   box-shadow:
@@ -33,7 +33,7 @@ const overlayStyles = `
   overflow: hidden;
 }
 
-@keyframes patch-overlay-enter {
+@keyframes ui-overlay-enter {
   from {
     opacity: 0;
   }
@@ -43,7 +43,7 @@ const overlayStyles = `
   }
 }
 
-@keyframes patch-panel-enter {
+@keyframes ui-panel-enter {
   from {
     opacity: 0;
     transform: scale(0.97) translateY(6px);
@@ -57,16 +57,16 @@ const overlayStyles = `
 
 @media (prefers-reduced-motion: no-preference) {
   #${OVERLAY_HOST_ID} {
-    animation: patch-overlay-enter 150ms ease;
+    animation: ui-overlay-enter 150ms ease;
   }
 
-  #${OVERLAY_HOST_ID} .patch-overlay-panel {
-    animation: patch-panel-enter 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  #${OVERLAY_HOST_ID} .ui-overlay-panel {
+    animation: ui-panel-enter 180ms cubic-bezier(0.16, 1, 0.3, 1);
     transition: height 120ms ease;
   }
 }
 
-#${OVERLAY_HOST_ID} .patch-overlay-frame {
+#${OVERLAY_HOST_ID} .ui-overlay-frame {
   width: 100%;
   height: 100%;
   border: 0;
@@ -79,7 +79,7 @@ const overlayStyles = `
     background: rgb(0 0 0 / 55%);
   }
 
-  #${OVERLAY_HOST_ID} .patch-overlay-panel {
+  #${OVERLAY_HOST_ID} .ui-overlay-panel {
     background: #202020;
     box-shadow:
       0 24px 48px rgb(0 0 0 / 45%),
@@ -90,7 +90,7 @@ const overlayStyles = `
 
 declare global {
   interface Window {
-    __patchOverlayHostLoaded?: boolean;
+    __olOverlayHostLoaded?: boolean;
   }
 }
 
@@ -121,7 +121,7 @@ function isOverlayOpen(): boolean {
 
 function clampPanelHeight(height: number): number {
   const maxHeight = Math.min(
-    PATCH_SHELL_MAX_HEIGHT,
+    UI_SHELL_MAX_HEIGHT,
     Math.floor(window.innerHeight * 0.85),
   );
   return Math.min(Math.max(height, 1), maxHeight);
@@ -137,12 +137,12 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
-  if (event.data?.type === PATCH_PANEL_CLOSE_MESSAGE) {
+  if (event.data?.type === PANEL_CLOSE_MESSAGE) {
     closeOverlay();
     return;
   }
 
-  if (event.data?.type !== PATCH_PANEL_RESIZE_MESSAGE) {
+  if (event.data?.type !== PANEL_RESIZE_MESSAGE) {
     return;
   }
 
@@ -187,7 +187,7 @@ function openOverlay(): void {
   overlayHost.id = OVERLAY_HOST_ID;
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
-  overlayHost.setAttribute("aria-label", "Patch");
+  overlayHost.setAttribute("aria-label", "Overline");
 
   overlayHost.addEventListener("mousedown", (event) => {
     if (event.target === overlayHost) {
@@ -196,12 +196,12 @@ function openOverlay(): void {
   });
 
   const panel = document.createElement("div");
-  panel.className = "patch-overlay-panel";
+  panel.className = "ui-overlay-panel";
 
   const iframe = document.createElement("iframe");
   iframe.src = getPanelUrl();
-  iframe.title = "Patch";
-  iframe.className = "patch-overlay-frame";
+  iframe.title = "Overline";
+  iframe.className = "ui-overlay-frame";
   iframe.setAttribute("scrolling", "no");
 
   panel.appendChild(iframe);
@@ -232,10 +232,10 @@ function toggleOverlay(): void {
 }
 
 function initializeOverlayHost(): void {
-  if (window.__patchOverlayHostLoaded) {
+  if (window.__olOverlayHostLoaded) {
     return;
   }
-  window.__patchOverlayHostLoaded = true;
+  window.__olOverlayHostLoaded = true;
 
   chrome.runtime.onMessage.addListener(
     (
@@ -243,13 +243,13 @@ function initializeOverlayHost(): void {
       _sender,
       sendResponse: (response: ContentResponse) => void,
     ) => {
-      if (message.type === "CLOSE_PATCH_OVERLAY") {
+      if (message.type === "CLOSE_OVERLAY") {
         closeOverlay();
         sendResponse({ ok: true });
         return false;
       }
 
-      if (message.type !== "TOGGLE_PATCH_OVERLAY") {
+      if (message.type !== "TOGGLE_OVERLAY") {
         return false;
       }
 
@@ -258,7 +258,7 @@ function initializeOverlayHost(): void {
         sendResponse({ ok: true });
       } catch (error: unknown) {
         const errorMessage =
-          error instanceof Error ? error.message : "Failed to toggle Patch";
+          error instanceof Error ? error.message : "Failed to toggle Overline";
         sendResponse({ ok: false, error: errorMessage });
       }
 

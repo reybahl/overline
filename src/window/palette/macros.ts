@@ -57,16 +57,16 @@ export function isCreateMacroOptionSelected(): boolean {
 }
 
 export function scrollSelectedIntoView(): void {
-  const activeItem = macroListEl.querySelector(".patch-palette__item--active");
+  const activeItem = macroListEl.querySelector(".ui-palette__item--active");
   activeItem?.scrollIntoView({ block: "nearest" });
 }
 
 function renderCreateMacroItem(index: number): HTMLLIElement {
   const query = getTrimmedSearchQuery();
   const item = document.createElement("li");
-  item.className = "patch-palette__item patch-palette__item--create";
+  item.className = "ui-palette__item ui-palette__item--create";
   if (index === paletteState.selectedIndex) {
-    item.classList.add("patch-palette__item--active");
+    item.classList.add("ui-palette__item--active");
   }
   item.setAttribute("role", "option");
   item.setAttribute(
@@ -76,7 +76,7 @@ function renderCreateMacroItem(index: number): HTMLLIElement {
 
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "patch-palette__item-btn";
+  button.className = "ui-palette__item-btn";
   button.addEventListener("click", () => {
     paletteActions.createMacro();
   });
@@ -84,10 +84,10 @@ function renderCreateMacroItem(index: number): HTMLLIElement {
   mountLucideIcon(button, Plus);
 
   const main = document.createElement("div");
-  main.className = "patch-palette__item-main";
+  main.className = "ui-palette__item-main";
 
   const title = document.createElement("span");
-  title.className = "patch-palette__item-title";
+  title.className = "ui-palette__item-title";
   title.textContent = `Create new macro "${query}"`;
   main.appendChild(title);
 
@@ -135,9 +135,9 @@ export function renderMacroList(highlightMacroId?: string): void {
 
   for (const [index, macro] of paletteState.filteredMacros.entries()) {
     const item = document.createElement("li");
-    item.className = "patch-palette__item";
+    item.className = "ui-palette__item";
     if (index === paletteState.selectedIndex) {
-      item.classList.add("patch-palette__item--active");
+      item.classList.add("ui-palette__item--active");
     }
     item.setAttribute("role", "option");
     item.setAttribute(
@@ -147,23 +147,23 @@ export function renderMacroList(highlightMacroId?: string): void {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "patch-palette__item-btn";
+    button.className = "ui-palette__item-btn";
     button.addEventListener("click", () => {
       paletteActions.runMacro(macro);
     });
 
     const main = document.createElement("div");
-    main.className = "patch-palette__item-main";
+    main.className = "ui-palette__item-main";
 
     const title = document.createElement("span");
-    title.className = "patch-palette__item-title";
+    title.className = "ui-palette__item-title";
     title.textContent = macro.name;
     main.appendChild(title);
 
     const description = getMacroDescription(macro);
     if (description) {
       const subtitle = document.createElement("span");
-      subtitle.className = "patch-palette__item-desc";
+      subtitle.className = "ui-palette__item-desc";
       subtitle.textContent = description;
       main.appendChild(subtitle);
     }
@@ -172,7 +172,7 @@ export function renderMacroList(highlightMacroId?: string): void {
 
     if (macro.shortcut) {
       const shortcut = document.createElement("kbd");
-      shortcut.className = "patch-kbd patch-kbd--compact";
+      shortcut.className = "ui-kbd ui-kbd--compact";
       shortcut.textContent = formatShortcutForDisplay(macro.shortcut);
       button.appendChild(shortcut);
     }

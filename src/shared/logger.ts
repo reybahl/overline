@@ -53,7 +53,7 @@ export class Logger {
   }
 
   private writeConsole(level: LogLevel, entry: LogEntry): void {
-    const prefix = `[Patch:${entry.ctx}]`;
+    const prefix = `[Overline:${entry.ctx}]`;
     const args: unknown[] = entry.data ? [entry.msg, entry.data] : [entry.msg];
 
     switch (level) {
@@ -82,7 +82,7 @@ export class Logger {
 
     if (typeof chrome !== "undefined" && chrome.runtime?.id) {
       void chrome.runtime
-        .sendMessage({ type: "PATCH_LOG", entry })
+        .sendMessage({ type: "DEV_LOG", entry })
         .catch(() => {});
     }
   }

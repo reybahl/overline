@@ -138,7 +138,7 @@ export const backgroundHandlers = {
     return { ok: true as const };
   },
 
-  PATCH_LOG: async (message, _context) => {
+  DEV_LOG: async (message, _context) => {
     relayLogEntry(message.entry);
     return { ok: true as const };
   },
@@ -176,8 +176,8 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.RUN_MACRO_BY_ID(message, context);
     case "EXECUTE_MACRO":
       return backgroundHandlers.EXECUTE_MACRO(message, context);
-    case "PATCH_LOG":
-      return backgroundHandlers.PATCH_LOG(message, context);
+    case "DEV_LOG":
+      return backgroundHandlers.DEV_LOG(message, context);
     case "AGENTIC_RECORD":
       return backgroundHandlers.AGENTIC_RECORD(message, context);
     case "CANCEL_PENDING_RECORD":

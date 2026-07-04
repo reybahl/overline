@@ -10,79 +10,79 @@ body {
 }
 
 body {
-  background: var(--patch-bg);
-  color: var(--patch-fg);
-  font: var(--patch-text-base) / 1.4 var(--patch-font);
+  background: var(--ui-bg);
+  color: var(--ui-fg);
+  font: var(--ui-text-base) / 1.4 var(--ui-font);
   -webkit-font-smoothing: antialiased;
 }
 
-.patch-shell {
-  width: var(--patch-shell-width);
-  padding: var(--patch-space-7);
+.ui-shell {
+  width: var(--ui-shell-width);
+  padding: var(--ui-space-7);
 }
 
-.patch-page {
+.ui-page {
   max-width: 42rem;
   margin: 0 auto;
-  padding: var(--patch-space-7);
+  padding: var(--ui-space-7);
 }
 
-.patch-page-header {
-  margin-bottom: var(--patch-space-7);
+.ui-page-header {
+  margin-bottom: var(--ui-space-7);
 }
 
-.patch-header__title--lg {
-  font-size: var(--patch-text-heading);
+.ui-header__title--lg {
+  font-size: var(--ui-text-heading);
 }
 
-.patch-header__subtitle {
-  margin: var(--patch-space-1) 0 0;
+.ui-header__subtitle {
+  margin: var(--ui-space-1) 0 0;
   max-width: 28rem;
-  font-size: var(--patch-text-sm);
+  font-size: var(--ui-text-sm);
   line-height: 1.45;
-  color: var(--patch-fg-secondary);
+  color: var(--ui-fg-secondary);
 }
 
-.patch-stack--loose {
-  gap: var(--patch-space-5);
+.ui-stack--loose {
+  gap: var(--ui-space-5);
 }
 
-.patch-header {
-  margin-bottom: var(--patch-space-6);
+.ui-header {
+  margin-bottom: var(--ui-space-6);
 }
 
-.patch-header__title {
+.ui-header__title {
   margin: 0;
-  font-size: var(--patch-text-title);
+  font-size: var(--ui-text-title);
   font-weight: 600;
   letter-spacing: -0.015em;
 }
 
-.patch-stack {
+.ui-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--patch-space-2);
+  gap: var(--ui-space-2);
 }
 
-ul.patch-stack {
+ul.ui-stack {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.patch-stack--actions {
-  margin-top: var(--patch-space-1);
+.ui-stack--actions {
+  margin-top: var(--ui-space-1);
 }
 
-.patch-row {
+.ui-row {
   display: flex;
-  gap: var(--patch-space-2);
+  gap: var(--ui-space-2);
 }
 
-.patch-row > .patch-btn {
+.ui-row > .ui-btn {
   flex: 1;
 }
 
-.patch-footer {
-  margin-top: var(--patch-space-5);
+.ui-footer {
+  margin-top: var(--ui-space-5);
 }

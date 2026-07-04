@@ -15,7 +15,7 @@ export function setIntentInputVisible(visible: boolean): void {
 
 export function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
-  statusEl.classList.toggle("patch-status--error", isError);
+  statusEl.classList.toggle("ui-status--error", isError);
 }
 
 export function setBusy(disabled: boolean): void {

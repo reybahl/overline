@@ -1,4 +1,4 @@
-import { togglePatchOverlay } from "@/background/overlay";
+import { toggleOverlay } from "@/background/overlay";
 import { handleBackgroundMessage } from "@/background/message-handlers";
 import { relayLogEntry } from "@/background/log-relay";
 import { bindLogRelay, createLogger } from "@/shared/logger";
@@ -21,8 +21,8 @@ chrome.action.onClicked.addListener((tab) => {
     return;
   }
 
-  void togglePatchOverlay(tab.id, tab.url).catch((error: unknown) => {
-    log.error("failed to open patch overlay", {
+  void toggleOverlay(tab.id, tab.url).catch((error: unknown) => {
+    log.error("failed to open overlay", {
       error: error instanceof Error ? error.message : String(error),
     });
   });
@@ -31,12 +31,12 @@ chrome.action.onClicked.addListener((tab) => {
 chrome.commands.onCommand.addListener(async (command) => {
   try {
     switch (command) {
-      case "open-patch": {
+      case "open-palette": {
         const tab = await getActiveTab();
         if (tab.id === undefined) {
           throw new Error("No active tab found.");
         }
-        await togglePatchOverlay(tab.id, tab.url);
+        await toggleOverlay(tab.id, tab.url);
         break;
       }
       default:

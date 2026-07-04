@@ -74,7 +74,7 @@ function applyPendingRecord(record: PendingRecord | null): void {
       palettePanelEl.hidden = true;
       setStatus(
         record.progress ??
-          "Recording… you can close Patch while it keeps working.",
+          "Recording… you can close Overline while it keeps working.",
       );
       startPendingRecordPoll();
       return;
@@ -156,7 +156,7 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
       throw new Error(getRestrictedPageMessage(startUrl));
     }
 
-    setStatus("Recording… you can close Patch while it keeps working.");
+    setStatus("Recording… you can close Overline while it keeps working.");
     startPendingRecordPoll();
 
     void sendBackgroundMessage({

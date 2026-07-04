@@ -42,33 +42,33 @@ export function ConfirmDialog({
     return null;
   }
 
-  const titleId = "patch-dialog-title";
+  const titleId = "ui-dialog-title";
 
   return (
     <div
-      className="patch-dialog"
+      className="ui-dialog"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
     >
       <button
         type="button"
-        className="patch-dialog__backdrop"
+        className="ui-dialog__backdrop"
         aria-label={cancelLabel}
         onClick={onCancel}
       />
-      <div className="patch-dialog__panel">
-        <h2 id={titleId} className="patch-dialog__title">
+      <div className="ui-dialog__panel">
+        <h2 id={titleId} className="ui-dialog__title">
           {title}
         </h2>
-        <p className="patch-dialog__message">{message}</p>
-        <div className="patch-dialog__actions">
-          <button type="button" className="patch-btn" onClick={onCancel}>
+        <p className="ui-dialog__message">{message}</p>
+        <div className="ui-dialog__actions">
+          <button type="button" className="ui-btn" onClick={onCancel}>
             {cancelLabel}
           </button>
           <button
             type="button"
-            className={`patch-btn ${destructive ? "patch-btn--destructive" : "patch-btn--primary"}`}
+            className={`ui-btn ${destructive ? "ui-btn--destructive" : "ui-btn--primary"}`}
             onClick={onConfirm}
           >
             {confirmLabel}

@@ -99,17 +99,17 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
   }
 
   return (
-    <div className="patch-section">
-      <p className="patch-section__title">Shortcut</p>
-      <div className="patch-inline-actions">
+    <div className="ui-section">
+      <p className="ui-section__title">Shortcut</p>
+      <div className="ui-inline-actions">
         {macro.shortcut ? (
-          <kbd className="patch-kbd">{formatShortcutForDisplay(macro.shortcut)}</kbd>
+          <kbd className="ui-kbd">{formatShortcutForDisplay(macro.shortcut)}</kbd>
         ) : (
-          <span className="patch-text-muted">None</span>
+          <span className="ui-text-muted">None</span>
         )}
         <button
           type="button"
-          className="patch-btn patch-btn--sm"
+          className="ui-btn ui-btn--sm"
           onClick={() => {
             onError(null);
             setListening(true);
@@ -120,7 +120,7 @@ function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps) {
         {macro.shortcut ? (
           <button
             type="button"
-            className="patch-btn patch-btn--sm patch-btn--ghost"
+            className="ui-btn ui-btn--sm ui-btn--ghost"
             onClick={() => {
               void clearShortcut();
             }}
@@ -172,12 +172,12 @@ function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps
   }
 
   return (
-    <div className="patch-section">
-      <label className="patch-field">
-        <span className="patch-label">Name</span>
+    <div className="ui-section">
+      <label className="ui-field">
+        <span className="ui-label">Name</span>
         <input
           type="text"
-          className="patch-input"
+          className="ui-input"
           value={name}
           onChange={(event) => {
             setName(event.target.value);
@@ -185,11 +185,11 @@ function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps
           }}
         />
       </label>
-      <label className="patch-field">
-        <span className="patch-label">Description</span>
+      <label className="ui-field">
+        <span className="ui-label">Description</span>
         <input
           type="text"
-          className="patch-input"
+          className="ui-input"
           placeholder={
             macro.intent && !macro.description
               ? macro.intent
@@ -205,7 +205,7 @@ function MacroDetailsEditor({ macro, onSaved, onError }: MacroDetailsEditorProps
       {dirty ? (
         <button
           type="button"
-          className="patch-btn patch-btn--sm"
+          className="ui-btn ui-btn--sm"
           onClick={() => {
             void saveDetails();
           }}
@@ -265,13 +265,13 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
   }
 
   return (
-    <div className="patch-section">
-      <p className="patch-section__title">Run on</p>
-      <label className="patch-field">
-        <span className="patch-label">Description</span>
+    <div className="ui-section">
+      <p className="ui-section__title">Run on</p>
+      <label className="ui-field">
+        <span className="ui-label">Description</span>
         <input
           type="text"
-          className="patch-input"
+          className="ui-input"
           placeholder="e.g. Any repository page on this site"
           value={description}
           onChange={(event) => {
@@ -280,11 +280,11 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
           }}
         />
       </label>
-      <label className="patch-field">
-        <span className="patch-label">URL regex</span>
+      <label className="ui-field">
+        <span className="ui-label">URL regex</span>
         <input
           type="text"
-          className="patch-input patch-input--mono"
+          className="ui-input ui-input--mono"
           placeholder="^https://…"
           value={pattern}
           onChange={(event) => {
@@ -296,7 +296,7 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
       {dirty ? (
         <button
           type="button"
-          className="patch-btn patch-btn--sm"
+          className="ui-btn ui-btn--sm"
           onClick={() => {
             void saveRunScope();
           }}
@@ -304,7 +304,7 @@ function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps) {
           Save run scope
         </button>
       ) : macro.runScope ? null : (
-        <p className="patch-text-muted">
+        <p className="ui-text-muted">
           No run scope yet. Record a new macro or fill in both fields above.
         </p>
       )}
@@ -323,24 +323,24 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
   const summaryDescription = macro.description ?? macro.intent;
 
   return (
-    <details className="patch-card">
-      <summary className="patch-card__summary">
-        <div className="patch-card__summary-main">
-          <div className="patch-card__heading">
-            <span className="patch-card__title">{macro.name}</span>
+    <details className="ui-card">
+      <summary className="ui-card__summary">
+        <div className="ui-card__summary-main">
+          <div className="ui-card__heading">
+            <span className="ui-card__title">{macro.name}</span>
             {macro.shortcut ? (
-              <kbd className="patch-kbd patch-kbd--compact">
+              <kbd className="ui-kbd ui-kbd--compact">
                 {formatShortcutForDisplay(macro.shortcut)}
               </kbd>
             ) : null}
           </div>
           {summaryDescription ? (
-            <p className="patch-card__meta">{summaryDescription}</p>
+            <p className="ui-card__meta">{summaryDescription}</p>
           ) : null}
         </div>
       </summary>
 
-      <div className="patch-card__body">
+      <div className="ui-card__body">
         <MacroDetailsEditor
           key={`${macro.id}-${macro.updatedAt}-details`}
           macro={macro}
@@ -356,55 +356,55 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
         <ShortcutEditor macro={macro} onSaved={onSaved} onError={onError} />
 
         {macro.script ? (
-          <details className="patch-disclosure">
+          <details className="ui-disclosure">
             <summary>
               {macro.script.steps.length} script step
               {macro.script.steps.length === 1 ? "" : "s"}
             </summary>
-            <ol className="patch-list--stack">
+            <ol className="ui-list--stack">
               {macro.script.steps.map((step, index) => (
                 <li
                   key={`${macro.id}-script-${index}`}
-                  className="patch-code-item"
+                  className="ui-code-item"
                 >
                   {formatScriptStep(step, index)}
                 </li>
               ))}
             </ol>
-            <details className="patch-disclosure">
+            <details className="ui-disclosure">
               <summary>Raw script JSON</summary>
-              <pre className="patch-code">
+              <pre className="ui-code">
                 {JSON.stringify(macro.script, null, 2)}
               </pre>
             </details>
           </details>
         ) : (
-          <p className="patch-text-muted">No compiled script — re-record this macro.</p>
+          <p className="ui-text-muted">No compiled script — re-record this macro.</p>
         )}
 
-        <details className="patch-disclosure">
+        <details className="ui-disclosure">
           <summary>
             {macro.steps.length} demo {macro.steps.length === 1 ? "step" : "steps"}{" "}
             (recording reference)
           </summary>
-          <ol className="patch-list--stack">
+          <ol className="ui-list--stack">
             {macro.steps.map((step, index) => (
-              <li key={step.id} className="patch-code-item">
+              <li key={step.id} className="ui-code-item">
                 {formatStep(step, index)}
               </li>
             ))}
           </ol>
         </details>
 
-        <div className="patch-card__footer">
+        <div className="ui-card__footer">
           <button
             type="button"
-            className="patch-btn patch-btn--icon patch-btn--danger"
+            className="ui-btn ui-btn--icon ui-btn--danger"
             aria-label={`Delete ${macro.name}`}
             onClick={onDelete}
           >
             <svg
-              className="patch-icon"
+              className="ui-icon"
               width="16"
               height="16"
               viewBox="0 0 16 16"
@@ -497,35 +497,35 @@ export default function App() {
 
   if (loading) {
     return (
-      <main className="patch-page">
-        <p className="patch-text-muted">Loading macros…</p>
+      <main className="ui-page">
+        <p className="ui-text-muted">Loading macros…</p>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="patch-page">
-        <p className="patch-status patch-status--error">{error}</p>
+      <main className="ui-page">
+        <p className="ui-status ui-status--error">{error}</p>
       </main>
     );
   }
 
   return (
     <>
-      <main className="patch-page patch-page--options">
-      <header className="patch-page-header">
-        <div className="patch-options-header">
+      <main className="ui-page ui-page--options">
+      <header className="ui-page-header">
+        <div className="ui-options-header">
           <div>
-            <h1 className="patch-header__title patch-header__title--lg">Patch</h1>
-            <p className="patch-header__subtitle">
+            <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
+            <p className="ui-header__subtitle">
               Saved macros, shortcuts, and run scope.
             </p>
           </div>
           {macros.length > 0 ? (
             <button
               type="button"
-              className="patch-btn patch-btn--sm patch-btn--destructive"
+              className="ui-btn ui-btn--sm ui-btn--destructive"
               onClick={() => {
                 setClearAllPending(true);
               }}
@@ -537,15 +537,15 @@ export default function App() {
       </header>
 
       {shortcutError ? (
-        <p className="patch-alert patch-alert--error">{shortcutError}</p>
+        <p className="ui-alert ui-alert--error">{shortcutError}</p>
       ) : null}
 
       {macros.length === 0 ? (
-        <p className="patch-text-muted">
-          No macros yet. Open Patch on a page and choose Record.
+        <p className="ui-text-muted">
+          No macros yet. Open Overline on a page and choose Record.
         </p>
       ) : (
-        <ul className="patch-stack patch-stack--loose">
+        <ul className="ui-stack ui-stack--loose">
           {macros.map((macro) => (
             <li key={macro.id}>
               <MacroCard

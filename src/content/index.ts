@@ -9,13 +9,13 @@ import { MacroScriptSchema } from "@/shared/types/script";
 
 declare global {
   interface Window {
-    __patchContentScriptLoaded?: boolean;
+    __olContentScriptLoaded?: boolean;
   }
 }
 
 function initializeContentScript(): void {
-  if (window.__patchContentScriptLoaded) return;
-  window.__patchContentScriptLoaded = true;
+  if (window.__olContentScriptLoaded) return;
+  window.__olContentScriptLoaded = true;
 
   chrome.runtime.onMessage.addListener(
     (
@@ -24,8 +24,8 @@ function initializeContentScript(): void {
       sendResponse: (response: ContentResponse) => void,
     ) => {
       if (
-        message.type === "TOGGLE_PATCH_OVERLAY" ||
-        message.type === "CLOSE_PATCH_OVERLAY"
+        message.type === "TOGGLE_OVERLAY" ||
+        message.type === "CLOSE_OVERLAY"
       ) {
         return false;
       }

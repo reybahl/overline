@@ -1,5 +1,5 @@
 {
-  "name": "Patch",
+  "name": "Overline",
   "manifest_version": 3,
   "icons": {
     "16": "icons/icon-16.png",
@@ -7,7 +7,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "Patch",
+    "default_title": "Overline",
     "default_icon": {
       "16": "icons/icon-16.png",
       "48": "icons/icon-48.png",
@@ -38,12 +38,12 @@
     "open_in_tab": true
   },
   "commands": {
-    "open-patch": {
+    "open-palette": {
       "suggested_key": {
         "default": "Ctrl+Shift+P",
         "mac": "Command+Shift+P"
       },
-      "description": "Open Patch"
+      "description": "Open Overline"
     }
   }
 }

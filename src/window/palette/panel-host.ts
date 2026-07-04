@@ -1,6 +1,6 @@
 import {
-  PATCH_PANEL_CLOSE_MESSAGE,
-  PATCH_PANEL_RESIZE_MESSAGE,
+  PANEL_CLOSE_MESSAGE,
+  PANEL_RESIZE_MESSAGE,
 } from "@/ui/tokens";
 
 export function closePalette(): void {
@@ -8,7 +8,7 @@ export function closePalette(): void {
     return;
   }
 
-  window.parent.postMessage({ type: PATCH_PANEL_CLOSE_MESSAGE }, "*");
+  window.parent.postMessage({ type: PANEL_CLOSE_MESSAGE }, "*");
 }
 
 function reportPanelHeight(): void {
@@ -18,7 +18,7 @@ function reportPanelHeight(): void {
 
   const height = Math.ceil(document.documentElement.offsetHeight);
   window.parent.postMessage(
-    { type: PATCH_PANEL_RESIZE_MESSAGE, height },
+    { type: PANEL_RESIZE_MESSAGE, height },
     "*",
   );
 }

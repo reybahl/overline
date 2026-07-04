@@ -16,7 +16,7 @@ export type BackgroundMessage =
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
   | { type: "DELETE_MACRO"; macroId: string }
-  | { type: "PATCH_LOG"; entry: LogEntry };
+  | { type: "DEV_LOG"; entry: LogEntry };
 
 export type BackgroundMessageType = BackgroundMessage["type"];
 
@@ -29,7 +29,7 @@ export type BackgroundSuccessMap = {
   GET_MACROS: { ok: true; macros: Macro[] };
   SAVE_MACRO: { ok: true; macros: Macro[] };
   DELETE_MACRO: { ok: true; macros: Macro[] };
-  PATCH_LOG: { ok: true };
+  DEV_LOG: { ok: true };
 };
 
 export type BackgroundFailure = { ok: false; error: string };
@@ -78,8 +78,8 @@ export type ContentMessage =
       index?: number;
     }
   | { type: "PING" }
-  | { type: "TOGGLE_PATCH_OVERLAY" }
-  | { type: "CLOSE_PATCH_OVERLAY" };
+  | { type: "TOGGLE_OVERLAY" }
+  | { type: "CLOSE_OVERLAY" };
 
 /** Viewport-relative center of an element, in CSS pixels. */
 export type ContentPoint = { x: number; y: number };
