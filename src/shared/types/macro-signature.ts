@@ -51,25 +51,29 @@ export const MacroParamPatchSchema = z.object({
     ),
 });
 
-/** LLM output for post-compile signature inference. */
-export const InferredMacroSignatureSchema = z.discriminatedUnion("standalone", [
-  z.object({
-    standalone: z
-      .literal(true)
-      .describe("Macro needs no runtime user input — use only when intent does NOT mark user-provided values"),
-    params: z.array(MacroParamSchema).length(0),
-    patches: z.array(MacroParamPatchSchema).length(0),
-  }),
-  z.object({
-    standalone: z
-      .literal(false)
-      .describe(
-        "Intent explicitly marks user-provided value(s) — declare params and patch script fields with {{param}} templates",
-      ),
-    params: z.array(MacroParamSchema).min(1),
-    patches: z.array(MacroParamPatchSchema).min(1),
-  }),
-]);
+/** LLM output for post-compile signature inference. Flat object — discriminated unions break generateObject JSON schema. */
+export const InferredMacroSignatureSchema = z.object({
+  standalone: z
+    .boolean()
+    .describe(
+      "false when intent explicitly marks user-provided values; true for fixed macros with no runtime params",
+    ),
+  params: z
+    .array(MacroParamSchema)
+    .describe("Runtime param metadata; empty array when standalone is true"),
+  patches: z
+    .array(MacroParamPatchSchema)
+    .describe("Script field templates with {{param}}; empty array when standalone is true"),
+});
+
+export type InferredMacroSignature = z.infer<typeof InferredMacroSignatureSchema>;
+
+/** Parameterized branch after standalone guard. */
+export type ParameterizedMacroSignature = InferredMacroSignature & {
+  standalone: false;
+  params: [MacroParam, ...MacroParam[]];
+  patches: [MacroParamPatch, ...MacroParamPatch[]];
+};
 
 export type MacroParamName = z.infer<typeof MacroParamNameSchema>;
 export type MacroParamType = z.infer<typeof MacroParamTypeSchema>;
@@ -77,7 +81,6 @@ export type MacroParam = z.infer<typeof MacroParamSchema>;
 export type MacroSignature = z.infer<typeof MacroSignatureSchema>;
 export type MacroScriptPatchField = z.infer<typeof MacroScriptPatchFieldSchema>;
 export type MacroParamPatch = z.infer<typeof MacroParamPatchSchema>;
-export type InferredMacroSignature = z.infer<typeof InferredMacroSignatureSchema>;
 
 export const STANDALONE_MACRO_SIGNATURE: MacroSignature = {
   version: 1,

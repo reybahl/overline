@@ -603,13 +603,13 @@ export async function inferMacroSignature(
     log.info("macro signature inferred", {
       standalone: inferred.standalone,
       paramCount: applied.signature.params.length,
-      patchCount: inferred.standalone ? 0 : inferred.patches.length,
-      ...(inferred.standalone
-        ? {}
-        : {
+      patchCount: inferred.patches.length,
+      ...(applied.signature.params.length > 0
+        ? {
             params: inferred.params.map((param) => param.name),
             patches: inferred.patches,
-          }),
+          }
+        : {}),
     });
     return applied;
   } catch (error) {

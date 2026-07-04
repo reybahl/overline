@@ -6,6 +6,7 @@ import {
   type InferredMacroSignature,
   type MacroScriptPatchField,
   type MacroSignature,
+  type ParameterizedMacroSignature,
 } from "@/shared/types/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import {
@@ -190,7 +191,7 @@ function extractParamNamesFromTemplate(template: string): Set<string> {
 
 function validatePatches(
   script: MacroScript,
-  inferred: Extract<InferredMacroSignature, { standalone: false }>,
+  inferred: ParameterizedMacroSignature,
 ): string | null {
   const paramNames = new Set(inferred.params.map((param) => param.name));
   const patchedFields = new Set<string>();
@@ -254,7 +255,21 @@ export function applyInferredMacroSignature(
     return standaloneResult(script);
   }
 
-  const patchError = validatePatches(script, inferred);
+  if (inferred.params.length === 0 || inferred.patches.length === 0) {
+    log.warn("signature marked parameterized but missing params or patches", {
+      paramCount: inferred.params.length,
+      patchCount: inferred.patches.length,
+    });
+    return standaloneResult(script);
+  }
+
+  const parameterized: ParameterizedMacroSignature = {
+    standalone: false,
+    params: inferred.params as ParameterizedMacroSignature["params"],
+    patches: inferred.patches as ParameterizedMacroSignature["patches"],
+  };
+
+  const patchError = validatePatches(script, parameterized);
   if (patchError) {
     log.warn("signature patches invalid, using standalone", { error: patchError });
     return standaloneResult(script);
@@ -263,7 +278,7 @@ export function applyInferredMacroSignature(
   const patched = MacroScriptSchema.parse(script);
   const steps = [...patched.steps];
 
-  for (const patch of inferred.patches) {
+  for (const patch of parameterized.patches) {
     const step = steps[patch.stepIndex];
     try {
       steps[patch.stepIndex] = writeScriptField(step, patch.field, patch.template);
@@ -283,7 +298,7 @@ export function applyInferredMacroSignature(
   };
   const signature: MacroSignature = {
     version: 1,
-    params: inferred.params,
+    params: parameterized.params,
   };
 
   const signatureError = validateMacroSignature(patchedScript, signature);

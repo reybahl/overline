@@ -170,4 +170,24 @@ describe("applyInferredMacroSignature", () => {
     expect(result.script).toEqual(script);
     expect(result.signature.params).toEqual([]);
   });
+
+  test("applies LLM-style dual patches for PR click", () => {
+    const script = scriptWithSteps([CLICK_STEP]);
+    const result = applyInferredMacroSignature(script, {
+      standalone: false,
+      params: [{ name: "prNumber", label: "PR Number", type: "number" }],
+      patches: [
+        { stepIndex: 0, field: "match.id", template: "issue_{{prNumber}}_link" },
+        { stepIndex: 0, field: "match.hrefContains", template: "/pull/{{prNumber}}" },
+      ],
+    });
+
+    expect(result.signature.params).toHaveLength(1);
+    expect(readScriptField(result.script.steps[0], "match.id")).toBe(
+      "issue_{{prNumber}}_link",
+    );
+    expect(readScriptField(result.script.steps[0], "match.hrefContains")).toBe(
+      "/pull/{{prNumber}}",
+    );
+  });
 });
