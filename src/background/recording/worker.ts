@@ -248,13 +248,20 @@ function normalizeToolOffset(offset: number | undefined): number {
   return Math.max(Math.floor(offset ?? 0), 0);
 }
 
+function truncateLogValue(value: string | undefined, maxLength: number): string {
+  if (!value) {
+    return "";
+  }
+  return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
+}
+
 function summarizeElementsForLog(elements: DomElement[]): Record<string, unknown>[] {
   return elements.slice(0, 5).map((element) => ({
-    selector: element.selector,
+    selector: truncateLogValue(element.selector, 160),
     role: element.role,
     controlKind: element.controlKind,
-    text: element.text,
-    ariaLabel: element.ariaLabel,
+    text: truncateLogValue(element.text, 120),
+    ariaLabel: truncateLogValue(element.ariaLabel, 120),
   }));
 }
 
