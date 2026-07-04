@@ -1,5 +1,11 @@
 # Patch — do not regress
 
+## Tooling
+
+- **Package manager:** [Bun](https://bun.sh). Use `bun install`, `bun run <script>`, `bun add`, etc. — not npm/yarn/pnpm.
+- **Typecheck:** `bun typecheck` (`tsc --noEmit`, strict).
+- **Lint:** `bun lint` (ESLint on `src/`).
+
 Recording → compile → playback. Trust the LLM for recording and compile; enforce correctness with thin deterministic sanitize + playback timing. No site-specific hacks.
 
 ## Pipeline shape
