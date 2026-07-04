@@ -39,13 +39,14 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
 }
 
 async function resolveMacroId(shortcut: string): Promise<string | undefined> {
-  let macroId = shortcutToMacroId.get(normalizeShortcut(shortcut));
-  if (macroId) {
-    return macroId;
+  const key = normalizeShortcut(shortcut);
+  const cached = shortcutToMacroId.get(key);
+  if (cached) {
+    return cached;
   }
 
   await refreshShortcutMap();
-  return shortcutToMacroId.get(normalizeShortcut(shortcut));
+  return shortcutToMacroId.get(key);
 }
 
 function initializeShortcutsContentScript(): void {

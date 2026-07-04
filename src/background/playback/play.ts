@@ -196,7 +196,7 @@ export async function runMacroScript(
         label: step.label,
         error: message,
       });
-      throw new Error(message);
+      throw new Error(message, { cause: error });
     }
   }
 }
