@@ -13,7 +13,7 @@ export async function ensureContentScript(tabId: number): Promise<void> {
 
   const readyAfterInject = await pingContentScript(tabId);
   if (!readyAfterInject) {
-    throw new Error("Failed to start Patch on this tab.");
+    throw new Error("Failed to start Overline on this tab.");
   }
 }
 

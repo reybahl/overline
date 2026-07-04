@@ -24,23 +24,23 @@ async function sendOverlayMessage(
   }
 }
 
-export async function togglePatchOverlay(tabId: number, url?: string): Promise<void> {
+export async function toggleOverlay(tabId: number, url?: string): Promise<void> {
   if (!isInjectableUrl(url)) {
     throw new Error(getRestrictedPageMessage(url));
   }
 
   const response = await sendOverlayMessage(tabId, {
-    type: "TOGGLE_PATCH_OVERLAY",
+    type: "TOGGLE_OVERLAY",
   });
 
   if (!response.ok) {
-    throw new Error(response.error ?? "Failed to open Patch.");
+    throw new Error(response.error ?? "Failed to open Overline.");
   }
 }
 
-export async function closePatchOverlay(tabId: number): Promise<void> {
+export async function closeOverlay(tabId: number): Promise<void> {
   try {
-    await sendOverlayMessage(tabId, { type: "CLOSE_PATCH_OVERLAY" });
+    await sendOverlayMessage(tabId, { type: "CLOSE_OVERLAY" });
   } catch {
     // Overlay host may not be loaded, or overlay already closed.
   }

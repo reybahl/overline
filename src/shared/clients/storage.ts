@@ -10,21 +10,26 @@ import {
 } from "@/shared/types/pending-record";
 
 const STORAGE_KEYS = {
+  macros: "overline:macros",
+  pendingRecord: "overline:pendingRecord",
+} as const;
+
+const LEGACY_STORAGE_KEYS = {
   macros: "patch:macros",
   pendingRecord: "patch:pendingRecord",
 } as const;
 
-export type PatchStorageKey = keyof typeof STORAGE_KEYS;
+export type StorageKey = keyof typeof STORAGE_KEYS;
 
-export type PatchStorageChange = Partial<Record<PatchStorageKey, true>>;
+export type StorageChange = Partial<Record<StorageKey, true>>;
 
-function buildPatchStorageChange(
+function buildStorageChange(
   changes: Record<string, chrome.storage.StorageChange>,
-): PatchStorageChange | null {
-  const change: PatchStorageChange = {};
+): StorageChange | null {
+  const change: StorageChange = {};
 
-  for (const key of Object.keys(STORAGE_KEYS) as PatchStorageKey[]) {
-    if (STORAGE_KEYS[key] in changes) {
+  for (const key of Object.keys(STORAGE_KEYS) as StorageKey[]) {
+    if (STORAGE_KEYS[key] in changes || LEGACY_STORAGE_KEYS[key] in changes) {
       change[key] = true;
     }
   }
@@ -32,9 +37,28 @@ function buildPatchStorageChange(
   return Object.keys(change).length > 0 ? change : null;
 }
 
+async function readWithLegacyMigration<T>(
+  key: StorageKey,
+): Promise<T | undefined> {
+  const currentKey = STORAGE_KEYS[key];
+  const legacyKey = LEGACY_STORAGE_KEYS[key];
+  const result = await chrome.storage.local.get([currentKey, legacyKey]);
+
+  if (result[currentKey] !== undefined) {
+    return result[currentKey] as T;
+  }
+
+  if (result[legacyKey] === undefined) {
+    return undefined;
+  }
+
+  await chrome.storage.local.set({ [currentKey]: result[legacyKey] });
+  await chrome.storage.local.remove(legacyKey);
+  return result[legacyKey] as T;
+}
+
 export async function getMacros(): Promise<Macro[]> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.macros);
-  const raw = result[STORAGE_KEYS.macros];
+  const raw = await readWithLegacyMigration<unknown>("macros");
   const { macros, changed } = migrateMacrosFromStorage(raw ?? []);
 
   if (changed) {
@@ -63,8 +87,7 @@ export async function getShortcutMap(): Promise<Map<string, string>> {
 }
 
 export async function getPendingRecord(): Promise<PendingRecord | null> {
-  const result = await chrome.storage.local.get(STORAGE_KEYS.pendingRecord);
-  const raw = result[STORAGE_KEYS.pendingRecord];
+  const raw = await readWithLegacyMigration<unknown>("pendingRecord");
   if (!raw) {
     return null;
   }
@@ -94,9 +117,9 @@ export async function clearPendingRecord(): Promise<void> {
   await chrome.storage.local.remove(STORAGE_KEYS.pendingRecord);
 }
 
-/** Subscribe to persisted Patch data changes. Returns an unsubscribe function. */
-export function subscribePatchStorage(
-  listener: (change: PatchStorageChange) => void,
+/** Subscribe to persisted extension data changes. Returns an unsubscribe function. */
+export function subscribeStorage(
+  listener: (change: StorageChange) => void,
 ): () => void {
   const handler = (
     changes: Record<string, chrome.storage.StorageChange>,
@@ -106,7 +129,7 @@ export function subscribePatchStorage(
       return;
     }
 
-    const change = buildPatchStorageChange(changes);
+    const change = buildStorageChange(changes);
     if (change) {
       listener(change);
     }

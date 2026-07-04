@@ -1,4 +1,4 @@
-import { patchDevLogsPlugin } from "./vite-plugin-patch-logs";
+import { devLogsPlugin } from "./vite-plugin-dev-logs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -21,7 +21,7 @@ function generateManifest() {
 export default defineConfig({
   plugins: [
     react(),
-    patchDevLogsPlugin(),
+    devLogsPlugin(),
     webExtension({
       manifest: generateManifest,
       disableAutoLaunch: true,

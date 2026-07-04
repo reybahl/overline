@@ -411,10 +411,10 @@ export function captureDom(): DomElement[] {
 
 declare global {
   interface Window {
-    __patchCaptureDom?: () => DomElement[];
-    __patchIndexInteractives?: () => DomElement[];
+    __olCaptureDom?: () => DomElement[];
+    __olIndexInteractives?: () => DomElement[];
   }
 }
 
-window.__patchCaptureDom = captureDom;
-window.__patchIndexInteractives = indexInteractives;
+window.__olCaptureDom = captureDom;
+window.__olIndexInteractives = indexInteractives;

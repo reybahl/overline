@@ -1,6 +1,6 @@
 import "@/ui/index.css";
 
-import { subscribePatchStorage } from "@/shared/clients/storage";
+import { subscribeStorage } from "@/shared/clients/storage";
 import { mountLucideIcon } from "@/ui/mount-icon";
 import { Braces, Plus, Settings } from "lucide";
 import { paletteActions } from "@/window/palette/actions";
@@ -135,7 +135,7 @@ void refreshMacros()
     setStatus(message, true);
   });
 
-subscribePatchStorage((change) => {
+subscribeStorage((change) => {
   if (change.macros) {
     void refreshMacros().catch((error: unknown) => {
       const message =

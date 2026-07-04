@@ -3,16 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Patch</title>
+    <title>Overline</title>
   </head>
   <body>
-    <main class="patch-shell patch-shell--palette">
-      <div id="palette-panel" class="patch-palette">
-        <div class="patch-palette__search-wrap">
+    <main class="ui-shell ui-shell--palette">
+      <div id="palette-panel" class="ui-palette">
+        <div class="ui-palette__search-wrap">
           <input
             id="search-input"
             type="search"
-            class="patch-palette__search"
+            class="ui-palette__search"
             placeholder="Search macros…"
             autocomplete="off"
             spellcheck="false"
@@ -21,30 +21,30 @@
           />
         </div>
 
-        <div class="patch-palette__list-wrap">
-          <ul id="macro-list" class="patch-palette__list" role="listbox" aria-label="Macros"></ul>
-          <p id="macro-empty" class="patch-palette__empty patch-text-muted" hidden>
+        <div class="ui-palette__list-wrap">
+          <ul id="macro-list" class="ui-palette__list" role="listbox" aria-label="Macros"></ul>
+          <p id="macro-empty" class="ui-palette__empty ui-text-muted" hidden>
             No macros found
           </p>
         </div>
 
-        <footer class="patch-palette-footer">
-          <div class="patch-palette-footer__bar">
-            <div class="patch-palette-footer__leading">
+        <footer class="ui-palette-footer">
+          <div class="ui-palette-footer__bar">
+            <div class="ui-palette-footer__leading">
               <button
                 id="capture-btn"
                 type="button"
-                class="patch-btn patch-btn--icon"
+                class="ui-btn ui-btn--icon"
                 title="Capture DOM"
                 aria-label="Capture DOM"
               ></button>
-              <button id="cancel-record-btn" type="button" class="patch-btn patch-btn--sm" hidden>
+              <button id="cancel-record-btn" type="button" class="ui-btn ui-btn--sm" hidden>
                 Cancel recording
               </button>
               <button
                 type="button"
                 id="options-link"
-                class="patch-btn patch-btn--icon"
+                class="ui-btn ui-btn--icon"
                 title="Manage macros"
                 aria-label="Manage macros"
               ></button>
@@ -52,7 +52,7 @@
             <input
               id="intent-input"
               type="text"
-              class="patch-palette__intent"
+              class="ui-palette__intent"
               placeholder="Describe what to record…"
               autocomplete="off"
               spellcheck="false"
@@ -61,7 +61,7 @@
             <button
               id="generate-btn"
               type="button"
-              class="patch-btn patch-btn--icon patch-btn--primary"
+              class="ui-btn ui-btn--icon ui-btn--primary"
               title="Generate"
               aria-label="Generate"
             ></button>
@@ -69,22 +69,22 @@
         </footer>
       </div>
 
-      <p id="status" class="patch-status" role="status" aria-live="polite"></p>
+      <p id="status" class="ui-status" role="status" aria-live="polite"></p>
 
-      <section id="review-panel" class="patch-section" hidden>
-        <h2 class="patch-section__title">Review</h2>
-        <p id="review-summary" class="patch-text-muted"></p>
-        <ol id="review-steps" class="patch-list"></ol>
-        <pre id="review-script-json" class="patch-code" hidden></pre>
-        <div class="patch-section__actions">
-          <button id="discard-btn" type="button" class="patch-btn">Discard</button>
-          <button id="confirm-save-btn" type="button" class="patch-btn patch-btn--primary">
+      <section id="review-panel" class="ui-section" hidden>
+        <h2 class="ui-section__title">Review</h2>
+        <p id="review-summary" class="ui-text-muted"></p>
+        <ol id="review-steps" class="ui-list"></ol>
+        <pre id="review-script-json" class="ui-code" hidden></pre>
+        <div class="ui-section__actions">
+          <button id="discard-btn" type="button" class="ui-btn">Discard</button>
+          <button id="confirm-save-btn" type="button" class="ui-btn ui-btn--primary">
             Save
           </button>
         </div>
       </section>
 
-      <pre id="capture-output" class="patch-code" hidden></pre>
+      <pre id="capture-output" class="ui-code" hidden></pre>
     </main>
 
     <script type="module" src="./index.ts"></script>

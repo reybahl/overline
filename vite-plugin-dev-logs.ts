@@ -14,15 +14,15 @@ function formatTerminalLine(entry: {
     entry.data && Object.keys(entry.data).length > 0
       ? ` ${JSON.stringify(entry.data)}`
       : "";
-  return `[Patch:${ctx}] ${level}${run} ${entry.msg ?? ""}${data}`;
+  return `[Overline:${ctx}] ${level}${run} ${entry.msg ?? ""}${data}`;
 }
 
-export function patchDevLogsPlugin(): Plugin {
+export function devLogsPlugin(): Plugin {
   return {
-    name: "patch-dev-logs",
+    name: "overline-dev-logs",
     apply: "serve",
     configureServer(server) {
-      server.middlewares.use("/__patch/log", (req, res, next) => {
+      server.middlewares.use("/__dev/log", (req, res, next) => {
         if (req.method !== "POST") {
           next();
           return;

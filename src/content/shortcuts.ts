@@ -1,7 +1,7 @@
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import {
   getShortcutMap,
-  subscribePatchStorage,
+  subscribeStorage,
 } from "@/shared/clients/storage";
 import {
   eventToShortcut,
@@ -11,7 +11,7 @@ import {
 
 declare global {
   interface Window {
-    __patchShortcutsLoaded?: boolean;
+    __olShortcutsLoaded?: boolean;
   }
 }
 
@@ -50,10 +50,10 @@ async function resolveMacroId(shortcut: string): Promise<string | undefined> {
 }
 
 function initializeShortcutsContentScript(): void {
-  if (window.__patchShortcutsLoaded) {
+  if (window.__olShortcutsLoaded) {
     return;
   }
-  window.__patchShortcutsLoaded = true;
+  window.__olShortcutsLoaded = true;
 
   void refreshShortcutMap().then(() => {
     document.addEventListener(
@@ -84,7 +84,7 @@ function initializeShortcutsContentScript(): void {
     );
   });
 
-  subscribePatchStorage((change) => {
+  subscribeStorage((change) => {
     if (change.macros) {
       void refreshShortcutMap();
     }

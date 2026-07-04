@@ -1,4 +1,4 @@
-import { closePatchOverlay } from "@/background/overlay";
+import { closeOverlay } from "@/background/overlay";
 import { getTabUrl } from "@/background/capture";
 import {
   createCdpSession,
@@ -213,7 +213,7 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
 
   const cdpSession = createCdpSession(tabId);
   try {
-    await closePatchOverlay(tabId);
+    await closeOverlay(tabId);
     await focusTabForPlayback(tabId);
 
     if (macro.script) {

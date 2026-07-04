@@ -32,11 +32,11 @@ async function captureDomOnActiveTab(): Promise<{
     func: () => {
       const hooks = (
         globalThis as {
-          __patchIndexInteractives?: () => DomElement[];
-          __patchCaptureDom?: () => DomElement[];
+          __olIndexInteractives?: () => DomElement[];
+          __olCaptureDom?: () => DomElement[];
         }
       );
-      const capture = hooks.__patchIndexInteractives ?? hooks.__patchCaptureDom;
+      const capture = hooks.__olIndexInteractives ?? hooks.__olCaptureDom;
       return capture?.() ?? [];
     },
   });
