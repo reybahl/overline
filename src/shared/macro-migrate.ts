@@ -78,19 +78,6 @@ export function migrateMacroRaw(
     }
   }
 
-  if ("inputSchema" in copy && !("signature" in copy)) {
-    const legacy = copy.inputSchema;
-    if (legacy && typeof legacy === "object") {
-      const legacyRecord = legacy as { version?: unknown; inputs?: unknown };
-      copy.signature = {
-        version: 1,
-        params: Array.isArray(legacyRecord.inputs) ? legacyRecord.inputs : [],
-      };
-    }
-    delete copy.inputSchema;
-    changed = true;
-  }
-
   const parsed = MacroSchema.safeParse(copy);
   if (!parsed.success) {
     return { macro: null, changed: true };
