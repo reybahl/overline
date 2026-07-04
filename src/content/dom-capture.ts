@@ -2,6 +2,7 @@ import { getAccessibleName } from "@/content/accessible-name";
 import { isVisible } from "@/content/visibility";
 import { INTERACTIVE_SELECTOR } from "@/shared/interactive-selector";
 import { isStableId } from "@/shared/stable-id";
+import type { DomControlKind, DomElement } from "@/shared/types/dom";
 
 const INTERACTIVE_TAGS = new Set([
   "button",
@@ -26,26 +27,7 @@ const INTERACTIVE_ROLES = new Set([
   "combobox",
 ]);
 
-const MAX_ELEMENTS = 80;
-
-export type DomElement = {
-  tag: string;
-  role: string;
-  text: string;
-  selector: string;
-  ariaLabel: string;
-  placeholder: string;
-  idStable: boolean;
-  controlKind?: string;
-  expanded?: boolean;
-  hasPopup?: string;
-  /** aria-selected — true once a tab/option is active. */
-  selected?: boolean;
-  /** aria-pressed — true for an engaged toggle button. */
-  pressed?: boolean;
-  /** checked state for checkboxes/radios/aria-checked. */
-  checked?: boolean;
-};
+const DEFAULT_CONTEXT_LIMIT = 25;
 
 function escapeAttr(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -83,12 +65,16 @@ function hasMeaningfulLabel(
   ariaLabel: string,
   placeholder: string,
   fieldValue = "",
+  title = "",
+  href = "",
 ): boolean {
   return (
     text.length > 0 ||
     ariaLabel.length > 0 ||
     placeholder.length > 0 ||
-    fieldValue.length > 0
+    fieldValue.length > 0 ||
+    title.length > 0 ||
+    href.length > 0
   );
 }
 
@@ -98,6 +84,28 @@ function getStableHref(anchor: HTMLAnchorElement): string | null {
     return null;
   }
   return href;
+}
+
+function normalizeHref(href: string): string {
+  if (href.startsWith("#")) {
+    return href;
+  }
+
+  try {
+    const resolved = new URL(href, window.location.href);
+    return resolved.pathname + resolved.search;
+  } catch {
+    return href;
+  }
+}
+
+function readHref(el: Element): string | undefined {
+  if (!(el instanceof HTMLAnchorElement)) {
+    return undefined;
+  }
+
+  const href = getStableHref(el);
+  return href ? normalizeHref(href) : undefined;
 }
 
 function getRole(el: Element): string {
@@ -136,7 +144,10 @@ function getRole(el: Element): string {
   return tag;
 }
 
-function inferControlKind(el: Element, role: string): string | undefined {
+function inferControlKind(
+  el: Element,
+  role: string,
+): DomControlKind | undefined {
   const hasPopup = el.getAttribute("aria-haspopup");
   const expanded = el.getAttribute("aria-expanded");
 
@@ -226,7 +237,33 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
     return { selector: `#${CSS.escape(el.id)}`, idStable: false };
   }
 
-  return null;
+  const pathSelector = buildPathSelector(el);
+  return pathSelector ? { selector: pathSelector, idStable: false } : null;
+}
+
+function buildPathSelector(el: Element): string | null {
+  const parts: string[] = [];
+  let current: HTMLElement | null = el instanceof HTMLElement ? el : null;
+
+  while (current && current !== document.documentElement) {
+    const parent: HTMLElement | null = current.parentElement;
+    if (!parent) {
+      return null;
+    }
+
+    const tag = current.tagName.toLowerCase();
+    const sameTagSiblings: Element[] = Array.from(parent.children).filter(
+      (child) => child.tagName.toLowerCase() === tag,
+    );
+    const index = sameTagSiblings.indexOf(current) + 1;
+    parts.unshift(
+      sameTagSiblings.length > 1 ? `${tag}:nth-of-type(${index})` : tag,
+    );
+
+    current = parent;
+  }
+
+  return parts.length > 0 ? parts.join(" > ") : null;
 }
 
 function readAriaBoolean(el: Element, attr: string): boolean | undefined {
@@ -267,8 +304,12 @@ function readChecked(el: Element): boolean | undefined {
   return readAriaBoolean(el, "aria-checked");
 }
 
-function isToggleElement(el: Element): boolean {
-  return readPressed(el) !== undefined || readChecked(el) !== undefined;
+function isToggleEntry(element: DomElement): boolean {
+  return element.pressed !== undefined || element.checked !== undefined;
+}
+
+function isExpandedContextEntry(element: DomElement): boolean {
+  return element.expanded === true || element.controlKind === "menu-item";
 }
 
 function buildDomEntry(element: Element): DomElement | null {
@@ -287,8 +328,10 @@ function buildDomEntry(element: Element): DomElement | null {
   const text = getText(element) || fieldValue.slice(0, 200);
   const ariaLabel = getAccessibleName(element);
   const placeholder = getPlaceholder(element);
+  const href = readHref(element) ?? "";
+  const title = element.getAttribute("title")?.trim() ?? "";
 
-  if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue)) {
+  if (!hasMeaningfulLabel(text, ariaLabel, placeholder, fieldValue, title, href)) {
     return null;
   }
 
@@ -308,6 +351,8 @@ function buildDomEntry(element: Element): DomElement | null {
     placeholder,
     idStable: built.idStable,
     ...(controlKind ? { controlKind } : {}),
+    ...(href ? { href } : {}),
+    ...(title ? { title } : {}),
     ...(expanded !== undefined ? { expanded } : {}),
     ...(hasPopup ? { hasPopup } : {}),
     ...(selected !== undefined ? { selected } : {}),
@@ -316,35 +361,11 @@ function buildDomEntry(element: Element): DomElement | null {
   };
 }
 
-export function captureDom(): DomElement[] {
+export function indexInteractives(): DomElement[] {
   const elements = document.querySelectorAll(INTERACTIVE_SELECTOR);
-  const toggles: Element[] = [];
-  const others: Element[] = [];
-
-  for (const element of elements) {
-    const role = getRole(element);
-    if (!isInteractiveElement(element, role) || isHidden(element)) {
-      continue;
-    }
-
-    if (!buildSelector(element)) {
-      continue;
-    }
-
-    if (isToggleElement(element)) {
-      toggles.push(element);
-    } else {
-      others.push(element);
-    }
-  }
-
   const results: DomElement[] = [];
 
-  for (const element of [...toggles, ...others]) {
-    if (results.length >= MAX_ELEMENTS) {
-      break;
-    }
-
+  for (const element of elements) {
     const entry = buildDomEntry(element);
     if (entry) {
       results.push(entry);
@@ -354,10 +375,46 @@ export function captureDom(): DomElement[] {
   return results;
 }
 
+export function orderInteractivesForBrowse(
+  elements: DomElement[],
+  options?: { toggleFirst?: boolean },
+): DomElement[] {
+  if (!options?.toggleFirst) {
+    return elements;
+  }
+
+  return [...elements].sort((a, b) => {
+    const toggleDelta = Number(isToggleEntry(b)) - Number(isToggleEntry(a));
+    return toggleDelta;
+  });
+}
+
+export function captureDom(): DomElement[] {
+  const elements = indexInteractives();
+  const selected = new Set<number>();
+
+  elements.forEach((element, index) => {
+    if (isToggleEntry(element) || isExpandedContextEntry(element)) {
+      selected.add(index);
+    }
+  });
+
+  for (let index = 0; index < elements.length; index += 1) {
+    if (selected.size >= DEFAULT_CONTEXT_LIMIT) {
+      break;
+    }
+    selected.add(index);
+  }
+
+  return elements.filter((_, index) => selected.has(index));
+}
+
 declare global {
   interface Window {
     __patchCaptureDom?: () => DomElement[];
+    __patchIndexInteractives?: () => DomElement[];
   }
 }
 
 window.__patchCaptureDom = captureDom;
+window.__patchIndexInteractives = indexInteractives;

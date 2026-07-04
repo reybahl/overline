@@ -1,4 +1,10 @@
-import type { DomElement } from "@/content/dom-capture";
+import { sendContentMessage } from "@/background/inject";
+import type {
+  DomElement,
+  ListInteractivesOptions,
+  ListInteractivesResult,
+  SearchInteractivesOptions,
+} from "@/shared/types/dom";
 
 const DOM_CAPTURE_SCRIPT = "src/content/dom-capture.js";
 
@@ -19,6 +25,45 @@ export async function captureDomInTab(tabId: number): Promise<DomElement[]> {
   });
 
   return (result?.result ?? []) as DomElement[];
+}
+
+export async function searchInteractivesInTab(
+  tabId: number,
+  query: string,
+  options?: SearchInteractivesOptions,
+): Promise<DomElement[]> {
+  const response = await sendContentMessage(tabId, {
+    type: "SEARCH_INTERACTIVES",
+    query,
+    options,
+  });
+
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+
+  return response.elements ?? [];
+}
+
+export async function listInteractivesInTab(
+  tabId: number,
+  options?: ListInteractivesOptions,
+): Promise<ListInteractivesResult> {
+  const response = await sendContentMessage(tabId, {
+    type: "LIST_INTERACTIVES",
+    options,
+  });
+
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+
+  return {
+    elements: response.elements ?? [],
+    total: response.total ?? 0,
+    offset: response.offset ?? options?.offset ?? 0,
+    limit: response.limit ?? options?.limit ?? 20,
+  };
 }
 
 export async function getTabUrl(tabId: number): Promise<string> {

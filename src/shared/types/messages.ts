@@ -2,6 +2,11 @@ import type { LogEntry } from "@/shared/types/log";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ScriptStep, ElementMatch } from "@/shared/types/script";
 import type { PendingRecord } from "@/shared/types/pending-record";
+import type {
+  DomElement,
+  ListInteractivesOptions,
+  SearchInteractivesOptions,
+} from "@/shared/types/dom";
 
 export type BackgroundMessage =
   | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
@@ -59,6 +64,15 @@ export type ContentMessage =
   | { type: "EXECUTE_STEPS"; steps: MacroStep[] }
   | { type: "EXECUTE_SCRIPT"; steps: ScriptStep[] }
   | {
+      type: "SEARCH_INTERACTIVES";
+      query: string;
+      options?: SearchInteractivesOptions;
+    }
+  | {
+      type: "LIST_INTERACTIVES";
+      options?: ListInteractivesOptions;
+    }
+  | {
       type: "RESOLVE_CLICK_TARGET";
       match: ElementMatch;
       index?: number;
@@ -75,5 +89,9 @@ export type ContentResponse =
       ok: true;
       point?: ContentPoint;
       matches?: (ElementMatch | null)[];
+      elements?: DomElement[];
+      total?: number;
+      offset?: number;
+      limit?: number;
     }
   | { ok: false; error: string };

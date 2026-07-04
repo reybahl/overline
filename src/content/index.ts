@@ -1,5 +1,9 @@
 import { executeSteps } from "@/content/executor";
 import { executeScript, resolveClickPoint } from "@/content/script-executor";
+import {
+  listInteractives,
+  searchInteractives,
+} from "@/content/search-interactives";
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import { MacroScriptSchema } from "@/shared/types/script";
 
@@ -42,6 +46,17 @@ function initializeContentScript(): void {
               sendResponse({ ok: false, error: errorMessage });
             });
           return true;
+        case "SEARCH_INTERACTIVES":
+          sendResponse({
+            ok: true,
+            elements: searchInteractives(message.query, message.options),
+          });
+          return false;
+        case "LIST_INTERACTIVES": {
+          const result = listInteractives(message.options);
+          sendResponse({ ok: true, ...result });
+          return false;
+        }
         case "EXECUTE_SCRIPT": {
           const script = MacroScriptSchema.parse({
             version: 1,
