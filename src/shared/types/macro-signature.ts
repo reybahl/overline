@@ -68,13 +68,6 @@ export const InferredMacroSignatureSchema = z.object({
 
 export type InferredMacroSignature = z.infer<typeof InferredMacroSignatureSchema>;
 
-/** Parameterized branch after standalone guard. */
-export type ParameterizedMacroSignature = InferredMacroSignature & {
-  standalone: false;
-  params: [MacroParam, ...MacroParam[]];
-  patches: [MacroParamPatch, ...MacroParamPatch[]];
-};
-
 export type MacroParamName = z.infer<typeof MacroParamNameSchema>;
 export type MacroParamType = z.infer<typeof MacroParamTypeSchema>;
 export type MacroParam = z.infer<typeof MacroParamSchema>;
