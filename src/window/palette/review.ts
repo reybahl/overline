@@ -1,5 +1,5 @@
 import type { Macro, MacroStep } from "@/shared/types/macro";
-import { macroNeedsInputs } from "@/shared/macro-input";
+import { macroNeedsParams } from "@/shared/macro-signature";
 import { formatScriptStep } from "@/shared/script-format";
 import {
   reviewPanelEl,
@@ -35,12 +35,12 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
         macro.script.steps.length === 1 ? "" : "s"
       }`
     : "";
-  const inputSummary = macroNeedsInputs(macro)
-    ? ` · ${macro.inputSchema!.inputs.length} runtime input${
-        macro.inputSchema!.inputs.length === 1 ? "" : "s"
+  const paramSummary = macroNeedsParams(macro)
+    ? ` · ${macro.signature!.params.length} param${
+        macro.signature!.params.length === 1 ? "" : "s"
       }`
     : "";
-  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${inputSummary}${scopeSummary}${
+  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${paramSummary}${scopeSummary}${
     reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""
   }`;
 
@@ -52,16 +52,16 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
     reviewStepsEl.appendChild(intentItem);
   }
 
-  if (macroNeedsInputs(macro)) {
-    const inputsLabel = document.createElement("li");
-    inputsLabel.textContent = "Runtime inputs:";
-    reviewStepsEl.appendChild(inputsLabel);
+  if (macroNeedsParams(macro)) {
+    const paramsLabel = document.createElement("li");
+    paramsLabel.textContent = "Signature (runtime params):";
+    reviewStepsEl.appendChild(paramsLabel);
 
     reviewStepsEl.append(
-      ...macro.inputSchema!.inputs.map((input) => {
+      ...macro.signature!.params.map((param) => {
         const item = document.createElement("li");
-        const detail = input.description ? ` — ${input.description}` : "";
-        item.textContent = `${input.label} (${input.type}) · {{${input.name}}}${detail}`;
+        const detail = param.description ? ` — ${param.description}` : "";
+        item.textContent = `${param.label} (${param.type}) · {{${param.name}}}${detail}`;
         return item;
       }),
     );
@@ -69,7 +69,7 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
 
   if (macro.script) {
     const scriptLabel = document.createElement("li");
-    scriptLabel.textContent = "Compiled script (runs on play):";
+    scriptLabel.textContent = "Compiled script (template body):";
     reviewStepsEl.appendChild(scriptLabel);
 
     reviewStepsEl.append(

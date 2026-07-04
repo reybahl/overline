@@ -1,7 +1,7 @@
 import { generateObject, generateText, Output, tool } from "ai";
 import { z } from "zod";
 
-import { applyInferredMacroInputs } from "@/shared/macro-input";
+import { applyInferredMacroSignature } from "@/shared/macro-signature";
 import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
@@ -29,10 +29,10 @@ import {
   type RunScope,
 } from "@/shared/types/macro";
 import {
-  InferredMacroInputsSchema,
-  STANDALONE_MACRO_INPUT_SCHEMA,
-  type MacroInputSchema,
-} from "@/shared/types/macro-input";
+  InferredMacroSignatureSchema,
+  STANDALONE_MACRO_SIGNATURE,
+  type MacroSignature,
+} from "@/shared/types/macro-signature";
 import type { MacroScript } from "@/shared/types/script";
 
 const log = createLogger("llm");
@@ -99,8 +99,9 @@ const RECORD_AGENT_RULES = [
   "- Never set done: true before recording at least one action",
   "- If a required control is missing, use waitFor — do not mark done or substitute unrelated controls",
   "- Take the fewest steps — do not click jump/anchor links to scroll to a control that is already in the DOM",
-  "- When the intent marks a value the user will provide at run time (e.g. \"X is something I'll type each run\"), use a realistic example from the page for fill/type values — never use {{placeholders}} in step values during recording",
-  "- Pick demo fill values that complete the flow (search returns results, PR exists, etc.) — e.g. repo name from the URL or visible page content",
+  "- When the intent marks a value the user will provide at run time (e.g. \"PR #X, I'll input X at playback\"), use a realistic example from the page — a visible PR number, repo name, search term, etc.",
+  "- Never use {{placeholders}} in recorded step values or targets — always concrete demo literals so the flow completes",
+  "- Pick demo values that complete the flow (search returns results, PR exists, etc.)",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -188,61 +189,75 @@ function buildCompileScriptPrompt(
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
     "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
-    "- Keep fill values as the recorded demo literals — runtime parameterization is applied in a later pass",
+    "- Keep demo literals in fill values and in match fields that correspond to user-provided intent slots (PR numbers, search terms, etc.) — do not replace them with open regexes like /pull/\\\\d+",
+    "- Runtime parameterization ({{param}} templates) is applied in a later pass",
   ].join("\n");
 }
 
-function summarizeScriptStepsForInputInference(script: MacroScript): Record<string, unknown>[] {
-  return script.steps.map((step, stepIndex) => ({
-    stepIndex,
-    type: step.type,
-    ...(step.type === "fill" ? { value: step.value } : {}),
-    ...(step.label ? { label: step.label } : {}),
-  }));
+function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {
+  return script.steps.map((step, stepIndex) => {
+    const base = { stepIndex, type: step.type, ...(step.label ? { label: step.label } : {}) };
+
+    switch (step.type) {
+      case "fill":
+        return { ...base, value: step.value, match: step.match };
+      case "click":
+        return { ...base, match: step.match, ...(step.index ? { index: step.index } : {}) };
+      case "waitFor":
+        return { ...base, match: step.match };
+      case "wait":
+        return { ...base, ms: step.ms };
+      default: {
+        const _exhaustive: never = step;
+        return { stepIndex, type: String(_exhaustive) };
+      }
+    }
+  });
 }
 
-function buildMacroInputSchemaPrompt(
+function buildMacroSignaturePrompt(
   intent: string,
   script: MacroScript,
   demoSteps: MacroStep[],
 ): string {
-  const demoFills = buildDemoScriptForCompile(demoSteps).filter(
-    (step) => step.type === "fill",
-  );
+  const demoScript = buildDemoScriptForCompile(demoSteps);
 
   return [
-    "Decide whether this macro needs runtime user inputs for fill steps.",
+    "Decide whether this macro is a standalone script or a parameterized function with runtime user inputs.",
     "",
-    "CRITICAL: Only declare inputs when the user's intent EXPLICITLY marks a value they will provide at run time.",
+    "CRITICAL: Only declare params when the user's intent EXPLICITLY marks a value they will provide at run time.",
     "If unsure, return standalone: true. Never infer parameters from recorded demo values alone.",
     "",
     `Intent: "${intent}"`,
     "",
-    "Compiled script steps (use stepIndex for fillBindings):",
-    JSON.stringify(summarizeScriptStepsForInputInference(script), null, 2),
+    "Compiled script (use stepIndex + field for patches):",
+    JSON.stringify(summarizeScriptForSignature(script), null, 2),
     "",
-    "Demo fill steps (recorded literals during the session):",
-    JSON.stringify(demoFills, null, 2),
+    "Demo steps (recorded literals + recordedMatch):",
+    JSON.stringify(demoScript, null, 2),
     "",
-    "Return standalone, inputs, and fillBindings.",
+    "Return standalone, params, and patches.",
     "",
-    "Create inputs ONLY when intent clearly signals user-provided values, e.g.:",
-    '- "search for X where X is something I\'ll type each run"',
-    '- "go to PR #N — I\'ll enter N every time"',
-    '- "filter by TERM (user provides)"',
+    "Create params ONLY when intent clearly signals user-provided values, e.g.:",
+    '- "PR #X, I will input X at playback"',
+    '- "search for TERM where TERM is something I\'ll type each run"',
+    '- "filter by N (user provides)"',
     "",
-    "Do NOT create inputs when:",
+    "Do NOT create params when:",
     "- Intent describes a fixed action with no user-supplied slot",
-    "- A fill happened during recording but intent never said the user supplies that value",
+    "- A demo literal appears but intent never said the user supplies it",
     "- You would have to guess what the variable is",
     "",
     "When standalone: false:",
-    "- inputs: name (camelCase), label (palette field title), optional description, type string|number",
-    "- fillBindings: stepIndex must target a fill step in the compiled script; inputName must match an inputs entry",
-    "- Patch target: fill.value becomes {{inputName}} at playback — only bind fills the intent marked as user-provided",
+    "- params: name (camelCase), label (prompt title), optional description, type string|number",
+    "- patches: replace a templatable script field with a template containing {{paramName}}",
+    "- Allowed patch fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
+    "- template is the full new field value, e.g. \"/pull/{{prNumber}}\" or \"{{searchTerm}}\" or \"issue_{{prNumber}}_link\"",
+    "- Prefer href/text fields over brittle ids when the demo literal appears there",
+    "- Bind only slots the intent marked as user-provided; correlate with demo recordedMatch / fill value",
     "",
-    "When standalone: true: return empty inputs and fillBindings arrays.",
-    "If intent asks for an input but the compiled script has no fill step to bind, return standalone: true.",
+    "When standalone: true: return empty params and patches arrays.",
+    "If intent asks for a param but no compiled field can be templated for the demo literal, return standalone: true.",
   ].join("\n");
 }
 
@@ -531,33 +546,34 @@ export async function inferRunScope(
   return generateObjectWithModels(RunScopeSchema, prompt);
 }
 
-export type InferredMacroInputResult = {
+export type InferredMacroSignatureResult = {
   script: MacroScript;
-  inputSchema: MacroInputSchema;
+  signature: MacroSignature;
 };
 
-export async function inferMacroInputSchema(
+export async function inferMacroSignature(
   intent: string,
   script: MacroScript,
   demoSteps: MacroStep[],
-): Promise<InferredMacroInputResult> {
-  const prompt = buildMacroInputSchemaPrompt(intent, script, demoSteps);
+): Promise<InferredMacroSignatureResult> {
+  const prompt = buildMacroSignaturePrompt(intent, script, demoSteps);
 
   try {
     const inferred = await generateObjectWithModels(
-      InferredMacroInputsSchema,
+      InferredMacroSignatureSchema,
       prompt,
     );
-    const applied = applyInferredMacroInputs(script, inferred);
-    log.info("input schema inferred", {
+    const applied = applyInferredMacroSignature(script, inferred);
+    log.info("macro signature inferred", {
       standalone: inferred.standalone,
-      inputCount: applied.inputSchema.inputs.length,
+      paramCount: applied.signature.params.length,
+      patchCount: inferred.standalone ? 0 : inferred.patches.length,
     });
     return applied;
   } catch (error) {
-    log.warn("input schema inference failed, using standalone", {
+    log.warn("macro signature inference failed, using standalone", {
       error: error instanceof Error ? error.message : String(error),
     });
-    return { script, inputSchema: STANDALONE_MACRO_INPUT_SCHEMA };
+    return { script, signature: STANDALONE_MACRO_SIGNATURE };
   }
 }
