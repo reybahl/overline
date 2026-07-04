@@ -1,5 +1,7 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
+import { macroNeedsParams, validateMacroParamValues } from "@/shared/macro-signature";
+import type { MacroParamValues } from "@/shared/macro-signature";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
 import { cancelPendingRecordSession } from "@/background/recording/recording-session";
@@ -39,6 +41,7 @@ async function requireInjectableActiveTab(): Promise<chrome.tabs.Tab> {
 async function runMacroById(
   macroId: string,
   tabId?: number,
+  params?: MacroParamValues,
 ): Promise<void> {
   const tab =
     tabId !== undefined
@@ -65,7 +68,11 @@ async function runMacroById(
     return;
   }
 
-  await runMacro(resolvedTabId, macro);
+  if (macroNeedsParams(macro) && !params) {
+    throw new Error(`"${macro.name}" requires inputs — run it from the palette.`);
+  }
+
+  await runMacro(resolvedTabId, macro, { params });
   log.info("ran macro via shortcut", { macro: macro.name });
 }
 
@@ -141,7 +148,17 @@ export const backgroundHandlers = {
       throw new Error(`"${macro.name}" does not run on this page.`);
     }
 
-    await runMacro(message.tabId, macro);
+    if (macroNeedsParams(macro)) {
+      if (!message.params) {
+        throw new Error(`"${macro.name}" requires inputs.`);
+      }
+      const validationError = validateMacroParamValues(macro.signature!, message.params);
+      if (validationError) {
+        throw new Error(validationError);
+      }
+    }
+
+    await runMacro(message.tabId, macro, { params: message.params });
     return { ok: true as const };
   },
 

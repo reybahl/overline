@@ -12,6 +12,8 @@ import { sendContentMessage } from "@/background/inject";
 import { settleAfterStep, waitForUrlChangeAfterClick, STEP_WAIT_FOR_MS } from "@/background/playback/tab-settle";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import { clickMatchLikelyNavigates, elementMatchesEqual } from "@/shared/script-match";
+import { instantiateMacroScript, macroNeedsParams } from "@/shared/macro-signature";
+import type { MacroParamValues } from "@/shared/macro-signature";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ElementMatch, MacroScript, ScriptStep } from "@/shared/types/script";
 
@@ -201,14 +203,36 @@ export async function runMacroScript(
   }
 }
 
-export async function runMacro(tabId: number, macro: Macro): Promise<void> {
+export type RunMacroOptions = {
+  params?: MacroParamValues;
+};
+
+export async function runMacro(
+  tabId: number,
+  macro: Macro,
+  options?: RunMacroOptions,
+): Promise<void> {
   const run = newRunId();
+  const script = (() => {
+    if (!macro.script) {
+      return undefined;
+    }
+    if (macroNeedsParams(macro)) {
+      if (!options?.params) {
+        throw new Error(`"${macro.name}" requires inputs.`);
+      }
+      return instantiateMacroScript(macro.script, options.params);
+    }
+    return macro.script;
+  })();
+
   log.info("run started", {
     run,
     tabId,
     macroId: macro.id,
     macroName: macro.name,
-    mode: macro.script ? "script" : "steps",
+    mode: script ? "script" : "steps",
+    parameterized: macroNeedsParams(macro),
   });
 
   const cdpSession = createCdpSession(tabId);
@@ -216,8 +240,8 @@ export async function runMacro(tabId: number, macro: Macro): Promise<void> {
     await closeOverlay(tabId);
     await focusTabForPlayback(tabId);
 
-    if (macro.script) {
-      await runMacroScript(tabId, macro.script, cdpSession);
+    if (script) {
+      await runMacroScript(tabId, script, cdpSession);
     } else {
       await runMacroSteps(tabId, macro.steps);
     }

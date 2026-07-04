@@ -85,6 +85,20 @@
       </section>
 
       <pre id="capture-output" class="ui-code" hidden></pre>
+
+      <dialog id="param-prompt" class="ui-param-prompt">
+        <form id="param-prompt-form" class="ui-param-prompt__form" method="dialog">
+          <h2 id="param-prompt-title" class="ui-param-prompt__title"></h2>
+          <div id="param-prompt-fields" class="ui-param-prompt__fields"></div>
+          <p id="param-prompt-error" class="ui-param-prompt__error" hidden></p>
+          <div class="ui-param-prompt__actions">
+            <button id="param-prompt-cancel" type="button" class="ui-btn">
+              Cancel
+            </button>
+            <button type="submit" class="ui-btn ui-btn--primary">Run</button>
+          </div>
+        </form>
+      </dialog>
     </main>
 
     <script type="module" src="./index.ts"></script>

@@ -1,3 +1,4 @@
+import { macroNeedsParams } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
@@ -10,6 +11,7 @@ import {
 import { mountLucideIcon } from "@/ui/mount-icon";
 import { Plus } from "lucide";
 import { paletteActions } from "@/window/palette/actions";
+import { promptMacroParams } from "@/window/palette/param-prompt";
 import {
   macroEmptyEl,
   macroListEl,
@@ -230,12 +232,19 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
       throw new Error(`"${target.name}" does not run on this page.`);
     }
 
+    const params = macroNeedsParams(target) ? await promptMacroParams(target) : {};
+    if (params === null) {
+      setStatus("Cancelled.");
+      return;
+    }
+
     setStatus(`Running "${target.name}"…`);
 
     const response = await sendBackgroundMessage({
       type: "EXECUTE_MACRO",
       tabId,
       macroId: target.id,
+      ...(Object.keys(params).length > 0 ? { params } : {}),
     });
 
     if (!response.ok) {
