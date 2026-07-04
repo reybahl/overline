@@ -30,7 +30,6 @@ export type DomElement = {
 
 export type SearchInteractivesOptions = {
   limit?: number;
-  controlKind?: DomControlKind | string;
 };
 
 export type ListInteractivesOptions = {

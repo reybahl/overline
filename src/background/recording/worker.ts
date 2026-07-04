@@ -40,7 +40,6 @@ const SearchElementsToolSchema = z.object({
     .min(1)
     .describe("Rough search terms from the user intent. Exact text is not required."),
   limit: z.number().int().min(1).max(TOOL_RESULT_LIMIT).optional(),
-  controlKind: z.string().min(1).optional(),
 });
 
 const ListElementsToolSchema = z.object({
@@ -131,7 +130,7 @@ function buildAgentTurnPrompt(
     JSON.stringify(elements, null, 2),
     "",
     "Available tools:",
-    "- searchElements({ query, limit?, controlKind? }): searches all indexed interactives with forgiving deterministic matching",
+    "- searchElements({ query, limit? }): searches all indexed interactives with forgiving deterministic matching",
     "- listElements({ offset?, limit?, controlKind?, toggleFirst? }): browses a small page of indexed interactives",
     "",
     "What is the single next step?",
@@ -286,7 +285,7 @@ function createRecorderTools(
     tools: {
       searchElements: tool({
         description:
-          "Search the full interactive DOM index with forgiving deterministic matching. Use rough terms; exact button or link text is not required.",
+          "Search the full interactive DOM index with forgiving deterministic matching. Use rough terms; exact button or link text is not required. Search always covers every indexed control kind.",
         parameters: SearchElementsToolSchema,
         execute: async (args) => {
           const limit = normalizeToolLimit(args.limit);
@@ -298,14 +297,12 @@ function createRecorderTools(
           log.info("recorder searchElements tool call", {
             query: args.query,
             limit,
-            controlKind: args.controlKind,
             toolCallsUsed,
           });
 
           try {
             const elements = await lookup.searchElements(args.query, {
               limit,
-              controlKind: args.controlKind,
             });
             addAllowedSelectors(allowedSelectors, elements);
             log.info("recorder searchElements tool result", {

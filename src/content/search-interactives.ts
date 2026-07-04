@@ -146,7 +146,7 @@ export function searchInteractives(
   }
 
   const limit = clampLimit(options?.limit);
-  const elements = filterByControlKind(indexInteractives(), options?.controlKind);
+  const elements = indexInteractives();
 
   return elements
     .map((element, index) => ({
