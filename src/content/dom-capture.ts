@@ -237,7 +237,33 @@ function buildSelector(el: Element): { selector: string; idStable: boolean } | n
     return { selector: `#${CSS.escape(el.id)}`, idStable: false };
   }
 
-  return null;
+  const pathSelector = buildPathSelector(el);
+  return pathSelector ? { selector: pathSelector, idStable: false } : null;
+}
+
+function buildPathSelector(el: Element): string | null {
+  const parts: string[] = [];
+  let current: HTMLElement | null = el instanceof HTMLElement ? el : null;
+
+  while (current && current !== document.documentElement) {
+    const parent: HTMLElement | null = current.parentElement;
+    if (!parent) {
+      return null;
+    }
+
+    const tag = current.tagName.toLowerCase();
+    const sameTagSiblings: Element[] = Array.from(parent.children).filter(
+      (child) => child.tagName.toLowerCase() === tag,
+    );
+    const index = sameTagSiblings.indexOf(current) + 1;
+    parts.unshift(
+      sameTagSiblings.length > 1 ? `${tag}:nth-of-type(${index})` : tag,
+    );
+
+    current = parent;
+  }
+
+  return parts.length > 0 ? parts.join(" > ") : null;
 }
 
 function readAriaBoolean(el: Element, attr: string): boolean | undefined {
@@ -386,7 +412,9 @@ export function captureDom(): DomElement[] {
 declare global {
   interface Window {
     __patchCaptureDom?: () => DomElement[];
+    __patchIndexInteractives?: () => DomElement[];
   }
 }
 
 window.__patchCaptureDom = captureDom;
+window.__patchIndexInteractives = indexInteractives;

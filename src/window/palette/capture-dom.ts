@@ -30,9 +30,13 @@ async function captureDomOnActiveTab(): Promise<{
   const [result] = await chrome.scripting.executeScript({
     target: { tabId },
     func: () => {
-      const capture = (
-        globalThis as { __patchCaptureDom?: () => DomElement[] }
-      ).__patchCaptureDom;
+      const hooks = (
+        globalThis as {
+          __patchIndexInteractives?: () => DomElement[];
+          __patchCaptureDom?: () => DomElement[];
+        }
+      );
+      const capture = hooks.__patchIndexInteractives ?? hooks.__patchCaptureDom;
       return capture?.() ?? [];
     },
   });
