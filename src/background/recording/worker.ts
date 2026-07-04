@@ -5,11 +5,11 @@ import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
-import { getLlmEnv, llmConfigHint } from "@/shared/env";
+import { getLlmSettings } from "@/shared/clients/llm-settings";
 import {
-  buildModelFallbackChain,
+  LLM_NOT_CONFIGURED_MESSAGE,
   resolveLanguageModel,
-} from "@/shared/llm-model";
+} from "@/shared/llm";
 import { createLogger } from "@/shared/logger";
 import type {
   DomElement,
@@ -186,34 +186,17 @@ async function generateObjectWithModels<T>(
   schema: z.ZodType<T>,
   prompt: string,
 ): Promise<T> {
-  const env = getLlmEnv();
-  if (!env) {
-    throw new Error(`LLM not configured.\n${llmConfigHint()}`);
+  const settings = await getLlmSettings();
+  if (!settings) {
+    throw new Error(LLM_NOT_CONFIGURED_MESSAGE);
   }
 
-  const models = buildModelFallbackChain(env.model);
-  let lastError: unknown;
-
-  for (const modelRef of models) {
-    try {
-      const result = await generateObject({
-        model: resolveLanguageModel(modelRef),
-        schema,
-        prompt,
-      });
-      return result.object as T;
-    } catch (error) {
-      lastError = error;
-      log.warn("model failed, trying next", {
-        model: modelRef,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("All configured models failed.");
+  const result = await generateObject({
+    model: resolveLanguageModel(settings),
+    schema,
+    prompt,
+  });
+  return result.object as T;
 }
 
 function addAllowedSelectors(
@@ -380,47 +363,29 @@ async function generateAgentTurnWithModels(
   elements: DomElement[],
   lookup: RecorderElementLookup,
 ): Promise<AgentTurn> {
-  const env = getLlmEnv();
-  if (!env) {
-    throw new Error(`LLM not configured.\n${llmConfigHint()}`);
+  const settings = await getLlmSettings();
+  if (!settings) {
+    throw new Error(LLM_NOT_CONFIGURED_MESSAGE);
   }
 
-  const models = buildModelFallbackChain(env.model);
-  let lastError: unknown;
+  const allowedSelectors = new Set<string>();
+  addAllowedSelectors(allowedSelectors, elements);
+  const recorderTools = createRecorderTools(lookup, allowedSelectors);
 
-  for (const modelRef of models) {
-    const allowedSelectors = new Set<string>();
-    addAllowedSelectors(allowedSelectors, elements);
-    const recorderTools = createRecorderTools(lookup, allowedSelectors);
-
-    try {
-      const result = await generateText({
-        model: resolveLanguageModel(modelRef),
-        prompt,
-        tools: recorderTools.tools,
-        maxSteps: AGENT_MAX_STEPS,
-        experimental_output: Output.object({ schema: AgentTurnSchema }),
-        experimental_prepareStep: async () =>
-          recorderTools.getToolCallsUsed() >= AGENT_TOOL_CALL_LIMIT
-            ? { toolChoice: "none" as const }
-            : undefined,
-      });
-      const turn = AgentTurnSchema.parse(result.experimental_output);
-      validateAgentTurnSelector(turn, allowedSelectors);
-      return turn;
-    } catch (error) {
-      lastError = error;
-      log.warn("agent model failed, trying next", {
-        model: modelRef,
-        toolCallsUsed: recorderTools.getToolCallsUsed(),
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("All configured models failed.");
+  const result = await generateText({
+    model: resolveLanguageModel(settings),
+    prompt,
+    tools: recorderTools.tools,
+    maxSteps: AGENT_MAX_STEPS,
+    experimental_output: Output.object({ schema: AgentTurnSchema }),
+    experimental_prepareStep: async () =>
+      recorderTools.getToolCallsUsed() >= AGENT_TOOL_CALL_LIMIT
+        ? { toolChoice: "none" as const }
+        : undefined,
+  });
+  const turn = AgentTurnSchema.parse(result.experimental_output);
+  validateAgentTurnSelector(turn, allowedSelectors);
+  return turn;
 }
 
 export async function getNextStep(

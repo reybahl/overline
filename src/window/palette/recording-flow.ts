@@ -25,6 +25,9 @@ import {
   setStatus,
 } from "@/window/palette/ui";
 
+const RECORDING_STATUS_MESSAGE =
+  "Recording… you can close Overline while it keeps working.";
+
 function stopPendingRecordPoll(): void {
   if (paletteState.pendingRecordPoll !== undefined) {
     window.clearInterval(paletteState.pendingRecordPoll);
@@ -39,6 +42,26 @@ function startPendingRecordPoll(): void {
   }, 1000);
 }
 
+function clearRecordingSession(): void {
+  paletteState.recordingSessionStartedAt = undefined;
+}
+
+function isExpectingRecordingSession(): boolean {
+  return paletteState.recordingSessionStartedAt !== undefined;
+}
+
+function isStalePendingError(record: Extract<PendingRecord, { status: "error" }>): boolean {
+  const sessionStartedAt = paletteState.recordingSessionStartedAt;
+  return sessionStartedAt !== undefined && record.completedAt < sessionStartedAt;
+}
+
+function showRecordingInProgress(): void {
+  setBusy(true);
+  setRecordingUi(true);
+  palettePanelEl.hidden = true;
+  setStatus(RECORDING_STATUS_MESSAGE);
+}
+
 export async function syncPendingRecord(): Promise<void> {
   try {
     applyPendingRecord(await getPendingRecord());
@@ -46,6 +69,7 @@ export async function syncPendingRecord(): Promise<void> {
     const message =
       error instanceof Error ? error.message : "Failed to load recording";
     setStatus(message, true);
+    clearRecordingSession();
     setBusy(false);
   }
 }
@@ -61,6 +85,11 @@ function isRecordingChannelError(error: unknown): boolean {
 
 function applyPendingRecord(record: PendingRecord | null): void {
   if (!record) {
+    if (isExpectingRecordingSession()) {
+      showRecordingInProgress();
+      return;
+    }
+
     stopPendingRecordPoll();
     setRecordingUi(false);
     palettePanelEl.hidden = false;
@@ -69,16 +98,12 @@ function applyPendingRecord(record: PendingRecord | null): void {
 
   switch (record.status) {
     case "recording":
-      setBusy(true);
-      setRecordingUi(true);
-      palettePanelEl.hidden = true;
-      setStatus(
-        record.progress ??
-          "Recording… you can close Overline while it keeps working.",
-      );
+      showRecordingInProgress();
+      setStatus(record.progress ?? RECORDING_STATUS_MESSAGE);
       startPendingRecordPoll();
       return;
     case "complete":
+      clearRecordingSession();
       stopPendingRecordPoll();
       setBusy(false);
       setRecordingUi(false);
@@ -87,6 +112,12 @@ function applyPendingRecord(record: PendingRecord | null): void {
       setStatus("Review the recorded steps below.");
       return;
     case "error":
+      if (isStalePendingError(record)) {
+        showRecordingInProgress();
+        return;
+      }
+
+      clearRecordingSession();
       stopPendingRecordPoll();
       setBusy(false);
       setRecordingUi(false);
@@ -145,6 +176,13 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
   setBusy(true);
 
   try {
+    const pending = await getPendingRecord();
+    if (pending?.status === "recording") {
+      showRecordingInProgress();
+      startPendingRecordPoll();
+      return;
+    }
+
     const tab = await getActiveTab();
     const tabId = tab.id;
     const startUrl = tab.url;
@@ -156,7 +194,10 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
       throw new Error(getRestrictedPageMessage(startUrl));
     }
 
-    setStatus("Recording… you can close Overline while it keeps working.");
+    paletteState.recordingSessionStartedAt = Date.now();
+    await clearPendingRecord();
+
+    showRecordingInProgress();
     startPendingRecordPoll();
 
     void sendBackgroundMessage({
@@ -167,8 +208,11 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
     })
       .then(async (response) => {
         if (!response.ok) {
+          clearRecordingSession();
           stopPendingRecordPoll();
           setBusy(false);
+          setRecordingUi(false);
+          palettePanelEl.hidden = false;
           setStatus(response.error ?? "Recording failed.", true);
           return;
         }
@@ -181,15 +225,17 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
           return;
         }
 
+        clearRecordingSession();
         stopPendingRecordPoll();
         setBusy(false);
+        setRecordingUi(false);
+        palettePanelEl.hidden = false;
         const errorMessage =
           error instanceof Error ? error.message : "Failed to record macro";
         setStatus(errorMessage, true);
       });
-
-    await syncPendingRecord();
   } catch (error) {
+    clearRecordingSession();
     stopPendingRecordPoll();
     const errorMessage =
       error instanceof Error ? error.message : "Failed to record macro";
@@ -240,6 +286,7 @@ export function handleDiscard(): void {
   palettePanelEl.hidden = false;
   intentInput.value = "";
   setIntentInputVisible(false);
+  clearRecordingSession();
   void clearPendingRecord().then(() => {
     setStatus("Recording discarded.");
     searchInput.focus();
@@ -248,6 +295,7 @@ export function handleDiscard(): void {
 
 export async function handleCancelRecording(): Promise<void> {
   stopPendingRecordPoll();
+  clearRecordingSession();
   setBusy(false);
   setRecordingUi(false);
   palettePanelEl.hidden = false;

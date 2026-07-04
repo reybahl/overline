@@ -1,3 +1,4 @@
+import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
@@ -6,7 +7,13 @@ import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut } from "@/shared/shortcut";
 import { validateRunScopePattern } from "@/shared/run-scope";
+import { getLlmSettings, saveLlmSettings } from "@/shared/clients/llm-settings";
 import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
+import {
+  LlmSettingsDraftSchema,
+  mergeLlmSettingsDraft,
+  toPublicLlmSettings,
+} from "@/shared/llm";
 import {
   getActiveTab,
   getRestrictedPageMessage,
@@ -159,6 +166,44 @@ export const backgroundHandlers = {
       pendingRecord: await getPendingRecord(),
     };
   },
+
+  GET_LLM_SETTINGS: async (_message, _context) => {
+    const settings = await getLlmSettings();
+    return {
+      ok: true as const,
+      configured: settings !== null,
+      settings: settings ? toPublicLlmSettings(settings) : null,
+    };
+  },
+
+  SAVE_LLM_SETTINGS: async (message, _context) => {
+    const parsedDraft = LlmSettingsDraftSchema.parse(message.draft);
+    const existing = await getLlmSettings();
+    const settings = mergeLlmSettingsDraft(parsedDraft, existing);
+    await saveLlmSettings(settings);
+    return {
+      ok: true as const,
+      settings: toPublicLlmSettings(settings),
+    };
+  },
+
+  TEST_LLM_SETTINGS: async (message, _context) => {
+    const existing = await getLlmSettings();
+    const draft = message.draft
+      ? LlmSettingsDraftSchema.parse(message.draft)
+      : null;
+
+    if (!draft && !existing) {
+      throw new Error("Configure AI settings before testing the connection.");
+    }
+
+    const settings = draft
+      ? mergeLlmSettingsDraft(draft, existing)
+      : existing!;
+
+    await testLlmConnection(settings);
+    return { ok: true as const };
+  },
 } satisfies BackgroundHandlers;
 
 export async function handleBackgroundMessage(
@@ -182,6 +227,12 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.AGENTIC_RECORD(message, context);
     case "CANCEL_PENDING_RECORD":
       return backgroundHandlers.CANCEL_PENDING_RECORD(message, context);
+    case "GET_LLM_SETTINGS":
+      return backgroundHandlers.GET_LLM_SETTINGS(message, context);
+    case "SAVE_LLM_SETTINGS":
+      return backgroundHandlers.SAVE_LLM_SETTINGS(message, context);
+    case "TEST_LLM_SETTINGS":
+      return backgroundHandlers.TEST_LLM_SETTINGS(message, context);
     default: {
       const _exhaustive: never = message;
       throw new Error(`Unknown message type "${String(_exhaustive)}"`);

@@ -1,3 +1,4 @@
+import type { LlmSettingsDraft, LlmSettingsPublic } from "@/shared/llm";
 import type { LogEntry } from "@/shared/types/log";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { ScriptStep, ElementMatch } from "@/shared/types/script";
@@ -16,7 +17,10 @@ export type BackgroundMessage =
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
   | { type: "DELETE_MACRO"; macroId: string }
-  | { type: "DEV_LOG"; entry: LogEntry };
+  | { type: "DEV_LOG"; entry: LogEntry }
+  | { type: "GET_LLM_SETTINGS" }
+  | { type: "SAVE_LLM_SETTINGS"; draft: LlmSettingsDraft }
+  | { type: "TEST_LLM_SETTINGS"; draft?: LlmSettingsDraft };
 
 export type BackgroundMessageType = BackgroundMessage["type"];
 
@@ -30,6 +34,13 @@ export type BackgroundSuccessMap = {
   SAVE_MACRO: { ok: true; macros: Macro[] };
   DELETE_MACRO: { ok: true; macros: Macro[] };
   DEV_LOG: { ok: true };
+  GET_LLM_SETTINGS: {
+    ok: true;
+    configured: boolean;
+    settings: LlmSettingsPublic | null;
+  };
+  SAVE_LLM_SETTINGS: { ok: true; settings: LlmSettingsPublic };
+  TEST_LLM_SETTINGS: { ok: true };
 };
 
 export type BackgroundFailure = { ok: false; error: string };
