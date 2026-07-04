@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { deriveUrlPattern } from "@/shared/macro-match";
+import { MacroSignatureSchema } from "@/shared/types/macro-signature";
 import {
   ElementMatchSchema,
   MacroScriptSchema,
@@ -42,6 +43,8 @@ export const MacroSchema = z.object({
   script: MacroScriptSchema.optional(),
   urlPattern: z.string().min(1).optional(),
   runScope: RunScopeSchema.optional(),
+  /** Runtime parameters inferred from intent; empty params = standalone. */
+  signature: MacroSignatureSchema.optional(),
   shortcut: z.string().min(1).optional(),
   steps: z.array(MacroStepSchema),
   createdAt: z.number().int().nonnegative(),

@@ -4,7 +4,7 @@ import {
   assertRecordingSessionActive,
   isRecordingCancelledError,
 } from "@/background/recording/recording-session";
-import { compileMacroScript, inferRunScope } from "@/background/recording/worker";
+import { compileMacroScript, inferMacroSignature, inferRunScope } from "@/background/recording/worker";
 import { clearRunId, createLogger, newRunId } from "@/shared/logger";
 import {
   getPendingRecord,
@@ -102,6 +102,29 @@ async function finishAgenticRecordSession(
     if (current?.status === "recording") {
       await savePendingRecord({
         ...current,
+        progress: "Inferring macro signature…",
+      });
+    }
+
+    await assertRecordingSessionActive();
+
+    const parameterized = await inferMacroSignature(
+      intent,
+      compiled.script,
+      result.macro.steps,
+    );
+
+    log.info("macro signature resolved", {
+      run,
+      paramCount: parameterized.signature.params.length,
+    });
+
+    await assertRecordingSessionActive();
+
+    current = await getPendingRecord();
+    if (current?.status === "recording") {
+      await savePendingRecord({
+        ...current,
         progress: "Deciding where this macro should run…",
       });
     }
@@ -111,7 +134,8 @@ async function finishAgenticRecordSession(
     const macro = await attachRunScope(
       {
         ...result.macro,
-        script: compiled.script,
+        script: parameterized.script,
+        signature: parameterized.signature,
         description: compiled.description,
         intent,
       },

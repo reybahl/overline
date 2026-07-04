@@ -1,4 +1,5 @@
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import { macroNeedsParams } from "@/shared/macro-signature";
 import { formatScriptStep } from "@/shared/script-format";
 import {
   reviewPanelEl,
@@ -34,7 +35,12 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
         macro.script.steps.length === 1 ? "" : "s"
       }`
     : "";
-  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${scopeSummary}${
+  const paramSummary = macroNeedsParams(macro)
+    ? ` · ${macro.signature!.params.length} param${
+        macro.signature!.params.length === 1 ? "" : "s"
+      }`
+    : "";
+  reviewSummaryEl.textContent = `"${macro.name}"${scriptSummary}${paramSummary}${scopeSummary}${
     reasoning.length > 0 ? ` · ${reasoning[reasoning.length - 1]}` : ""
   }`;
 
@@ -46,9 +52,24 @@ export function showReview(macro: Macro, reasoning: string[] = []): void {
     reviewStepsEl.appendChild(intentItem);
   }
 
+  if (macroNeedsParams(macro)) {
+    const paramsLabel = document.createElement("li");
+    paramsLabel.textContent = "Signature (runtime params):";
+    reviewStepsEl.appendChild(paramsLabel);
+
+    reviewStepsEl.append(
+      ...macro.signature!.params.map((param) => {
+        const item = document.createElement("li");
+        const detail = param.description ? ` — ${param.description}` : "";
+        item.textContent = `${param.label} (${param.type}) · {{${param.name}}}${detail}`;
+        return item;
+      }),
+    );
+  }
+
   if (macro.script) {
     const scriptLabel = document.createElement("li");
-    scriptLabel.textContent = "Compiled script (runs on play):";
+    scriptLabel.textContent = "Compiled script (template body):";
     reviewStepsEl.appendChild(scriptLabel);
 
     reviewStepsEl.append(

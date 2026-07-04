@@ -1,6 +1,7 @@
 import { generateObject, generateText, Output, tool } from "ai";
 import { z } from "zod";
 
+import { applyInferredMacroSignature } from "@/shared/macro-signature";
 import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
@@ -27,6 +28,12 @@ import {
   type MacroStep,
   type RunScope,
 } from "@/shared/types/macro";
+import {
+  InferredMacroSignatureSchema,
+  STANDALONE_MACRO_SIGNATURE,
+  type MacroSignature,
+} from "@/shared/types/macro-signature";
+import type { MacroScript } from "@/shared/types/script";
 
 const log = createLogger("llm");
 
@@ -92,6 +99,9 @@ const RECORD_AGENT_RULES = [
   "- Never set done: true before recording at least one action",
   "- If a required control is missing, use waitFor — do not mark done or substitute unrelated controls",
   "- Take the fewest steps — do not click jump/anchor links to scroll to a control that is already in the DOM",
+  "- When the intent marks a value the user will provide at run time (on any site — issue #X, order ID, search query, filter text, etc.), use a realistic example visible on the current page so the demo completes",
+  "- Never use {{placeholders}} in recorded step values or targets — always concrete demo literals",
+  "- Pick demo values that actually work on this page (search returns results, the link opens, the item exists)",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -166,7 +176,8 @@ function buildCompileScriptPrompt(
     "- One output click/fill step per demo step — same count, same order",
     "- Generalize each recordedMatch; never add fields absent from that step's recordedMatch (especially testId)",
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
-    "- Stable semantic ids → keep id",
+    "- Stable semantic ids → keep id UNLESS intent marks that value as user-provided at run time (see below)",
+    "- When intent marks a user-provided slot (numeric id, slug, search text, etc.) and recordedMatch has hrefSuffix/hrefContains/text with the demo literal: include that href/text field with the demo literal — do not rely on id alone when id embeds the literal (e.g. item_42_link)",
     "- text with counts/badges → textContains with static words only",
     "- When recordedMatch.ariaLabel and recordedMatch.text differ, use ariaLabel only (state lives in aria, not visible label)",
     "- When recordedMatch.pressed or checked is set on a toggle, include it in the replay match",
@@ -175,10 +186,117 @@ function buildCompileScriptPrompt(
     "- Bare /{segmentN} matching pageUrl segment N, no query → hrefFromPathSegment: N (no text)",
     "- Fragment/hash hrefSuffix (#…) → hrefContains with static # prefix through trailing hyphen; never hrefFromPathSegment",
     "- Query tabs (?tab=…) → hrefPattern \\\\?tab=… (+ textContains if ambiguous)",
-    "- Scoped paths (/org/repo/pulls) → hrefPattern preserving segment count",
+    "- Scoped paths (/org/project/items) → hrefPattern preserving segment count",
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
     "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
+    "- Keep demo literals in fill values and match fields for user-provided intent slots — do not replace them with open regexes (e.g. /items/\\\\d+)",
+    "- Runtime parameterization ({{param}} templates) is applied in a later pass",
+  ].join("\n");
+}
+
+const MACRO_SIGNATURE_RULES = [
+  "You are defining the function signature for a browser macro script template.",
+  "",
+  "Return standalone: false when the intent EXPLICITLY says the user will supply a value at run time.",
+  'Explicit signals include: "I give you", "I will input", "as input", "at playback", "each run", "user provides", "where X is".',
+  "When those signals are present AND a demo/compiled field contains the example literal, you MUST return standalone: false with params and patches.",
+  "",
+  "Return standalone: true ONLY when:",
+  "- Intent describes a fixed action with no user-supplied slot, OR",
+  "- Intent mentions a user slot but no compiled or recordedMatch field contains the demo literal to template",
+  "",
+  "Never infer params from demo values alone when intent does not mark them as user-provided.",
+];
+
+const MACRO_SIGNATURE_PATCH_RULES = [
+  "patches replace one script field with a template containing {{paramName}}",
+  "Allowed fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
+  "template is the FULL new string for that field",
+  "Correlate the demo literal from recordedMatch or fill value with the param named in intent (item number → itemNumber, search text → searchTerm)",
+  "When recordedMatch has hrefSuffix/hrefContains with the demo literal, prefer match.hrefContains or match.hrefSuffix over match.id",
+  "When compiled script only has match.id embedding the demo literal, template the literal portion: e.g. item_{{itemNumber}}_link",
+  "Every declared param must appear in at least one patch template",
+];
+
+const MACRO_SIGNATURE_EXAMPLE = [
+  "Example A — intent: \"open item #N where N is the number I give you\" (works on any site with numeric item links)",
+  "Compiled step 0: { type: \"click\", match: { id: \"item_42_link\" } }",
+  "Demo recordedMatch: { hrefSuffix: \"/items/42\", ... }",
+  "Correct output:",
+  JSON.stringify(
+    {
+      standalone: false,
+      params: [
+        {
+          name: "itemNumber",
+          label: "Item number",
+          type: "number",
+          description: "Numeric id of the item to open",
+        },
+      ],
+      patches: [
+        {
+          stepIndex: 0,
+          field: "match.hrefContains",
+          template: "/items/{{itemNumber}}",
+        },
+      ],
+    },
+    null,
+    2,
+  ),
+  "Alternate when href is absent from recordedMatch: patch match.id to embed {{paramName}} where the demo literal was",
+  "",
+  "Example B — intent: \"search for TERM where TERM is something I type each run\"",
+  "Patch fill value to \"{{searchTerm}}\"",
+];
+
+function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {
+  return script.steps.map((step, stepIndex) => {
+    const base = { stepIndex, type: step.type, ...(step.label ? { label: step.label } : {}) };
+
+    switch (step.type) {
+      case "fill":
+        return { ...base, value: step.value, match: step.match };
+      case "click":
+        return { ...base, match: step.match, ...(step.index ? { index: step.index } : {}) };
+      case "waitFor":
+        return { ...base, match: step.match };
+      case "wait":
+        return { ...base, ms: step.ms };
+      default: {
+        const _exhaustive: never = step;
+        return { stepIndex, type: String(_exhaustive) };
+      }
+    }
+  });
+}
+
+function buildMacroSignaturePrompt(
+  intent: string,
+  script: MacroScript,
+  demoSteps: MacroStep[],
+): string {
+  const demoScript = buildDemoScriptForCompile(demoSteps);
+
+  return [
+    ...MACRO_SIGNATURE_RULES,
+    "",
+    `Intent: "${intent}"`,
+    "",
+    "Compiled script (stepIndex + field for patches):",
+    JSON.stringify(summarizeScriptForSignature(script), null, 2),
+    "",
+    "Demo steps (recorded literals + recordedMatch — use to find which field holds the demo literal):",
+    JSON.stringify(demoScript, null, 2),
+    "",
+    "Patch rules:",
+    ...MACRO_SIGNATURE_PATCH_RULES.map((rule) => `- ${rule}`),
+    "",
+    ...MACRO_SIGNATURE_EXAMPLE,
+    "",
+    "Return standalone, params, and patches.",
   ].join("\n");
 }
 
@@ -465,4 +583,42 @@ export async function inferRunScope(
 ): Promise<RunScope> {
   const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps);
   return generateObjectWithModels(RunScopeSchema, prompt);
+}
+
+export type InferredMacroSignatureResult = {
+  script: MacroScript;
+  signature: MacroSignature;
+};
+
+export async function inferMacroSignature(
+  intent: string,
+  script: MacroScript,
+  demoSteps: MacroStep[],
+): Promise<InferredMacroSignatureResult> {
+  const prompt = buildMacroSignaturePrompt(intent, script, demoSteps);
+
+  try {
+    const inferred = await generateObjectWithModels(
+      InferredMacroSignatureSchema,
+      prompt,
+    );
+    const applied = applyInferredMacroSignature(script, inferred);
+    log.info("macro signature inferred", {
+      standalone: inferred.standalone,
+      paramCount: applied.signature.params.length,
+      patchCount: inferred.patches.length,
+      ...(applied.signature.params.length > 0
+        ? {
+            params: inferred.params.map((param) => param.name),
+            patches: inferred.patches,
+          }
+        : {}),
+    });
+    return applied;
+  } catch (error) {
+    log.warn("macro signature inference failed, using standalone", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { script, signature: STANDALONE_MACRO_SIGNATURE };
+  }
 }
