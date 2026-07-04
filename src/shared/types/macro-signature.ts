@@ -14,7 +14,7 @@ export const MacroParamSchema = z.object({
   ),
   label: z.string().min(1).describe("Short human label for the runtime prompt"),
   description: z.string().optional().describe("Optional helper text for the prompt"),
-  type: MacroParamTypeSchema.describe("number for PR/issue ids; string for text search"),
+  type: MacroParamTypeSchema.describe("number for numeric ids; string for free text"),
 });
 
 export const MacroSignatureSchema = z.object({
@@ -41,13 +41,13 @@ export const MacroParamPatchSchema = z.object({
     .nonnegative()
     .describe("Index in the compiled script steps array"),
   field: MacroScriptPatchFieldSchema.describe(
-    "Script field to replace with template; use match.hrefContains for PR links when href is in recordedMatch",
+    "Script field to replace with template; prefer match.hrefContains/hrefSuffix when href carries the demo literal",
   ),
   template: z
     .string()
     .min(1)
     .describe(
-      "Full new field value containing {{paramName}}, e.g. /pull/{{prNumber}} or issue_{{prNumber}}_link",
+      "Full new field value containing {{paramName}}, e.g. /items/{{itemNumber}} or item_{{itemNumber}}_link or {{searchTerm}}",
     ),
 });
 

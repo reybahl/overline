@@ -312,7 +312,7 @@ export function applyInferredMacroSignature(
   return { script: patchedScript, signature };
 }
 
-/** Drop demo-pinned ids when another match field carries {{param}} — e.g. issue_1980_link + /pull/{{prNumber}}. */
+/** Drop demo-pinned ids when another match field carries {{param}} — e.g. item_42_link + /items/{{itemNumber}}. */
 function stripPinnedIdsWhenMatchTemplated(step: ScriptStep): ScriptStep {
   if (step.type === "wait") {
     return step;

@@ -99,9 +99,9 @@ const RECORD_AGENT_RULES = [
   "- Never set done: true before recording at least one action",
   "- If a required control is missing, use waitFor — do not mark done or substitute unrelated controls",
   "- Take the fewest steps — do not click jump/anchor links to scroll to a control that is already in the DOM",
-  "- When the intent marks a value the user will provide at run time (e.g. \"PR #X, I'll input X at playback\"), use a realistic example from the page — a visible PR number, repo name, search term, etc.",
-  "- Never use {{placeholders}} in recorded step values or targets — always concrete demo literals so the flow completes",
-  "- Pick demo values that complete the flow (search returns results, PR exists, etc.)",
+  "- When the intent marks a value the user will provide at run time (on any site — issue #X, order ID, search query, filter text, etc.), use a realistic example visible on the current page so the demo completes",
+  "- Never use {{placeholders}} in recorded step values or targets — always concrete demo literals",
+  "- Pick demo values that actually work on this page (search returns results, the link opens, the item exists)",
   ...DOM_ELEMENT_RULES,
 ];
 
@@ -177,7 +177,7 @@ function buildCompileScriptPrompt(
     "- Generalize each recordedMatch; never add fields absent from that step's recordedMatch (especially testId)",
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
     "- Stable semantic ids → keep id UNLESS intent marks that value as user-provided at run time (see below)",
-    "- When intent marks a user-provided slot (PR number, search term, etc.) and recordedMatch has hrefSuffix/hrefContains/text with the demo literal: include that href/text field with the demo literal — do not rely on id alone when id embeds the literal (e.g. issue_1973_link)",
+    "- When intent marks a user-provided slot (numeric id, slug, search text, etc.) and recordedMatch has hrefSuffix/hrefContains/text with the demo literal: include that href/text field with the demo literal — do not rely on id alone when id embeds the literal (e.g. item_42_link)",
     "- text with counts/badges → textContains with static words only",
     "- When recordedMatch.ariaLabel and recordedMatch.text differ, use ariaLabel only (state lives in aria, not visible label)",
     "- When recordedMatch.pressed or checked is set on a toggle, include it in the replay match",
@@ -186,11 +186,11 @@ function buildCompileScriptPrompt(
     "- Bare /{segmentN} matching pageUrl segment N, no query → hrefFromPathSegment: N (no text)",
     "- Fragment/hash hrefSuffix (#…) → hrefContains with static # prefix through trailing hyphen; never hrefFromPathSegment",
     "- Query tabs (?tab=…) → hrefPattern \\\\?tab=… (+ textContains if ambiguous)",
-    "- Scoped paths (/org/repo/pulls) → hrefPattern preserving segment count",
+    "- Scoped paths (/org/project/items) → hrefPattern preserving segment count",
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
     "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
-    "- Keep demo literals in fill values and in match fields that correspond to user-provided intent slots (PR numbers, search terms, etc.) — do not replace them with open regexes like /pull/\\\\d+",
+    "- Keep demo literals in fill values and match fields for user-provided intent slots — do not replace them with open regexes (e.g. /items/\\\\d+)",
     "- Runtime parameterization ({{param}} templates) is applied in a later pass",
   ].join("\n");
 }
@@ -213,40 +213,43 @@ const MACRO_SIGNATURE_PATCH_RULES = [
   "patches replace one script field with a template containing {{paramName}}",
   "Allowed fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
   "template is the FULL new string for that field",
-  "Correlate the demo literal from recordedMatch or fill value with the param named in intent (PR number → prNumber, search text → searchTerm)",
-  "When recordedMatch has hrefSuffix/hrefContains with the demo number or text, prefer match.hrefContains or match.hrefSuffix over match.id",
-  "When compiled script only has match.id embedding the demo number (e.g. issue_1973_link), patch match.id to issue_{{prNumber}}_link",
+  "Correlate the demo literal from recordedMatch or fill value with the param named in intent (item number → itemNumber, search text → searchTerm)",
+  "When recordedMatch has hrefSuffix/hrefContains with the demo literal, prefer match.hrefContains or match.hrefSuffix over match.id",
+  "When compiled script only has match.id embedding the demo literal, template the literal portion: e.g. item_{{itemNumber}}_link",
   "Every declared param must appear in at least one patch template",
 ];
 
 const MACRO_SIGNATURE_EXAMPLE = [
-  "Example — intent: \"click PR #X where X is the number I give you as input\"",
-  "Compiled step 0: { type: \"click\", match: { id: \"issue_1973_link\" } }",
-  "Demo recordedMatch: { hrefSuffix: \"/pull/1973\", ... }",
+  "Example A — intent: \"open item #N where N is the number I give you\" (works on any site with numeric item links)",
+  "Compiled step 0: { type: \"click\", match: { id: \"item_42_link\" } }",
+  "Demo recordedMatch: { hrefSuffix: \"/items/42\", ... }",
   "Correct output:",
   JSON.stringify(
     {
       standalone: false,
       params: [
         {
-          name: "prNumber",
-          label: "PR number",
+          name: "itemNumber",
+          label: "Item number",
           type: "number",
-          description: "Pull request number to open",
+          description: "Numeric id of the item to open",
         },
       ],
       patches: [
         {
           stepIndex: 0,
           field: "match.hrefContains",
-          template: "/pull/{{prNumber}}",
+          template: "/items/{{itemNumber}}",
         },
       ],
     },
     null,
     2,
   ),
-  "Alternate when href is absent from recordedMatch: patch match.id to \"issue_{{prNumber}}_link\"",
+  "Alternate when href is absent from recordedMatch: patch match.id to embed {{paramName}} where the demo literal was",
+  "",
+  "Example B — intent: \"search for TERM where TERM is something I type each run\"",
+  "Patch fill value to \"{{searchTerm}}\"",
 ];
 
 function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {
