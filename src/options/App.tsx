@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
+import { LlmSettingsEditor } from "@/options/LlmSettingsEditor";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { saveMacros } from "@/shared/clients/storage";
 import type { Macro, MacroStep, RunScope } from "@/shared/types/macro";
@@ -519,7 +520,7 @@ export default function App() {
           <div>
             <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
             <p className="ui-header__subtitle">
-              Saved macros, shortcuts, and run scope.
+              AI settings, saved macros, shortcuts, and run scope.
             </p>
           </div>
           {macros.length > 0 ? (
@@ -539,6 +540,8 @@ export default function App() {
       {shortcutError ? (
         <p className="ui-alert ui-alert--error">{shortcutError}</p>
       ) : null}
+
+      <LlmSettingsEditor onError={setShortcutError} />
 
       {macros.length === 0 ? (
         <p className="ui-text-muted">
