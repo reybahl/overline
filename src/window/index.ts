@@ -23,6 +23,7 @@ import {
   renderMacroList,
   scrollSelectedIntoView,
 } from "@/window/palette/macros";
+import { isParamPromptOpen } from "@/window/palette/param-prompt";
 import { closePalette, startPanelHeightObserver } from "@/window/palette/panel-host";
 import {
   handleCancelRecording,
@@ -84,6 +85,10 @@ searchInput.addEventListener("keydown", (event) => {
 
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") {
+    return;
+  }
+
+  if (isParamPromptOpen()) {
     return;
   }
 

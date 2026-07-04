@@ -24,4 +24,11 @@ export const discardBtn = requireElement<HTMLButtonElement>("discard-btn");
 export const cancelRecordBtn = requireElement<HTMLButtonElement>("cancel-record-btn");
 export const optionsLink = requireElement<HTMLButtonElement>("options-link");
 
+export const paramPromptDialog = requireElement<HTMLDialogElement>("param-prompt");
+export const paramPromptForm = requireElement<HTMLFormElement>("param-prompt-form");
+export const paramPromptTitleEl = requireElement<HTMLHeadingElement>("param-prompt-title");
+export const paramPromptFieldsEl = requireElement<HTMLDivElement>("param-prompt-fields");
+export const paramPromptErrorEl = requireElement<HTMLParagraphElement>("param-prompt-error");
+export const paramPromptCancelBtn = requireElement<HTMLButtonElement>("param-prompt-cancel");
+
 export const actionButtons = [generateBtn, captureBtn];

@@ -1,6 +1,7 @@
 import type { LlmSettingsDraft, LlmSettingsPublic } from "@/shared/llm";
 import type { LogEntry } from "@/shared/types/log";
 import type { Macro, MacroStep } from "@/shared/types/macro";
+import type { MacroParamValues } from "@/shared/macro-signature";
 import type { ScriptStep, ElementMatch } from "@/shared/types/script";
 import type { PendingRecord } from "@/shared/types/pending-record";
 import type {
@@ -13,7 +14,7 @@ export type BackgroundMessage =
   | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
   | { type: "CANCEL_PENDING_RECORD" }
   | { type: "RUN_MACRO_BY_ID"; macroId: string }
-  | { type: "EXECUTE_MACRO"; tabId: number; macroId: string }
+  | { type: "EXECUTE_MACRO"; tabId: number; macroId: string; params?: MacroParamValues }
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
   | { type: "DELETE_MACRO"; macroId: string }

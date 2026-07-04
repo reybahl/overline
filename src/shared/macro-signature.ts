@@ -184,6 +184,74 @@ export function macroNeedsParams(macro: Macro): boolean {
   return (macro.signature?.params.length ?? 0) > 0;
 }
 
+export type MacroParamValues = Record<string, string>;
+
+function substituteParamsInString(value: string, params: MacroParamValues): string {
+  return value.replace(PLACEHOLDER_RE, (_match, name: string) => {
+    const replacement = params[name];
+    if (replacement === undefined) {
+      throw new Error(`Missing value for param "${name}".`);
+    }
+    return replacement;
+  });
+}
+
+function instantiateStep(step: ScriptStep, params: MacroParamValues): ScriptStep {
+  if (step.type === "wait") {
+    return step;
+  }
+
+  if (step.type === "fill") {
+    const match = Object.fromEntries(
+      Object.entries(step.match).map(([key, value]) => [
+        key,
+        typeof value === "string" ? substituteParamsInString(value, params) : value,
+      ]),
+    ) as ElementMatch;
+    return {
+      ...step,
+      value: substituteParamsInString(step.value, params),
+      match,
+    };
+  }
+
+  const match = Object.fromEntries(
+    Object.entries(step.match).map(([key, value]) => [
+      key,
+      typeof value === "string" ? substituteParamsInString(value, params) : value,
+    ]),
+  ) as ElementMatch;
+  return { ...step, match };
+}
+
+/** Replace {{param}} placeholders in a templated script with runtime values. */
+export function instantiateMacroScript(
+  script: MacroScript,
+  params: MacroParamValues,
+): MacroScript {
+  return MacroScriptSchema.parse({
+    ...script,
+    steps: script.steps.map((step) => instantiateStep(step, params)),
+  });
+}
+
+/** Returns an error message when invalid, otherwise null. */
+export function validateMacroParamValues(
+  signature: NonNullable<Macro["signature"]>,
+  params: MacroParamValues,
+): string | null {
+  for (const param of signature.params) {
+    const value = params[param.name]?.trim() ?? "";
+    if (!value) {
+      return `${param.label} is required.`;
+    }
+    if (param.type === "number" && !/^\d+$/.test(value)) {
+      return `${param.label} must be a number.`;
+    }
+  }
+  return null;
+}
+
 /** Apply LLM signature inference; fall back to standalone on any inconsistency. */
 export function applyInferredMacroSignature(
   script: MacroScript,
