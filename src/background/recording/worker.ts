@@ -13,6 +13,7 @@ import {
   resolveLanguageModel,
 } from "@/shared/llm";
 import { createLogger } from "@/shared/logger";
+import { runScopeMayBeTooNarrowForScript } from "@/shared/run-scope";
 import type {
   DomElement,
   ListInteractivesOptions,
@@ -624,20 +625,37 @@ function buildRunScopePrompt(
   startUrl: string,
   endUrl: string,
   steps: MacroStep[],
+  script?: MacroScript,
 ): string {
   const firstStepPageUrl = steps.find((step) => step.pageUrl)?.pageUrl ?? startUrl;
+  const scriptSummary = script
+    ? JSON.stringify(script.steps, null, 2)
+    : "(not available)";
 
   return [
-    "Return a RegExp (string) for where this macro may START, plus a short description.",
-    "One page type only — match startUrl / first step pageUrl, not endUrl.",
+    "Decide where this macro may START (run scope). Return a RegExp string + short description.",
+    "",
+    "Think from the compiled script and intent — not a fixed formula:",
+    "1. What does the script need from the current URL when playback begins?",
+    "2. If navigate href uses {{segment0}}, {{segment1}}, … — those segments must exist on the start page. Any URL with the same prefix is valid, including section/tab subpaths.",
+    "3. If the script clicks in-page UI on the current page, scope is narrower — the control must be present.",
     "",
     `Intent: "${intent}"`,
     `Started on: ${startUrl}`,
     `First step pageUrl: ${firstStepPageUrl}`,
     `Ended on: ${endUrl}`,
     "",
-    "Generalize slugs with [^/]+ but keep the same path segment count as the start URL.",
-    "Example: started on /owner/repo → repo pages only, not bare /owner profile URLs.",
+    "Compiled script:",
+    scriptSummary,
+    "",
+    "Rules:",
+    "- Generalize session slugs as [^/]+",
+    "- Scope is where START is allowed, not where the macro ends up",
+    "- WRONG: exact path depth of startUrl only when script only needs parent path segments and works from sibling sections",
+    "- WRONG: /org/project/?$ only — excludes /org/project/issues, /org/project/settings",
+    "- RIGHT: /org/project and all subpaths when script reads {{segment0}}/{{segment1}} and navigates elsewhere",
+    "- RIGHT: narrow scope when script depends on elements or state specific to one page type",
+    "- Escape regex metacharacters in literal domains (e.g. example\\.com)",
   ].join("\n");
 }
 
@@ -646,9 +664,24 @@ export async function inferRunScope(
   startUrl: string,
   endUrl: string,
   steps: MacroStep[],
+  script?: MacroScript,
 ): Promise<RunScope> {
-  const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps);
-  return generateObjectWithModels(RunScopeSchema, prompt);
+  const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps, script);
+  let runScope = await generateObjectWithModels(RunScopeSchema, prompt);
+
+  if (script && runScopeMayBeTooNarrowForScript(runScope.pattern, startUrl, script)) {
+    log.warn("run scope may be too narrow, retrying");
+    const retryPrompt = [
+      prompt,
+      "",
+      "Your pattern only matches the exact start URL depth.",
+      "The script uses {{segmentN}} from the current page — it can start from any page sharing that path prefix, including section subpaths.",
+      "Widen the pattern to include subpaths under the scope prefix the script needs.",
+    ].join("\n");
+    runScope = await generateObjectWithModels(RunScopeSchema, retryPrompt);
+  }
+
+  return runScope;
 }
 
 export type InferredMacroSignatureResult = {

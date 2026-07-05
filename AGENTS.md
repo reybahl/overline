@@ -14,7 +14,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - **Recorder:** one LLM turn per click from live DOM + user intent. No separate recording plan (`steps`, `avoid`, `doneWhen`) or plan LLM call.
 - **Compile:** one output click/fill per demo step — same count, same order. Never drop navigation hops. Generalize each step's `recordedMatch`; do not invent targets.
 - **Sanitize:** deterministic post-compile only — not a second LLM pass.
-- **Run scope:** one start page type from `startUrl` / first step `pageUrl`, not `endUrl`. Same path segment count; slugs → `[^/]+`.
+- **Run scope:** where the macro may start — reason from compiled script + intent, not start URL shape alone. Prefix scope when the script only needs path segments from a parent scope; narrower when it depends on the current page's UI.
 - **Playback:** pre-click `waitFor` for the next target; navigation wait only when the previous click match has href fields.
 
 ## Recording
