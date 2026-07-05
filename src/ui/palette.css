@@ -72,20 +72,12 @@
   display: flex;
   align-items: center;
   gap: var(--ui-space-4);
-  width: 100%;
   border: 0;
-  border-radius: var(--ui-radius-sm);
-  padding: var(--ui-space-3) var(--ui-space-4);
   font: inherit;
   text-align: left;
   color: inherit;
   background: transparent;
   cursor: pointer;
-  transition: background-color var(--ui-transition);
-}
-
-.ui-palette__item-btn:hover:not(:disabled) {
-  background: var(--ui-hover);
 }
 
 .ui-palette__item-btn:disabled {
@@ -93,7 +85,18 @@
   cursor: not-allowed;
 }
 
-.ui-palette__item--active .ui-palette__item-btn {
+.ui-palette__item--create .ui-palette__item-btn {
+  width: 100%;
+  border-radius: var(--ui-radius-sm);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  transition: background-color var(--ui-transition);
+}
+
+.ui-palette__item--create .ui-palette__item-btn:hover:not(:disabled) {
+  background: var(--ui-hover);
+}
+
+.ui-palette__item--create.ui-palette__item--active .ui-palette__item-btn {
   background: var(--ui-hover);
 }
 
@@ -123,9 +126,55 @@
   white-space: nowrap;
 }
 
+.ui-palette__item-row {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  width: 100%;
+  border-radius: var(--ui-radius-sm);
+  transition: background-color var(--ui-transition);
+}
+
+.ui-palette__item:hover .ui-palette__item-row,
+.ui-palette__item--active .ui-palette__item-row {
+  background: var(--ui-hover);
+}
+
+.ui-palette__item-row .ui-palette__item-btn {
+  flex: 1;
+  min-width: 0;
+  padding: var(--ui-space-3) var(--ui-space-2) var(--ui-space-3) var(--ui-space-4);
+}
+
+.ui-palette__item-row .ui-palette__item-btn:hover:not(:disabled),
+.ui-palette__item-row .ui-palette__item-btn:active:not(:disabled) {
+  background: transparent;
+}
+
 .ui-palette__item-btn .ui-kbd {
   flex-shrink: 0;
   margin-left: auto;
+}
+
+.ui-palette__item-settings {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  margin-right: var(--ui-space-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--ui-transition);
+}
+
+.ui-palette__item-settings:hover:not(:disabled) {
+  background: transparent;
+}
+
+.ui-palette__item:hover .ui-palette__item-settings,
+.ui-palette__item--active .ui-palette__item-settings,
+.ui-palette__item-settings:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .ui-palette__item--create .ui-palette__item-btn .ui-icon {
@@ -305,4 +354,86 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--ui-space-2);
+}
+
+.ui-macro-settings {
+  width: min(100%, 440px);
+  max-width: calc(100vw - var(--ui-space-8));
+  max-height: min(80vh, 560px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-md);
+  color: var(--ui-fg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
+}
+
+.ui-macro-settings::backdrop {
+  background: rgb(0 0 0 / 0.35);
+}
+
+.ui-macro-settings__form {
+  display: flex;
+  flex-direction: column;
+  max-height: min(80vh, 560px);
+}
+
+.ui-macro-settings__header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-macro-settings__title {
+  margin: 0;
+  min-width: 0;
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-macro-settings__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+.ui-macro-settings__content {
+  padding: var(--ui-space-4);
+}
+
+.ui-macro-settings__content .ui-section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ui-macro-settings .ui-field {
+  margin-bottom: var(--ui-space-4);
+}
+
+.ui-macro-settings .ui-input {
+  padding: var(--ui-space-2) var(--ui-space-3);
+}
+
+.ui-macro-settings .ui-section {
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-4);
+}
+
+.ui-macro-settings .ui-section > .ui-disclosure:first-of-type,
+.ui-macro-settings .ui-section > .ui-text-muted:first-child {
+  margin-top: 0;
+}
+
+.ui-macro-settings .ui-alert {
+  margin: var(--ui-space-3) var(--ui-space-4) 0;
 }
