@@ -23,6 +23,7 @@ import {
   renderMacroList,
   scrollSelectedIntoView,
 } from "@/window/palette/macros";
+import { initMacroSettingsHost, isMacroSettingsOpen } from "@/window/palette/macro-settings-host";
 import { isParamPromptOpen } from "@/window/palette/param-prompt";
 import { closePalette, startPanelHeightObserver } from "@/window/palette/panel-host";
 import {
@@ -40,6 +41,8 @@ mountLucideIcon(captureBtn, Braces);
 mountLucideIcon(optionsLink, Settings);
 mountLucideIcon(generateBtn, Plus);
 
+initMacroSettingsHost();
+
 paletteActions.runMacro = (macro) => {
   void handleRunMacro(macro);
 };
@@ -53,7 +56,7 @@ searchInput.addEventListener("input", () => {
 });
 
 searchInput.addEventListener("keydown", (event) => {
-  if (isParamPromptOpen()) {
+  if (isParamPromptOpen() || isMacroSettingsOpen()) {
     return;
   }
 
@@ -92,7 +95,7 @@ document.addEventListener("keydown", (event) => {
     return;
   }
 
-  if (isParamPromptOpen()) {
+  if (isParamPromptOpen() || isMacroSettingsOpen()) {
     return;
   }
 

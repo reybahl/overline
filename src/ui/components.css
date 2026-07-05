@@ -347,18 +347,22 @@ select.ui-input {
   margin-top: var(--ui-space-3);
 }
 
-.ui-disclosure > summary {
+.ui-disclosure__summary {
+  display: block;
   cursor: pointer;
   font-size: var(--ui-text-sm);
+  font-weight: 600;
   color: var(--ui-fg-secondary);
   list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
-.ui-disclosure > summary::-webkit-details-marker {
+.ui-disclosure__summary::-webkit-details-marker {
   display: none;
 }
 
-.ui-disclosure > summary:hover {
+.ui-disclosure__summary:hover {
   color: var(--ui-fg);
 }
 
@@ -465,4 +469,48 @@ select.ui-input {
   font: 11px / 1.45 var(--ui-font-mono);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Dialog */
+
+.ui-dialog {
+  width: min(100%, 360px);
+  max-width: calc(100vw - var(--ui-space-8));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+}
+
+.ui-dialog::backdrop {
+  background: var(--ui-overlay-scrim);
+}
+
+.ui-dialog__panel {
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-bg);
+  box-shadow: var(--ui-shadow-lg);
+  padding: var(--ui-space-7);
+}
+
+.ui-dialog__title {
+  margin: 0 0 var(--ui-space-3);
+  font-size: var(--ui-text-base);
+  font-weight: 600;
+}
+
+.ui-dialog__message {
+  margin: 0 0 var(--ui-space-7);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg-secondary);
+}
+
+.ui-dialog__actions {
+  display: flex;
+  gap: var(--ui-space-2);
+}
+
+.ui-dialog__actions .ui-btn {
+  flex: 1;
 }

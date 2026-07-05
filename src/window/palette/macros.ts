@@ -9,7 +9,8 @@ import {
   isInjectableUrl,
 } from "@/shared/tab";
 import { mountLucideIcon } from "@/ui/mount-icon";
-import { Plus } from "lucide";
+import { Plus, Settings } from "lucide";
+import { openMacroSettings } from "@/window/palette/macro-settings-host";
 import { paletteActions } from "@/window/palette/actions";
 import { promptMacroParams } from "@/window/palette/param-prompt";
 import {
@@ -147,6 +148,9 @@ export function renderMacroList(highlightMacroId?: string): void {
       index === paletteState.selectedIndex ? "true" : "false",
     );
 
+    const row = document.createElement("div");
+    row.className = "ui-palette__item-row";
+
     const button = document.createElement("button");
     button.type = "button";
     button.className = "ui-palette__item-btn";
@@ -179,7 +183,22 @@ export function renderMacroList(highlightMacroId?: string): void {
       button.appendChild(shortcut);
     }
 
-    item.appendChild(button);
+    row.appendChild(button);
+
+    const settingsBtn = document.createElement("button");
+    settingsBtn.type = "button";
+    settingsBtn.className = "ui-btn ui-btn--icon ui-palette__item-settings";
+    settingsBtn.title = "Macro settings";
+    settingsBtn.setAttribute("aria-label", `Settings for ${macro.name}`);
+    settingsBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMacroSettings(macro);
+    });
+    mountLucideIcon(settingsBtn, Settings);
+    row.appendChild(settingsBtn);
+
+    item.appendChild(row);
     macroListEl.appendChild(item);
   }
 

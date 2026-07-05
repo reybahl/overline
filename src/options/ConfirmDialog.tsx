@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -21,60 +21,65 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = "ui-dialog-title";
+
   useEffect(() => {
-    if (!open) {
+    const dialog = dialogRef.current;
+    if (!dialog) {
       return;
     }
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onCancel();
-      }
-    };
+    if (open && !dialog.open) {
+      dialog.showModal();
+      return;
+    }
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open, onCancel]);
-
-  if (!open) {
-    return null;
-  }
-
-  const titleId = "ui-dialog-title";
+    if (!open && dialog.open) {
+      dialog.close();
+    }
+  }, [open]);
 
   return (
-    <div
+    <dialog
+      ref={dialogRef}
       className="ui-dialog"
-      role="dialog"
-      aria-modal="true"
       aria-labelledby={titleId}
+      onClose={onCancel}
+      onCancel={(event) => {
+        event.preventDefault();
+        onCancel();
+      }}
     >
-      <button
-        type="button"
-        className="ui-dialog__backdrop"
-        aria-label={cancelLabel}
-        onClick={onCancel}
-      />
-      <div className="ui-dialog__panel">
+      <form
+        className="ui-dialog__panel"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onConfirm();
+        }}
+      >
         <h2 id={titleId} className="ui-dialog__title">
           {title}
         </h2>
         <p className="ui-dialog__message">{message}</p>
         <div className="ui-dialog__actions">
-          <button type="button" className="ui-btn" onClick={onCancel}>
+          <button
+            type="button"
+            className="ui-btn"
+            onClick={() => {
+              onCancel();
+            }}
+          >
             {cancelLabel}
           </button>
           <button
-            type="button"
+            type="submit"
             className={`ui-btn ${destructive ? "ui-btn--destructive" : "ui-btn--primary"}`}
-            onClick={onConfirm}
           >
             {confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+      </form>
+    </dialog>
   );
 }
