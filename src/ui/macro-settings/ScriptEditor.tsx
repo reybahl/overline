@@ -1,11 +1,10 @@
 import { useState } from "react";
-import { Pencil } from "lucide";
+import { Pencil } from "lucide-react";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { formatScriptStep } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
-import { LucideIcon } from "@/ui/LucideIcon";
 
 type ScriptEditorProps = {
   macro: Macro;
@@ -126,7 +125,7 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
             startEditing();
           }}
         >
-          <LucideIcon icon={Pencil} />
+          <Pencil className="ui-icon" size={16} strokeWidth={2} aria-hidden />
         </button>
       </summary>
       <ol className="ui-list--stack">
