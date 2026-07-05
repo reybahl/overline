@@ -598,11 +598,31 @@ export async function inferMacroSignature(
   const prompt = buildMacroSignaturePrompt(intent, script, demoSteps);
 
   try {
-    const inferred = await generateObjectWithModels(
+    let inferred = await generateObjectWithModels(
       InferredMacroSignatureSchema,
       prompt,
     );
-    const applied = applyInferredMacroSignature(script, inferred);
+    let applied = applyInferredMacroSignature(script, inferred);
+
+    if (
+      !inferred.standalone &&
+      inferred.params.length > 0 &&
+      applied.signature.params.length === 0
+    ) {
+      log.warn("macro signature patches did not apply, retrying");
+      const retryPrompt = [
+        prompt,
+        "",
+        "Your previous params/patches could not be applied to the compiled script.",
+        "Return corrected standalone, params, and patches.",
+      ].join("\n");
+      inferred = await generateObjectWithModels(
+        InferredMacroSignatureSchema,
+        retryPrompt,
+      );
+      applied = applyInferredMacroSignature(script, inferred);
+    }
+
     log.info("macro signature inferred", {
       standalone: inferred.standalone,
       paramCount: applied.signature.params.length,

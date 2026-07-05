@@ -180,6 +180,45 @@ function dropPinnedId(step: ScriptStep): ScriptStep {
   return { ...step, match };
 }
 
+/** Best-effort repair when script placeholders and signature metadata diverge. */
+export function repairMacroSignature(macro: Macro): Macro {
+  if (!macro.script) {
+    return (macro.signature?.params.length ?? 0) > 0
+      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
+      : macro;
+  }
+
+  const refs = paramRefsInScript(macro.script);
+  const params = macro.signature?.params ?? [];
+
+  if (refs.size === 0) {
+    return params.length > 0
+      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
+      : macro;
+  }
+
+  if (params.length > 0 && !signatureMismatch(macro.script, params)) {
+    return macro;
+  }
+
+  const existingByName = new Map(params.map((param) => [param.name, param]));
+  const repairedParams = [...refs].map(
+    (name) =>
+      existingByName.get(name) ?? {
+        name,
+        label: humanizeParamName(name),
+        type: "string" as const,
+      },
+  );
+  log.warn("macro signature repaired from script placeholders", { macroId: macro.id });
+  return { ...macro, signature: { version: 1, params: repairedParams } };
+}
+
+function humanizeParamName(name: string): string {
+  const spaced = name.replace(/([A-Z])/g, " $1").replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
 export function macroNeedsParams(macro: Macro): boolean {
   return (macro.signature?.params.length ?? 0) > 0;
 }
@@ -237,11 +276,11 @@ export function instantiateMacroScript(
 
 /** Returns an error message when invalid, otherwise null. */
 export function validateMacroParamValues(
-  signature: NonNullable<Macro["signature"]>,
-  params: MacroParamValues,
+  params: MacroParam[],
+  values: MacroParamValues,
 ): string | null {
-  for (const param of signature.params) {
-    const value = params[param.name]?.trim() ?? "";
+  for (const param of params) {
+    const value = values[param.name]?.trim() ?? "";
     if (!value) {
       return `${param.label} is required.`;
     }

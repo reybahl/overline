@@ -3,9 +3,11 @@ import { describe, expect, test } from "bun:test";
 import {
   applyInferredMacroSignature,
   instantiateMacroScript,
+  macroNeedsParams,
+  repairMacroSignature,
   validateMacroParamValues,
 } from "@/shared/macro-signature";
-import type { MacroSignature } from "@/shared/types/macro-signature";
+import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
 
 const CLICK_STEP: ScriptStep = {
@@ -139,30 +141,95 @@ describe("instantiateMacroScript", () => {
   });
 });
 
-describe("validateMacroParamValues", () => {
-  const signature: MacroSignature = {
-    version: 1,
-    params: [
+describe("repairMacroSignature", () => {
+  const branchScript = scriptWithSteps([
+    {
+      type: "click",
+      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+    },
+  ]);
+
+  test("synthesizes signature from script placeholders", () => {
+    const macro = { id: "test", script: branchScript } as Macro;
+    const repaired = repairMacroSignature(macro);
+
+    expect(repaired.signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
+    expect(macroNeedsParams(repaired)).toBe(true);
+  });
+
+  test("leaves valid macros unchanged", () => {
+    const macro = {
+      id: "test",
+      script: branchScript,
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch name", type: "string" as const }],
+      },
+    } as Macro;
+
+    expect(repairMacroSignature(macro)).toBe(macro);
+  });
+
+  test("clears orphan signature params", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([CLICK_STEP]),
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch", type: "string" as const }],
+      },
+    } as Macro;
+
+    expect(repairMacroSignature(macro).signature?.params).toEqual([]);
+  });
+
+  test("preserves existing param metadata when dropping orphans", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([
+        {
+          type: "click",
+          match: { id: "issue_{{prNumber}}_link", hrefContains: "/pull/{{prNumber}}" },
+        },
+      ]),
+      signature: {
+        version: 1 as const,
+        params: [
+          { name: "prNumber", label: "PR number", type: "number" as const },
+          { name: "orphan", label: "Orphan", type: "string" as const },
+        ],
+      },
+    } as Macro;
+
+    expect(repairMacroSignature(macro).signature?.params).toEqual([
       { name: "prNumber", label: "PR number", type: "number" },
-      { name: "searchTerm", label: "Search term", type: "string" },
-    ],
-  };
+    ]);
+  });
+});
+
+describe("validateMacroParamValues", () => {
+  const params = [
+    { name: "prNumber", label: "PR number", type: "number" as const },
+    { name: "searchTerm", label: "Search term", type: "string" as const },
+  ];
 
   test("rejects empty values", () => {
-    expect(validateMacroParamValues(signature, { prNumber: "1", searchTerm: "" })).toBe(
+    expect(validateMacroParamValues(params, { prNumber: "1", searchTerm: "" })).toBe(
       "Search term is required.",
     );
   });
 
   test("rejects non-numeric number params", () => {
-    expect(validateMacroParamValues(signature, { prNumber: "abc", searchTerm: "x" })).toBe(
+    expect(validateMacroParamValues(params, { prNumber: "abc", searchTerm: "x" })).toBe(
       "PR number must be a number.",
     );
   });
 
   test("accepts valid values", () => {
     expect(
-      validateMacroParamValues(signature, { prNumber: "42", searchTerm: "react" }),
+      validateMacroParamValues(params, { prNumber: "42", searchTerm: "react" }),
     ).toBeNull();
   });
 });

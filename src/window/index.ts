@@ -53,6 +53,10 @@ searchInput.addEventListener("input", () => {
 });
 
 searchInput.addEventListener("keydown", (event) => {
+  if (isParamPromptOpen()) {
+    return;
+  }
+
   const itemCount = getSelectableItemCount();
 
   if (event.key === "ArrowDown") {

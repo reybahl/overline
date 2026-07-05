@@ -19,6 +19,8 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
     return Promise.resolve({});
   }
 
+  const paramDefs = macro.signature.params;
+
   return new Promise((resolve) => {
     paramPromptTitleEl.textContent = macro.name;
     paramPromptFieldsEl.replaceChildren();
@@ -27,7 +29,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
 
     const inputs: HTMLInputElement[] = [];
 
-    for (const param of macro.signature!.params) {
+    for (const param of paramDefs) {
       const field = document.createElement("label");
       field.className = "ui-param-prompt__field";
 
@@ -69,7 +71,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
       const values = Object.fromEntries(
         inputs.map((input) => [input.name, input.value.trim()]),
       );
-      const error = validateMacroParamValues(macro.signature!, values);
+      const error = validateMacroParamValues(paramDefs, values);
       if (error) {
         paramPromptErrorEl.textContent = error;
         paramPromptErrorEl.hidden = false;
