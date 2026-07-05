@@ -184,6 +184,29 @@ describe("repairMacroSignature", () => {
 
     expect(repairMacroSignature(macro).signature?.params).toEqual([]);
   });
+
+  test("preserves existing param metadata when dropping orphans", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([
+        {
+          type: "click",
+          match: { id: "issue_{{prNumber}}_link", hrefContains: "/pull/{{prNumber}}" },
+        },
+      ]),
+      signature: {
+        version: 1 as const,
+        params: [
+          { name: "prNumber", label: "PR number", type: "number" as const },
+          { name: "orphan", label: "Orphan", type: "string" as const },
+        ],
+      },
+    } as Macro;
+
+    expect(repairMacroSignature(macro).signature?.params).toEqual([
+      { name: "prNumber", label: "PR number", type: "number" },
+    ]);
+  });
 });
 
 describe("validateMacroParamValues", () => {

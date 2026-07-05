@@ -201,13 +201,17 @@ export function repairMacroSignature(macro: Macro): Macro {
     return macro;
   }
 
-  const synthesized = [...refs].map((name) => ({
-    name,
-    label: humanizeParamName(name),
-    type: "string" as const,
-  }));
+  const existingByName = new Map(params.map((param) => [param.name, param]));
+  const repairedParams = [...refs].map(
+    (name) =>
+      existingByName.get(name) ?? {
+        name,
+        label: humanizeParamName(name),
+        type: "string" as const,
+      },
+  );
   log.warn("macro signature repaired from script placeholders", { macroId: macro.id });
-  return { ...macro, signature: { version: 1, params: synthesized } };
+  return { ...macro, signature: { version: 1, params: repairedParams } };
 }
 
 function humanizeParamName(name: string): string {
