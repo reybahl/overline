@@ -340,8 +340,7 @@ textarea.ui-input {
 .ui-badge {
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 11px;
-  font-weight: 500;
+  font: 500 11px / 1.45 var(--ui-font);
   background: var(--ui-hover);
   color: var(--ui-fg-secondary);
 }
@@ -410,6 +409,25 @@ textarea.ui-input {
   padding: var(--ui-space-3) var(--ui-space-4);
   font: 11px / 1.45 var(--ui-font-mono);
   color: var(--ui-fg-secondary);
+}
+
+.ui-code-item--row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2) var(--ui-space-3);
+}
+
+.ui-code-item__lead {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+  flex-shrink: 0;
+}
+
+.ui-code-item__body {
+  min-width: 0;
+  flex: 1 1 12rem;
 }
 
 .ui-alert {

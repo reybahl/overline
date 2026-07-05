@@ -3,7 +3,7 @@ import { Pencil } from "lucide-react";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { validateMacroScriptSignature } from "@/shared/macro-signature";
-import { formatScriptStep } from "@/shared/script-format";
+import { formatScriptStepBody } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
 
@@ -135,8 +135,15 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
       </summary>
       <ol className="ui-list--stack">
         {macro.script.steps.map((step, index) => (
-          <li key={`${macro.id}-script-${index}`} className="ui-code-item">
-            {formatScriptStep(step, index)}
+          <li key={`${macro.id}-script-${index}`} className="ui-code-item ui-code-item--row">
+            <span className="ui-code-item__lead">
+              {index + 1}.
+              <span className="ui-badge">{step.type}</span>
+            </span>
+            <span className="ui-code-item__body">
+              {step.label ? <>{step.label} — </> : null}
+              {formatScriptStepBody(step)}
+            </span>
           </li>
         ))}
       </ol>

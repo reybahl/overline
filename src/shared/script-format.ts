@@ -25,25 +25,28 @@ function formatClickIndex(index: number | undefined): string {
   return ` · match #${index + 1}`;
 }
 
-export function formatScriptStep(step: ScriptStep, index: number): string {
-  const prefix = step.label ? `${step.label} — ` : "";
-
+export function formatScriptStepBody(step: ScriptStep): string {
   switch (step.type) {
     case "click":
-      return `${index + 1}. ${prefix}click · ${formatMatch(step.match)}${formatClickIndex(step.index)}`;
+      return `${formatMatch(step.match)}${formatClickIndex(step.index)}`;
     case "fill":
-      return `${index + 1}. ${prefix}fill · ${formatMatch(step.match)} → "${step.value}"`;
+      return `${formatMatch(step.match)} → "${step.value}"`;
     case "wait":
-      return `${index + 1}. ${prefix}wait · ${step.ms}ms`;
+      return `${step.ms}ms`;
     case "waitFor":
-      return `${index + 1}. ${prefix}waitFor · ${formatMatch(step.match)}${
+      return `${formatMatch(step.match)}${
         step.timeoutMs ? ` · up to ${Math.round(step.timeoutMs / 1000)}s` : ""
       }`;
     case "navigate":
-      return `${index + 1}. ${prefix}navigate · ${step.href}`;
+      return step.href;
     default: {
       const _exhaustive: never = step;
-      return `${index + 1}. ${String(_exhaustive)}`;
+      return String(_exhaustive);
     }
   }
+}
+
+export function formatScriptStep(step: ScriptStep, index: number): string {
+  const prefix = step.label ? `${step.label} — ` : "";
+  return `${index + 1}. ${prefix}${step.type} · ${formatScriptStepBody(step)}`;
 }
