@@ -25,10 +25,6 @@ import {
 } from "@/window/palette/macros";
 import { initMacroSettingsHost, isMacroSettingsOpen } from "@/window/palette/macro-settings-host";
 import { isParamPromptOpen } from "@/window/palette/param-prompt";
-import {
-  enableParamOnlyMode,
-  getRunMacroIdFromUrl,
-} from "@/window/palette/param-only";
 import { closePalette, startPanelHeightObserver } from "@/window/palette/panel-host";
 import {
   handleCancelRecording,
@@ -140,44 +136,18 @@ optionsLink.addEventListener("click", () => {
 
 startPanelHeightObserver();
 
-const runMacroId = getRunMacroIdFromUrl();
-const paramOnlyMode = runMacroId !== null;
-
-if (paramOnlyMode) {
-  enableParamOnlyMode();
-}
-
 void refreshMacros()
-  .then(() => (paramOnlyMode ? undefined : syncPendingRecord()))
-  .then(async () => {
-    if (!runMacroId) {
-      searchInput.focus();
-      return;
-    }
-
-    const macro = paletteState.savedMacros.find((entry) => entry.id === runMacroId);
-    if (!macro) {
-      closePalette();
-      return;
-    }
-
-    await handleRunMacro(macro, { closeOnFinish: true });
+  .then(() => syncPendingRecord())
+  .then(() => {
+    searchInput.focus();
   })
   .catch((error: unknown) => {
     const message =
       error instanceof Error ? error.message : "Failed to load macros";
-    if (paramOnlyMode) {
-      closePalette();
-      return;
-    }
     setStatus(message, true);
   });
 
 subscribeStorage((change) => {
-  if (paramOnlyMode) {
-    return;
-  }
-
   if (change.macros) {
     void refreshMacros().catch((error: unknown) => {
       const message =

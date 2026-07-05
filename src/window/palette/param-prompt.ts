@@ -2,6 +2,10 @@ import type { MacroParamValues } from "@/shared/macro-signature";
 import { macroNeedsParams, validateMacroParamValues } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import {
+  appendMacroParamFields,
+  readMacroParamValues,
+} from "@/window/macro-param-fields";
+import {
   paramPromptCancelBtn,
   paramPromptDialog,
   paramPromptErrorEl,
@@ -9,8 +13,6 @@ import {
   paramPromptForm,
   paramPromptTitleEl,
 } from "@/window/palette/elements";
-import { schedulePanelHeightReport } from "@/window/palette/panel-host";
-import { isParamOnlyMode } from "@/window/palette/param-only";
 
 export function isParamPromptOpen(): boolean {
   return paramPromptDialog.open;
@@ -29,31 +31,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
     paramPromptErrorEl.hidden = true;
     paramPromptErrorEl.textContent = "";
 
-    const inputs: HTMLInputElement[] = [];
-
-    for (const param of paramDefs) {
-      const field = document.createElement("label");
-      field.className = "ui-param-prompt__field";
-
-      const label = document.createElement("span");
-      label.className = "ui-param-prompt__label";
-      label.textContent = param.label;
-
-      const input = document.createElement("input");
-      input.className = "ui-param-prompt__input";
-      input.name = param.name;
-      input.type = param.type === "number" ? "text" : "text";
-      input.inputMode = param.type === "number" ? "numeric" : "text";
-      input.autocomplete = "off";
-      input.spellcheck = false;
-      if (param.description) {
-        input.placeholder = param.description;
-      }
-
-      field.append(label, input);
-      paramPromptFieldsEl.appendChild(field);
-      inputs.push(input);
-    }
+    const inputs = appendMacroParamFields(paramPromptFieldsEl, paramDefs);
 
     const finish = (values: MacroParamValues | null) => {
       paramPromptDialog.close();
@@ -70,16 +48,13 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
 
     const onSubmit = (event: Event) => {
       event.preventDefault();
-      const values = Object.fromEntries(
-        inputs.map((input) => [input.name, input.value.trim()]),
-      );
+      const values = readMacroParamValues(inputs);
       const error = validateMacroParamValues(paramDefs, values);
       if (error) {
         paramPromptErrorEl.textContent = error;
         paramPromptErrorEl.hidden = false;
         const invalid = inputs.find((input) => !input.value.trim());
         (invalid ?? inputs[0])?.focus();
-        schedulePanelHeightReport();
         return;
       }
       finish(values);
@@ -89,14 +64,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
     paramPromptCancelBtn.addEventListener("click", onCancel);
     paramPromptDialog.addEventListener("cancel", onCancel);
 
-    if (isParamOnlyMode()) {
-      // Stay in document flow so the overlay iframe can size to the dialog.
-      paramPromptDialog.show();
-    } else {
-      paramPromptDialog.showModal();
-    }
-
-    schedulePanelHeightReport();
+    paramPromptDialog.showModal();
     inputs[0]?.focus();
     inputs[0]?.select();
   });

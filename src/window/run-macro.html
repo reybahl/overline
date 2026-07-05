@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Run macro</title>
+  </head>
+  <body>
+    <main class="ui-run-macro">
+      <form id="run-macro-form" class="ui-run-macro__card">
+        <h1 id="run-macro-title" class="ui-run-macro__title"></h1>
+        <div id="run-macro-fields" class="ui-run-macro__fields"></div>
+        <p id="run-macro-error" class="ui-run-macro__error" hidden></p>
+        <div class="ui-run-macro__actions">
+          <button id="run-macro-cancel" type="button" class="ui-btn">Cancel</button>
+          <button type="submit" class="ui-btn ui-btn--primary">Run</button>
+        </div>
+      </form>
+    </main>
+    <script type="module" src="./run-macro.ts"></script>
+  </body>
+</html>

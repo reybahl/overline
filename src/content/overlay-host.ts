@@ -2,13 +2,15 @@ import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import {
   PANEL_CLOSE_MESSAGE,
   PANEL_RESIZE_MESSAGE,
+  RUN_MACRO_PANEL_WIDTH,
   UI_SHELL_MAX_HEIGHT,
   UI_SHELL_WIDTH,
 } from "@/ui/tokens";
 
 const OVERLAY_HOST_ID = "ui-overlay-host";
 const OVERLAY_STYLE_ID = "ui-overlay-styles";
-const PANEL_PATH = "src/window/index.html";
+const PALETTE_PANEL_PATH = "src/window/index.html";
+const RUN_MACRO_PANEL_PATH = "src/window/run-macro.html";
 
 /* Color values mirror src/ui/tokens.css */
 const overlayStyles = `
@@ -33,15 +35,15 @@ const overlayStyles = `
   overflow: hidden;
 }
 
-#${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-panel {
-  width: auto;
+#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
+  width: ${RUN_MACRO_PANEL_WIDTH}px;
   background: transparent;
   box-shadow: none;
   border-radius: 0;
   overflow: visible;
 }
 
-#${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-frame {
+#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-frame {
   border-radius: 0;
 }
 
@@ -98,7 +100,7 @@ const overlayStyles = `
       0 0 0 1px rgb(255 255 255 / 8%);
   }
 
-  #${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-panel {
+  #${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
     background: transparent;
     box-shadow: none;
   }
@@ -128,11 +130,13 @@ function ensureOverlayStyles(): void {
   document.documentElement.appendChild(style);
 }
 
-function getPanelUrl(macroId?: string): string {
-  const url = new URL(chrome.runtime.getURL(PANEL_PATH));
-  if (macroId) {
-    url.searchParams.set("runMacro", macroId);
-  }
+function getPalettePanelUrl(): string {
+  return chrome.runtime.getURL(PALETTE_PANEL_PATH);
+}
+
+function getRunMacroPanelUrl(macroId: string): string {
+  const url = new URL(chrome.runtime.getURL(RUN_MACRO_PANEL_PATH));
+  url.searchParams.set("macroId", macroId);
   return url.toString();
 }
 
@@ -153,7 +157,7 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
-  const extensionOrigin = new URL(getPanelUrl()).origin;
+  const extensionOrigin = new URL(getPalettePanelUrl()).origin;
   if (event.origin !== extensionOrigin) {
     return;
   }
@@ -172,10 +176,7 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
-  const minHeight = overlayHost?.classList.contains("ui-overlay-host--param-only")
-    ? 160
-    : 1;
-  const clamped = clampPanelHeight(Math.max(height, minHeight));
+  const clamped = clampPanelHeight(height);
   panelElement.style.height = `${clamped}px`;
   panelFrame?.setAttribute("scrolling", height > clamped ? "yes" : "no");
 }
@@ -198,12 +199,8 @@ function closeOverlay(): void {
   document.body.style.overflow = previousBodyOverflow;
 }
 
-function openOverlay(macroId?: string): void {
+function openOverlay(): void {
   if (isOverlayOpen()) {
-    if (macroId && panelFrame) {
-      overlayHost?.classList.add("ui-overlay-host--param-only");
-      panelFrame.src = getPanelUrl(macroId);
-    }
     return;
   }
 
@@ -213,9 +210,6 @@ function openOverlay(macroId?: string): void {
 
   overlayHost = document.createElement("div");
   overlayHost.id = OVERLAY_HOST_ID;
-  if (macroId) {
-    overlayHost.classList.add("ui-overlay-host--param-only");
-  }
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
   overlayHost.setAttribute("aria-label", "Overline");
@@ -230,7 +224,7 @@ function openOverlay(macroId?: string): void {
   panel.className = "ui-overlay-panel";
 
   const iframe = document.createElement("iframe");
-  iframe.src = getPanelUrl(macroId);
+  iframe.src = getPalettePanelUrl();
   iframe.title = "Overline";
   iframe.className = "ui-overlay-frame";
   iframe.setAttribute("scrolling", "no");
@@ -254,7 +248,52 @@ function openOverlay(macroId?: string): void {
 }
 
 function openOverlayForMacro(macroId: string): void {
-  openOverlay(macroId);
+  if (isOverlayOpen()) {
+    closeOverlay();
+  }
+
+  ensureOverlayStyles();
+  previousBodyOverflow = document.body.style.overflow;
+  document.body.style.overflow = "hidden";
+
+  overlayHost = document.createElement("div");
+  overlayHost.id = OVERLAY_HOST_ID;
+  overlayHost.classList.add("ui-overlay-host--run-macro");
+  overlayHost.setAttribute("role", "dialog");
+  overlayHost.setAttribute("aria-modal", "true");
+  overlayHost.setAttribute("aria-label", "Run macro");
+
+  overlayHost.addEventListener("mousedown", (event) => {
+    if (event.target === overlayHost) {
+      closeOverlay();
+    }
+  });
+
+  const panel = document.createElement("div");
+  panel.className = "ui-overlay-panel";
+
+  const iframe = document.createElement("iframe");
+  iframe.src = getRunMacroPanelUrl(macroId);
+  iframe.title = "Run macro";
+  iframe.className = "ui-overlay-frame";
+  iframe.setAttribute("scrolling", "no");
+
+  panel.appendChild(iframe);
+  overlayHost.appendChild(panel);
+  document.documentElement.appendChild(overlayHost);
+
+  panelElement = panel;
+  panelFrame = iframe;
+  window.addEventListener("message", handlePanelMessage);
+
+  keydownHandler = (event: KeyboardEvent) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      closeOverlay();
+    }
+  };
+  document.addEventListener("keydown", keydownHandler, true);
 }
 
 function toggleOverlay(): void {

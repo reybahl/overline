@@ -1,6 +1,7 @@
 /** Layout constants shared with overlay-host and tokens.css. */
 export const UI_SHELL_WIDTH = 560;
 export const UI_SHELL_MAX_HEIGHT = 480;
+export const RUN_MACRO_PANEL_WIDTH = 360;
 
 /** postMessage types between the overlay iframe and content-script host. */
 export const PANEL_RESIZE_MESSAGE = "PANEL_RESIZE";
