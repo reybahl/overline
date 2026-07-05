@@ -1,36 +1,17 @@
 import { useState } from "react";
+import { Pencil } from "lucide";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { formatScriptStep } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
+import { LucideIcon } from "@/ui/LucideIcon";
 
 type ScriptEditorProps = {
   macro: Macro;
   onSaved: (macros: Macro[]) => void;
   onError: (message: string | null) => void;
 };
-
-function PencilIcon() {
-  return (
-    <svg
-      className="ui-icon"
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M11.333 2.667a1.333 1.333 0 0 1 1.884 1.884L5.22 12.547l-2.887.962.962-2.887L11.333 2.667z"
-        stroke="currentColor"
-        strokeWidth="1.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
 
 export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
   const [editing, setEditing] = useState(false);
@@ -145,7 +126,7 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
             startEditing();
           }}
         >
-          <PencilIcon />
+          <LucideIcon icon={Pencil} />
         </button>
       </summary>
       <ol className="ui-list--stack">
