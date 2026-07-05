@@ -39,6 +39,8 @@ export function formatScriptStep(step: ScriptStep, index: number): string {
       return `${index + 1}. ${prefix}waitFor · ${formatMatch(step.match)}${
         step.timeoutMs ? ` · up to ${Math.round(step.timeoutMs / 1000)}s` : ""
       }`;
+    case "navigate":
+      return `${index + 1}. ${prefix}navigate · ${step.href}`;
     default: {
       const _exhaustive: never = step;
       return `${index + 1}. ${String(_exhaustive)}`;

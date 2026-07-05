@@ -28,6 +28,7 @@ export const MacroSignatureSchema = z.object({
 /** Templatable string field on a compiled script step. */
 export const MacroScriptPatchFieldSchema = z.enum([
   "value",
+  "href",
   "match.id",
   "match.ariaLabel",
   "match.text",

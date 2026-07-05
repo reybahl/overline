@@ -173,7 +173,9 @@ function buildCompileScriptPrompt(
     `- description: ${MACRO_DESCRIPTION_RULE}`,
     "",
     "Rules:",
-    "- One output click/fill step per demo step — same count, same order",
+    "- One output step per demo step (click, fill, or navigate) — same count, same order",
+    "- Prefer navigate over click when the demo click was pure link navigation with generalizable recordedMatch.hrefSuffix",
+    "- Keep click when: no hrefSuffix, toggle/pressed state, in-page # fragment, button without href, or intent needs ordinal/relative targeting (first, latest, top)",
     "- Generalize each recordedMatch; never add fields absent from that step's recordedMatch (especially testId)",
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
     "- Stable semantic ids → keep id UNLESS intent marks that value as user-provided at run time (see below)",
@@ -189,7 +191,14 @@ function buildCompileScriptPrompt(
     "- Scoped paths (/org/project/items) → hrefPattern preserving segment count",
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
-    "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
+    "Navigate (when demo click is pure link navigation):",
+    "- Emit { type: \"navigate\", href } instead of click — href is pathname + search like recordedMatch.hrefSuffix",
+    "- Generalize scoped slugs with {{segment0}}, {{segment1}}, … from demo pageUrl (0 = first path segment)",
+    "- Fragment/hash hrefSuffix (#…) → never navigate; keep click",
+    "- Query tabs (?tab=…) → navigate with query preserved in href",
+    "- User-provided literals stay in href for the signature pass — do not open-regex them",
+    "",
+    "Allowed: click, fill, navigate, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
     "- Keep demo literals in fill values and match fields for user-provided intent slots — do not replace them with open regexes (e.g. /items/\\\\d+)",
     "- Runtime parameterization ({{param}} templates) is applied in a later pass",
   ].join("\n");
@@ -211,9 +220,10 @@ const MACRO_SIGNATURE_RULES = [
 
 const MACRO_SIGNATURE_PATCH_RULES = [
   "patches replace one script field with a template containing {{paramName}}",
-  "Allowed fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
+  "Allowed fields: value (fill only), href (navigate only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
   "template is the FULL new string for that field",
   "Correlate the demo literal from recordedMatch or fill value with the param named in intent (item number → itemNumber, search text → searchTerm)",
+  "When compiled step is navigate and href carries the demo literal, patch href (not match fields)",
   "When recordedMatch has hrefSuffix/hrefContains with the demo literal, prefer match.hrefContains or match.hrefSuffix over match.id",
   "When compiled script only has match.id embedding the demo literal, template the literal portion: e.g. item_{{itemNumber}}_link",
   "Every declared param must appear in at least one patch template",
@@ -263,6 +273,8 @@ function summarizeScriptForSignature(script: MacroScript): Record<string, unknow
         return { ...base, match: step.match, ...(step.index ? { index: step.index } : {}) };
       case "waitFor":
         return { ...base, match: step.match };
+      case "navigate":
+        return { ...base, href: step.href };
       case "wait":
         return { ...base, ms: step.ms };
       default: {

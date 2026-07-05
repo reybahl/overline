@@ -50,11 +50,18 @@ export const ScriptWaitForStepSchema = ScriptStepLabelSchema.extend({
   timeoutMs: z.number().int().positive().optional(),
 });
 
+export const ScriptNavigateStepSchema = ScriptStepLabelSchema.extend({
+  type: z.literal("navigate"),
+  /** Pathname + search relative to origin; may include {{segmentN}} and {{param}} placeholders. */
+  href: z.string().min(1),
+});
+
 export const ScriptStepSchema = z.discriminatedUnion("type", [
   ScriptClickStepSchema,
   ScriptFillStepSchema,
   ScriptWaitStepSchema,
   ScriptWaitForStepSchema,
+  ScriptNavigateStepSchema,
 ]);
 
 export const MacroScriptSchema = z.object({
@@ -67,5 +74,6 @@ export type ScriptClickStep = z.infer<typeof ScriptClickStepSchema>;
 export type ScriptFillStep = z.infer<typeof ScriptFillStepSchema>;
 export type ScriptWaitStep = z.infer<typeof ScriptWaitStepSchema>;
 export type ScriptWaitForStep = z.infer<typeof ScriptWaitForStepSchema>;
+export type ScriptNavigateStep = z.infer<typeof ScriptNavigateStepSchema>;
 export type ScriptStep = z.infer<typeof ScriptStepSchema>;
 export type MacroScript = z.infer<typeof MacroScriptSchema>;

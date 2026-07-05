@@ -1,4 +1,5 @@
 import { createLogger } from "@/shared/logger";
+import { isPathSegmentPlaceholder } from "@/shared/resolve-navigate-href";
 import {
   STANDALONE_MACRO_SIGNATURE,
   type InferredMacroSignature,
@@ -36,6 +37,7 @@ const ALLOWED_FIELDS: Record<ScriptStep["type"], readonly MacroScriptPatchField[
   fill: ["value", ...MATCH_PATCH_FIELDS],
   waitFor: MATCH_PATCH_FIELDS,
   wait: [],
+  navigate: ["href"],
 };
 
 function standalone(script: MacroScript) {
@@ -46,7 +48,10 @@ function readField(step: ScriptStep, field: MacroScriptPatchField): string | und
   if (field === "value") {
     return step.type === "fill" ? step.value : undefined;
   }
-  if (step.type === "wait") {
+  if (field === "href") {
+    return step.type === "navigate" ? step.href : undefined;
+  }
+  if (step.type === "wait" || step.type === "navigate") {
     return undefined;
   }
   const key = field.slice("match.".length) as keyof ElementMatch;
@@ -65,8 +70,14 @@ function writeField(
     }
     return { ...step, value: template };
   }
-  if (step.type === "wait") {
-    throw new Error(`${field} not valid on wait steps`);
+  if (field === "href") {
+    if (step.type !== "navigate") {
+      throw new Error(`${field} only valid on navigate steps`);
+    }
+    return { ...step, href: template };
+  }
+  if (step.type === "wait" || step.type === "navigate") {
+    throw new Error(`${field} not valid on ${step.type} steps`);
   }
   const key = field.slice("match.".length) as keyof ElementMatch;
   return { ...step, match: { ...step.match, [key]: template } };
@@ -75,7 +86,10 @@ function writeField(
 function paramRefsIn(value: string): Set<string> {
   const names = new Set<string>();
   for (const match of value.matchAll(PLACEHOLDER_RE)) {
-    names.add(match[1]);
+    const name = match[1];
+    if (!isPathSegmentPlaceholder(name)) {
+      names.add(name);
+    }
   }
   return names;
 }
@@ -88,7 +102,10 @@ export function getParamRefsInScript(script: MacroScript): Set<string> {
     if (step.type === "fill") {
       values.push(step.value);
     }
-    if (step.type !== "wait") {
+    if (step.type === "navigate") {
+      values.push(step.href);
+    }
+    if (step.type === "click" || step.type === "waitFor") {
       for (const key of MATCH_KEYS) {
         const value = step.match[key];
         if (typeof value === "string") {
@@ -197,7 +214,7 @@ function patchMismatch(
 
 /** Drop demo-pinned id when another match field is templated. */
 function dropPinnedId(step: ScriptStep): ScriptStep {
-  if (step.type === "wait" || !step.match.id || step.match.id.includes("{{")) {
+  if (step.type !== "click" || !step.match.id || step.match.id.includes("{{")) {
     return step;
   }
   const matchTemplated = MATCH_PATCH_FIELDS.some((field) =>
@@ -253,7 +270,10 @@ export function macroNeedsParams(macro: Macro): boolean {
 export type MacroParamValues = Record<string, string>;
 
 function substituteParamsInString(value: string, params: MacroParamValues): string {
-  return value.replace(PLACEHOLDER_RE, (_match, name: string) => {
+  return value.replace(PLACEHOLDER_RE, (placeholder, name: string) => {
+    if (isPathSegmentPlaceholder(name)) {
+      return placeholder;
+    }
     const replacement = params[name];
     if (replacement === undefined) {
       throw new Error(`Missing value for param "${name}".`);
@@ -265,6 +285,13 @@ function substituteParamsInString(value: string, params: MacroParamValues): stri
 function instantiateStep(step: ScriptStep, params: MacroParamValues): ScriptStep {
   if (step.type === "wait") {
     return step;
+  }
+
+  if (step.type === "navigate") {
+    return {
+      ...step,
+      href: substituteParamsInString(step.href, params),
+    };
   }
 
   if (step.type === "fill") {

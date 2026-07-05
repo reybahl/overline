@@ -49,6 +49,13 @@ function stepNeedsElement(step: MacroStep): boolean {
   );
 }
 
+function scriptStepLikelyNavigates(step: ScriptStep): boolean {
+  return (
+    step.type === "navigate" ||
+    (step.type === "click" && clickMatchLikelyNavigates(step.match))
+  );
+}
+
 function scriptStepNeedsSettle(step: ScriptStep): boolean {
   return step.type === "click";
 }
@@ -130,7 +137,7 @@ export async function runMacroScript(
   script: MacroScript,
   cdpSession: CdpSession,
 ): Promise<void> {
-  let urlBeforeLastClick: string | undefined;
+  let urlBeforeLastNav: string | undefined;
   let priorClickSkip: ClickVerificationSkip = EMPTY_CLICK_SKIP;
 
   for (let i = 0; i < script.steps.length; i++) {
@@ -141,11 +148,10 @@ export async function runMacroScript(
       const previousStep = script.steps[i - 1];
       if (
         !priorClickSkip.navigation &&
-        urlBeforeLastClick &&
-        previousStep.type === "click" &&
-        clickMatchLikelyNavigates(previousStep.match)
+        urlBeforeLastNav &&
+        scriptStepLikelyNavigates(previousStep)
       ) {
-        await waitForUrlChangeAfterClick(tabId, urlBeforeLastClick);
+        await waitForUrlChangeAfterClick(tabId, urlBeforeLastNav);
       }
 
       const alreadyWaited =
@@ -162,7 +168,9 @@ export async function runMacroScript(
     priorClickSkip = EMPTY_CLICK_SKIP;
 
     const urlBeforeStep =
-      step.type === "click" ? await getTabUrl(tabId) : undefined;
+      step.type === "click" || step.type === "navigate"
+        ? await getTabUrl(tabId)
+        : undefined;
 
     log.info("executing step", { step: stepNum, type: step.type, label: step.label });
 
@@ -175,7 +183,19 @@ export async function runMacroScript(
           session: cdpSession,
         });
         if (urlBeforeStep) {
-          urlBeforeLastClick = urlBeforeStep;
+          urlBeforeLastNav = urlBeforeStep;
+        }
+      } else if (step.type === "navigate") {
+        const response = await sendContentMessage(tabId, {
+          type: "EXECUTE_SCRIPT",
+          steps: [step],
+        });
+        if (!response.ok) {
+          throw new Error(response.error);
+        }
+        if (urlBeforeStep) {
+          await waitForUrlChangeAfterClick(tabId, urlBeforeStep);
+          urlBeforeLastNav = urlBeforeStep;
         }
       } else {
         const response = await sendContentMessage(tabId, {
