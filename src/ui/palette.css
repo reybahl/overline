@@ -325,6 +325,11 @@ html.ol-param-only #macro-settings-root,
   background: rgb(0 0 0 / 0.35);
 }
 
+html.ol-param-only .ui-param-prompt::backdrop,
+.ui-shell--param-only .ui-param-prompt::backdrop {
+  display: none;
+}
+
 .ui-param-prompt__form {
   display: flex;
   flex-direction: column;

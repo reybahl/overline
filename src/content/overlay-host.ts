@@ -172,7 +172,10 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
-  const clamped = clampPanelHeight(height);
+  const minHeight = overlayHost?.classList.contains("ui-overlay-host--param-only")
+    ? 160
+    : 1;
+  const clamped = clampPanelHeight(Math.max(height, minHeight));
   panelElement.style.height = `${clamped}px`;
   panelFrame?.setAttribute("scrolling", height > clamped ? "yes" : "no");
 }

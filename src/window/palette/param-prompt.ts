@@ -9,6 +9,8 @@ import {
   paramPromptForm,
   paramPromptTitleEl,
 } from "@/window/palette/elements";
+import { schedulePanelHeightReport } from "@/window/palette/panel-host";
+import { isParamOnlyMode } from "@/window/palette/param-only";
 
 export function isParamPromptOpen(): boolean {
   return paramPromptDialog.open;
@@ -77,6 +79,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
         paramPromptErrorEl.hidden = false;
         const invalid = inputs.find((input) => !input.value.trim());
         (invalid ?? inputs[0])?.focus();
+        schedulePanelHeightReport();
         return;
       }
       finish(values);
@@ -86,7 +89,14 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
     paramPromptCancelBtn.addEventListener("click", onCancel);
     paramPromptDialog.addEventListener("cancel", onCancel);
 
-    paramPromptDialog.showModal();
+    if (isParamOnlyMode()) {
+      // Stay in document flow so the overlay iframe can size to the dialog.
+      paramPromptDialog.show();
+    } else {
+      paramPromptDialog.showModal();
+    }
+
+    schedulePanelHeightReport();
     inputs[0]?.focus();
     inputs[0]?.select();
   });
