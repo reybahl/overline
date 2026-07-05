@@ -5,6 +5,7 @@ import {
   instantiateMacroScript,
   macroNeedsParams,
   repairMacroSignature,
+  validateMacroForSave,
   validateMacroParamValues,
   validateMacroScriptSignature,
 } from "@/shared/macro-signature";
@@ -171,6 +172,39 @@ describe("validateMacroScriptSignature", () => {
         { name: "branch", label: "Branch", type: "string" },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("validateMacroForSave", () => {
+  test("keeps unused params when script has no placeholders", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([CLICK_STEP]),
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch", type: "string" as const }],
+      },
+    } as Macro;
+
+    expect(validateMacroForSave(macro).signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
+  });
+
+  test("rejects script placeholders without declared params", () => {
+    const script = scriptWithSteps([
+      {
+        type: "click",
+        match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+      },
+    ]);
+    const macro = {
+      id: "test",
+      script,
+      signature: { version: 1 as const, params: [] },
+    } as Macro;
+
+    expect(() => validateMacroForSave(macro)).toThrow(/no param "branch"/);
   });
 });
 

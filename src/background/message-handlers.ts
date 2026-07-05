@@ -1,6 +1,6 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
-import { macroNeedsParams, validateMacroForSave, validateMacroParamValues } from "@/shared/macro-signature";
+import { macroNeedsParams, validateMacroForSave, validateMacroParamValues, validateMacroScriptSignature } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
 import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
@@ -127,6 +127,35 @@ export const backgroundHandlers = {
     return { ok: true as const, macros };
   },
 
+  SAVE_MACRO_SCRIPT: async (message, _context) => {
+    const macros = await getMacros();
+    const index = macros.findIndex((macro) => macro.id === message.macroId);
+    if (index < 0) {
+      throw new Error("Macro not found.");
+    }
+    if (!message.script) {
+      throw new Error("Script is required.");
+    }
+
+    const existing = macros[index];
+    const syncError = validateMacroScriptSignature(
+      message.script,
+      existing.signature?.params ?? [],
+    );
+    if (syncError) {
+      throw new Error(syncError);
+    }
+
+    macros[index] = {
+      ...existing,
+      script: message.script,
+      updatedAt: Date.now(),
+    };
+    await saveMacros(macros);
+
+    return { ok: true as const, macros };
+  },
+
   DELETE_MACRO: async (message, _context) => {
     const macros = (await getMacros()).filter(
       (macro) => macro.id !== message.macroId,
@@ -244,6 +273,8 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.GET_MACROS(message, context);
     case "SAVE_MACRO":
       return backgroundHandlers.SAVE_MACRO(message, context);
+    case "SAVE_MACRO_SCRIPT":
+      return backgroundHandlers.SAVE_MACRO_SCRIPT(message, context);
     case "DELETE_MACRO":
       return backgroundHandlers.DELETE_MACRO(message, context);
     case "RUN_MACRO_BY_ID":

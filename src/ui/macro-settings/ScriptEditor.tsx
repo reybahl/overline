@@ -59,12 +59,9 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
     }
 
     const response = await sendBackgroundMessage({
-      type: "SAVE_MACRO",
-      macro: {
-        ...macro,
-        script: result.data,
-        updatedAt: Date.now(),
-      },
+      type: "SAVE_MACRO_SCRIPT",
+      macroId: macro.id,
+      script: result.data,
     });
 
     if (!response.ok) {

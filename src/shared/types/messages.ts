@@ -17,6 +17,7 @@ export type BackgroundMessage =
   | { type: "EXECUTE_MACRO"; tabId: number; macroId: string; params?: MacroParamValues }
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
+  | { type: "SAVE_MACRO_SCRIPT"; macroId: string; script: Macro["script"] }
   | { type: "DELETE_MACRO"; macroId: string }
   | { type: "DEV_LOG"; entry: LogEntry }
   | { type: "GET_LLM_SETTINGS" }
@@ -33,6 +34,7 @@ export type BackgroundSuccessMap = {
   EXECUTE_MACRO: { ok: true };
   GET_MACROS: { ok: true; macros: Macro[] };
   SAVE_MACRO: { ok: true; macros: Macro[] };
+  SAVE_MACRO_SCRIPT: { ok: true; macros: Macro[] };
   DELETE_MACRO: { ok: true; macros: Macro[] };
   DEV_LOG: { ok: true };
   GET_LLM_SETTINGS: {

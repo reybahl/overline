@@ -27,7 +27,7 @@ export function MacroParamsEditor({
   const [params, setParams] = useState<MacroParam[]>(() => macro.signature?.params ?? []);
   const [dirty, setDirty] = useState(false);
 
-  if (scriptRefs.size === 0 && !macroNeedsParams(macro)) {
+  if (!macro.script || (scriptRefs.size === 0 && !macroNeedsParams(macro))) {
     return null;
   }
 
