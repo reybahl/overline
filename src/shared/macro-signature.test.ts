@@ -2,13 +2,16 @@ import { describe, expect, test } from "bun:test";
 
 import {
   applyInferredMacroSignature,
+  finalizeInferredMacroSignature,
   instantiateMacroScript,
   macroNeedsParams,
+  repairMacroSignature,
   validateMacroForSave,
   validateMacroParamValues,
 } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
+import { STANDALONE_MACRO_SIGNATURE } from "@/shared/types/macro-signature";
 
 const CLICK_STEP: ScriptStep = {
   type: "click",
@@ -183,6 +186,57 @@ describe("validateMacroForSave", () => {
     expect(validateMacroForSave(macro as Macro)).toBe(
       "Macro signature does not match script: unused param: branch",
     );
+  });
+});
+
+describe("repairMacroSignature", () => {
+  const branchScript = scriptWithSteps([
+    {
+      type: "click",
+      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+    },
+  ]);
+
+  test("synthesizes signature from script placeholders", () => {
+    const macro = { id: "test", script: branchScript } as Macro;
+    const repaired = repairMacroSignature(macro);
+
+    expect(validateMacroForSave(repaired)).toBeNull();
+    expect(repaired.signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
+  });
+
+  test("leaves valid macros unchanged", () => {
+    const macro = {
+      id: "test",
+      script: branchScript,
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch name", type: "string" as const }],
+      },
+    } as Macro;
+
+    expect(repairMacroSignature(macro)).toBe(macro);
+  });
+});
+
+describe("finalizeInferredMacroSignature", () => {
+  test("falls back to concrete compiled script when invalid", () => {
+    const compiled = scriptWithSteps([
+      { type: "click", match: { ariaLabel: "fixes", text: "fixes" } },
+    ]);
+    const invalid = {
+      script: scriptWithSteps([
+        { type: "click", match: { ariaLabel: "{{branch}}", text: "{{branch}}" } },
+      ]),
+      signature: STANDALONE_MACRO_SIGNATURE,
+    };
+
+    const result = finalizeInferredMacroSignature(compiled, invalid);
+
+    expect(result.script).toEqual(compiled);
+    expect(result.signature).toEqual(STANDALONE_MACRO_SIGNATURE);
   });
 });
 

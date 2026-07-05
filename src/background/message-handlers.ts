@@ -1,6 +1,6 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
-import { macroNeedsParams, validateMacroForSave, validateMacroParamValues } from "@/shared/macro-signature";
+import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
@@ -108,15 +108,12 @@ export const backgroundHandlers = {
       }
     }
 
-    const signatureError = validateMacroForSave(message.macro);
-    if (signatureError) {
-      throw new Error(signatureError);
-    }
+    const macro = repairMacroSignature(message.macro);
 
     if (index >= 0) {
-      macros[index] = message.macro;
+      macros[index] = macro;
     } else {
-      macros.push(message.macro);
+      macros.push(macro);
     }
     await saveMacros(macros);
 
