@@ -13,9 +13,7 @@ import {
   generateBtn,
   intentInput,
   optionsLink,
-  palettePanelEl,
   searchInput,
-  statusEl,
 } from "@/window/palette/elements";
 import {
   getSelectableItemCount,
@@ -27,6 +25,10 @@ import {
 } from "@/window/palette/macros";
 import { initMacroSettingsHost, isMacroSettingsOpen } from "@/window/palette/macro-settings-host";
 import { isParamPromptOpen } from "@/window/palette/param-prompt";
+import {
+  enableParamOnlyMode,
+  getRunMacroIdFromUrl,
+} from "@/window/palette/param-only";
 import { closePalette, startPanelHeightObserver } from "@/window/palette/panel-host";
 import {
   handleCancelRecording,
@@ -138,16 +140,6 @@ optionsLink.addEventListener("click", () => {
 
 startPanelHeightObserver();
 
-function getRunMacroIdFromUrl(): string | null {
-  return new URLSearchParams(window.location.search).get("runMacro");
-}
-
-function enableParamOnlyMode(): void {
-  document.querySelector(".ui-shell")?.classList.add("ui-shell--param-only");
-  palettePanelEl.hidden = true;
-  statusEl.hidden = true;
-}
-
 const runMacroId = getRunMacroIdFromUrl();
 const paramOnlyMode = runMacroId !== null;
 
@@ -156,7 +148,7 @@ if (paramOnlyMode) {
 }
 
 void refreshMacros()
-  .then(() => syncPendingRecord())
+  .then(() => (paramOnlyMode ? undefined : syncPendingRecord()))
   .then(async () => {
     if (!runMacroId) {
       searchInput.focus();
@@ -182,6 +174,10 @@ void refreshMacros()
   });
 
 subscribeStorage((change) => {
+  if (paramOnlyMode) {
+    return;
+  }
+
   if (change.macros) {
     void refreshMacros().catch((error: unknown) => {
       const message =

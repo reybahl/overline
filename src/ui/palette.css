@@ -8,10 +8,34 @@
   min-height: 0;
 }
 
+html.ol-param-only,
+html.ol-param-only body {
+  background: transparent;
+}
+
+html.ol-param-only .ui-shell {
+  width: auto;
+  padding: 0;
+}
+
 .ui-shell--param-only {
   align-items: center;
   justify-content: center;
   min-height: 0;
+  background: transparent;
+}
+
+html.ol-param-only #palette-panel,
+html.ol-param-only #status,
+html.ol-param-only #review-panel,
+html.ol-param-only #capture-output,
+html.ol-param-only #macro-settings-root,
+.ui-shell--param-only #palette-panel,
+.ui-shell--param-only #status,
+.ui-shell--param-only #review-panel,
+.ui-shell--param-only #capture-output,
+.ui-shell--param-only #macro-settings-root {
+  display: none !important;
 }
 
 .ui-palette {

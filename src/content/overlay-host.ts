@@ -33,6 +33,18 @@ const overlayStyles = `
   overflow: hidden;
 }
 
+#${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-panel {
+  width: auto;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+#${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-frame {
+  border-radius: 0;
+}
+
 @keyframes ui-overlay-enter {
   from {
     opacity: 0;
@@ -84,6 +96,11 @@ const overlayStyles = `
     box-shadow:
       0 24px 48px rgb(0 0 0 / 45%),
       0 0 0 1px rgb(255 255 255 / 8%);
+  }
+
+  #${OVERLAY_HOST_ID}.ui-overlay-host--param-only .ui-overlay-panel {
+    background: transparent;
+    box-shadow: none;
   }
 }
 `;
@@ -181,6 +198,7 @@ function closeOverlay(): void {
 function openOverlay(macroId?: string): void {
   if (isOverlayOpen()) {
     if (macroId && panelFrame) {
+      overlayHost?.classList.add("ui-overlay-host--param-only");
       panelFrame.src = getPanelUrl(macroId);
     }
     return;
@@ -192,6 +210,9 @@ function openOverlay(macroId?: string): void {
 
   overlayHost = document.createElement("div");
   overlayHost.id = OVERLAY_HOST_ID;
+  if (macroId) {
+    overlayHost.classList.add("ui-overlay-host--param-only");
+  }
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
   overlayHost.setAttribute("aria-label", "Overline");

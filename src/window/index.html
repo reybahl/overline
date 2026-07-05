@@ -6,6 +6,11 @@
     <title>Overline</title>
   </head>
   <body>
+    <script>
+      if (new URLSearchParams(location.search).has("runMacro")) {
+        document.documentElement.classList.add("ol-param-only");
+      }
+    </script>
     <main class="ui-shell ui-shell--palette">
       <div id="palette-panel" class="ui-palette">
         <div class="ui-palette__search-wrap">
