@@ -105,7 +105,7 @@ export function getParamRefsInScript(script: MacroScript): Set<string> {
   return names;
 }
 
-/** Returns an error when script placeholders and param metadata diverge. */
+/** Returns an error when the script references an undefined param. */
 export function validateMacroScriptSignature(
   script: MacroScript,
   params: MacroParam[],
@@ -118,31 +118,16 @@ export function validateMacroScriptSignature(
     declared.add(param.name);
   }
 
-  const refs = getParamRefsInScript(script);
-  for (const name of refs) {
+  for (const name of getParamRefsInScript(script)) {
     if (!declared.has(name)) {
       return `Script uses {{${name}}} but no param "${name}" is defined. Add it in Params first.`;
-    }
-  }
-  for (const param of params) {
-    if (!refs.has(param.name)) {
-      return `Param "${param.name}" is not used in the script. Use {{${param.name}}} in the script or remove the param.`;
     }
   }
   return null;
 }
 
 function stripOrphanSignature(macro: Macro): Macro {
-  if (!macro.script) {
-    return (macro.signature?.params.length ?? 0) > 0
-      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
-      : macro;
-  }
-
-  if (
-    getParamRefsInScript(macro.script).size === 0 &&
-    (macro.signature?.params.length ?? 0) > 0
-  ) {
+  if (!macro.script && (macro.signature?.params.length ?? 0) > 0) {
     return { ...macro, signature: STANDALONE_MACRO_SIGNATURE };
   }
 

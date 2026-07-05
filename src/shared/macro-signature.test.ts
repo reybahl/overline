@@ -156,15 +156,13 @@ describe("validateMacroScriptSignature", () => {
     );
   });
 
-  test("rejects unused params", () => {
+  test("allows unused params", () => {
     expect(
       validateMacroScriptSignature(branchScript, [
         { name: "branch", label: "Branch", type: "string" },
         { name: "extra", label: "Extra", type: "string" },
       ]),
-    ).toBe(
-      'Param "extra" is not used in the script. Use {{extra}} in the script or remove the param.',
-    );
+    ).toBeNull();
   });
 
   test("accepts matching script and params", () => {
@@ -207,7 +205,7 @@ describe("repairMacroSignature", () => {
     expect(repairMacroSignature(macro)).toBe(macro);
   });
 
-  test("clears orphan signature params", () => {
+  test("keeps unused signature params when script has no placeholders", () => {
     const macro = {
       id: "test",
       script: scriptWithSteps([CLICK_STEP]),
@@ -217,10 +215,12 @@ describe("repairMacroSignature", () => {
       },
     } as Macro;
 
-    expect(repairMacroSignature(macro).signature?.params).toEqual([]);
+    expect(repairMacroSignature(macro).signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
   });
 
-  test("preserves existing param metadata when dropping orphans", () => {
+  test("preserves existing param metadata for script placeholders", () => {
     const macro = {
       id: "test",
       script: scriptWithSteps([
@@ -240,6 +240,7 @@ describe("repairMacroSignature", () => {
 
     expect(repairMacroSignature(macro).signature?.params).toEqual([
       { name: "prNumber", label: "PR number", type: "number" },
+      { name: "orphan", label: "Orphan", type: "string" },
     ]);
   });
 });
