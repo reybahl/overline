@@ -1,5 +1,5 @@
 import { createLogger } from "@/shared/logger";
-import { isPathSegmentPlaceholder } from "@/shared/resolve-navigate-href";
+import { isPathSegmentPlaceholder, navigateHrefIsScopeOnly } from "@/shared/resolve-navigate-href";
 import {
   STANDALONE_MACRO_SIGNATURE,
   type InferredMacroSignature,
@@ -352,6 +352,19 @@ export function applyInferredMacroSignature(
 ) {
   if (inferred.standalone || inferred.params.length === 0 || inferred.patches.length === 0) {
     return standalone(script);
+  }
+
+  for (const patch of inferred.patches) {
+    if (patch.field !== "href") {
+      continue;
+    }
+    const step = script.steps[patch.stepIndex];
+    if (step?.type === "navigate" && navigateHrefIsScopeOnly(step.href)) {
+      log.warn("signature rejected href patch on scope-only navigate", {
+        stepIndex: patch.stepIndex,
+      });
+      return standalone(script);
+    }
   }
 
   const patchError = patchMismatch(script, inferred.params, inferred.patches);

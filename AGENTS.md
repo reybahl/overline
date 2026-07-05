@@ -48,7 +48,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - **Query/tab hrefs** (`?tab=…`): `hrefPattern`, never `hrefFromPathSegment`.
 - Scoped paths: `hrefPattern` preserving segment count.
 - Never combine `hrefFromPathSegment` with `hrefPattern` or text fields.
-- **Navigate:** prefer `{ type: "navigate", href }` over click when demo click was pure link navigation with `recordedMatch.hrefSuffix`. Generalize scoped slugs as `{{segment0}}`, `{{segment1}}`, … from demo `pageUrl`. Never navigate for `#…` fragments, toggles (`pressed`), buttons without href, or ordinal intents (first/latest/top).
+- **Navigate:** prefer `{ type: "navigate", href }` over click when demo click was pure link navigation with `recordedMatch.hrefSuffix`. Shared `pageUrl` segments → `{{segmentN}}`; static path tail literal. `{{segmentN}}` is playback scope, not a user param.
 - Do not insert extra `waitFor` steps — playback owns timing between actions.
 - Description from compile with generalized roles ("the owner", "the current repository") — not raw intent, session URLs, or slugs.
 

@@ -72,6 +72,44 @@ describe("applyInferredMacroSignature", () => {
     });
   });
 
+  test("rejects href patch on scope-only navigate", () => {
+    const script = scriptWithSteps([
+      { type: "navigate", href: "/{{segment0}}/{{segment1}}/pulls" },
+    ]);
+    const result = applyInferredMacroSignature(script, {
+      standalone: false,
+      params: [{ name: "repoName", label: "Repository name", type: "string" }],
+      patches: [
+        { stepIndex: 0, field: "href", template: "/{{repoName}}/pulls" },
+      ],
+    });
+
+    expect(result.script).toEqual(script);
+    expect(result.signature.params).toEqual([]);
+  });
+
+  test("patches navigate href for user-provided literal", () => {
+    const script = scriptWithSteps([
+      { type: "navigate", href: "/acme/widget/pull/1980" },
+    ]);
+    const result = applyInferredMacroSignature(script, {
+      standalone: false,
+      params: [{ name: "prNumber", label: "PR number", type: "number" }],
+      patches: [
+        {
+          stepIndex: 0,
+          field: "href",
+          template: "/{{segment0}}/{{segment1}}/pull/{{prNumber}}",
+        },
+      ],
+    });
+
+    expect(result.script.steps[0]).toEqual({
+      type: "navigate",
+      href: "/{{segment0}}/{{segment1}}/pull/{{prNumber}}",
+    });
+  });
+
   test("patches click match href", () => {
     const script = scriptWithSteps([CLICK_STEP]);
     const result = applyInferredMacroSignature(script, {

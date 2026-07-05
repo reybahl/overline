@@ -193,10 +193,12 @@ function buildCompileScriptPrompt(
     "",
     "Navigate (when demo click is pure link navigation):",
     "- Emit { type: \"navigate\", href } instead of click — href is pathname + search like recordedMatch.hrefSuffix",
-    "- Generalize scoped slugs with {{segment0}}, {{segment1}}, … from demo pageUrl (0 = first path segment)",
+    "- Segments shared with demo pageUrl → {{segment0}}, {{segment1}}, … (0 = first path segment); static tail stays literal",
+    "- {{segmentN}} is resolved from the page at playback — never a runtime user param",
+    "- Do not use {{param}} for slugs already on demo pageUrl when intent refers to the current page scope",
     "- Fragment/hash hrefSuffix (#…) → never navigate; keep click",
     "- Query tabs (?tab=…) → navigate with query preserved in href",
-    "- User-provided literals stay in href for the signature pass — do not open-regex them",
+    "- User-provided literals (only when intent marks them) stay in href for the signature pass",
     "",
     "Allowed: click, fill, navigate, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
     "- Keep demo literals in fill values and match fields for user-provided intent slots — do not replace them with open regexes (e.g. /items/\\\\d+)",
@@ -216,6 +218,8 @@ const MACRO_SIGNATURE_RULES = [
   "- Intent mentions a user slot but no compiled or recordedMatch field contains the demo literal to template",
   "",
   "Never infer params from demo values alone when intent does not mark them as user-provided.",
+  "{{segment0}}, {{segment1}}, … in navigate href are compile-time path scope — NOT macro params.",
+  "Never declare params for slugs taken from startUrl/pageUrl (current page scope). Those use {{segmentN}} only.",
 ];
 
 const MACRO_SIGNATURE_PATCH_RULES = [
@@ -223,7 +227,7 @@ const MACRO_SIGNATURE_PATCH_RULES = [
   "Allowed fields: value (fill only), href (navigate only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
   "template is the FULL new string for that field",
   "Correlate the demo literal from recordedMatch or fill value with the param named in intent (item number → itemNumber, search text → searchTerm)",
-  "When compiled step is navigate and href carries the demo literal, patch href (not match fields)",
+  "Patch navigate href only for literals the user will supply at run time — never replace {{segmentN}} scope placeholders",
   "When recordedMatch has hrefSuffix/hrefContains with the demo literal, prefer match.hrefContains or match.hrefSuffix over match.id",
   "When compiled script only has match.id embedding the demo literal, template the literal portion: e.g. item_{{itemNumber}}_link",
   "Every declared param must appear in at least one patch template",
@@ -260,6 +264,10 @@ const MACRO_SIGNATURE_EXAMPLE = [
   "",
   "Example B — intent: \"search for TERM where TERM is something I type each run\"",
   "Patch fill value to \"{{searchTerm}}\"",
+  "",
+  "Example C — intent: \"open the pull requests list for the current repository\" (no user-supplied slot)",
+  "Compiled step 0: { type: \"navigate\", href: \"/{{segment0}}/{{segment1}}/pulls\" }",
+  "Correct output: standalone true, params [], patches []",
 ];
 
 function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {

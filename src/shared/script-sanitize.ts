@@ -1,4 +1,5 @@
 import { normalizeElementMatch } from "@/shared/script-match";
+import { generalizeNavigateHrefFromDemo } from "@/shared/resolve-navigate-href";
 import { isStableId } from "@/shared/stable-id";
 import type { MacroStep } from "@/shared/types/macro";
 import type {
@@ -159,13 +160,13 @@ function navigateToClick(
   };
 }
 
-function constrainNavigateHref(demo: DemoScriptStep, href: string): string {
+function resolveNavigateHrefForDemo(demo: DemoScriptStep): string | undefined {
   const suffix = demo.recordedMatch?.hrefSuffix;
-  if (!suffix || href.includes(suffix)) {
-    return href;
+  if (!suffix || !demo.pageUrl) {
+    return undefined;
   }
 
-  return suffix;
+  return generalizeNavigateHrefFromDemo(demo.pageUrl, suffix);
 }
 
 /**
@@ -197,7 +198,7 @@ export function sanitizeCompiledScript(
 
       return {
         ...step,
-        href: constrainNavigateHref(demo, step.href),
+        href: resolveNavigateHrefForDemo(demo) ?? step.href,
       };
     }
 

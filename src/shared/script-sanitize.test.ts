@@ -7,12 +7,12 @@ describe("sanitizeCompiledScript navigate", () => {
     const script = sanitizeCompiledScript(
       {
         version: 1,
-        steps: [{ type: "navigate", href: "/acme/widget/pulls" }],
+        steps: [{ type: "navigate", href: "/wrong/repo/pulls" }],
       },
       [
         {
           type: "click",
-          pageUrl: "https://github.com/acme/widget",
+          pageUrl: "https://example.com/acme/widget",
           recordedMatch: { tag: "a", hrefSuffix: "/acme/widget/pulls" },
         },
       ],
@@ -20,7 +20,7 @@ describe("sanitizeCompiledScript navigate", () => {
 
     expect(script.steps[0]).toEqual({
       type: "navigate",
-      href: "/acme/widget/pulls",
+      href: "/{{segment0}}/{{segment1}}/pulls",
     });
   });
 
