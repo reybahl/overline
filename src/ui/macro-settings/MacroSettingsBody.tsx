@@ -1,9 +1,9 @@
 import { formatMacroStep } from "@/shared/macro-step-format";
-import { formatScriptStep } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 
 import { MacroDetailsEditor } from "@/ui/macro-settings/MacroDetailsEditor";
 import { RunScopeEditor } from "@/ui/macro-settings/RunScopeEditor";
+import { ScriptEditor } from "@/ui/macro-settings/ScriptEditor";
 import { ShortcutEditor } from "@/ui/macro-settings/ShortcutEditor";
 
 type MacroSettingsBodyProps = {
@@ -36,32 +36,12 @@ export function MacroSettingsBody({
       <ShortcutEditor macro={macro} onSaved={onSaved} onError={onError} />
 
       <div className="ui-section">
-        {macro.script ? (
-          <details className="ui-disclosure">
-            <summary className="ui-disclosure__summary">
-              {macro.script.steps.length} script step
-              {macro.script.steps.length === 1 ? "" : "s"}
-            </summary>
-            <ol className="ui-list--stack">
-              {macro.script.steps.map((step, index) => (
-                <li
-                  key={`${macro.id}-script-${index}`}
-                  className="ui-code-item"
-                >
-                  {formatScriptStep(step, index)}
-                </li>
-              ))}
-            </ol>
-            <details className="ui-disclosure">
-              <summary className="ui-disclosure__summary">Raw script JSON</summary>
-              <pre className="ui-code">
-                {JSON.stringify(macro.script, null, 2)}
-              </pre>
-            </details>
-          </details>
-        ) : (
-          <p className="ui-text-muted">No compiled script — re-record this macro.</p>
-        )}
+        <ScriptEditor
+          key={macro.id}
+          macro={macro}
+          onSaved={onSaved}
+          onError={onError}
+        />
 
         <details className="ui-disclosure">
           <summary className="ui-disclosure__summary">
