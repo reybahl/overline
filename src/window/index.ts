@@ -134,18 +134,42 @@ optionsLink.addEventListener("click", () => {
   void chrome.runtime.openOptionsPage();
 });
 
-startPanelHeightObserver();
+function getPromptMacroId(): string | null {
+  const id = new URLSearchParams(location.search).get("promptMacro");
+  return id?.trim() ? id : null;
+}
 
-void refreshMacros()
-  .then(() => syncPendingRecord())
-  .then(() => {
-    searchInput.focus();
-  })
-  .catch((error: unknown) => {
-    const message =
-      error instanceof Error ? error.message : "Failed to load macros";
-    setStatus(message, true);
-  });
+const promptMacroId = getPromptMacroId();
+
+if (promptMacroId) {
+  void refreshMacros()
+    .then(() => {
+      const macro = paletteState.savedMacros.find((entry) => entry.id === promptMacroId);
+      if (!macro) {
+        throw new Error("Macro not found.");
+      }
+      return handleRunMacro(macro, { closeOnFinish: true });
+    })
+    .catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to run macro";
+      setStatus(message, true);
+      closePalette();
+    });
+} else {
+  startPanelHeightObserver();
+
+  void refreshMacros()
+    .then(() => syncPendingRecord())
+    .then(() => {
+      searchInput.focus();
+    })
+    .catch((error: unknown) => {
+      const message =
+        error instanceof Error ? error.message : "Failed to load macros";
+      setStatus(message, true);
+    });
+}
 
 subscribeStorage((change) => {
   if (change.macros) {

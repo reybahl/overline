@@ -13,6 +13,7 @@ import { mountLucideIcon } from "@/ui/mount-icon";
 import { Plus, Settings } from "lucide";
 import { openMacroSettings } from "@/window/palette/macro-settings-host";
 import { paletteActions } from "@/window/palette/actions";
+import { closePalette } from "@/window/palette/panel-host";
 import { promptMacroParams } from "@/window/palette/param-prompt";
 import {
   macroEmptyEl,
@@ -250,7 +251,10 @@ export async function executeMacroById(
   }
 }
 
-export async function handleRunMacro(macro?: Macro): Promise<void> {
+export async function handleRunMacro(
+  macro?: Macro,
+  options?: { closeOnFinish?: boolean },
+): Promise<void> {
   const selected =
     macro ?? paletteState.filteredMacros[paletteState.selectedIndex];
   if (!selected) {
@@ -296,6 +300,9 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
     setStatus(errorMessage, true);
   } finally {
     setBusy(false);
+    if (options?.closeOnFinish) {
+      closePalette();
+    }
   }
 }
 

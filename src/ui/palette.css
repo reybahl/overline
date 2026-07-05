@@ -295,15 +295,23 @@
   background: rgb(0 0 0 / 0.35);
 }
 
-html.ui-run-macro-page,
-html.ui-run-macro-page body {
+html.ol-prompt-only,
+html.ol-prompt-only body {
   background: transparent;
-  margin: 0;
 }
 
-.ui-param-prompt--inline {
-  display: block;
-  margin: 0;
+html.ol-prompt-only .ui-shell {
+  width: 100%;
+  padding: 0;
+  background: transparent;
+}
+
+html.ol-prompt-only #palette-panel,
+html.ol-prompt-only #status,
+html.ol-prompt-only #review-panel,
+html.ol-prompt-only #capture-output,
+html.ol-prompt-only #macro-settings-root {
+  display: none !important;
 }
 
 .ui-param-prompt__form {

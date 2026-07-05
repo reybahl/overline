@@ -6,12 +6,12 @@ import {
   UI_SHELL_WIDTH,
 } from "@/ui/tokens";
 
-const RUN_MACRO_PANEL_WIDTH = 360;
+const PROMPT_MACRO_PANEL_WIDTH = 360;
+const PROMPT_MACRO_PANEL_HEIGHT = 280;
 
 const OVERLAY_HOST_ID = "ui-overlay-host";
 const OVERLAY_STYLE_ID = "ui-overlay-styles";
 const PALETTE_PANEL_PATH = "src/window/index.html";
-const RUN_MACRO_PANEL_PATH = "src/window/run-macro.html";
 
 /* Color values mirror src/ui/tokens.css */
 const overlayStyles = `
@@ -36,15 +36,16 @@ const overlayStyles = `
   overflow: hidden;
 }
 
-#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
-  width: ${RUN_MACRO_PANEL_WIDTH}px;
+#${OVERLAY_HOST_ID}.ui-overlay-host--prompt-macro .ui-overlay-panel {
+  width: ${PROMPT_MACRO_PANEL_WIDTH}px;
+  height: ${PROMPT_MACRO_PANEL_HEIGHT}px;
   background: transparent;
   box-shadow: none;
   border-radius: 0;
   overflow: visible;
 }
 
-#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-frame {
+#${OVERLAY_HOST_ID}.ui-overlay-host--prompt-macro .ui-overlay-frame {
   border-radius: 0;
 }
 
@@ -101,7 +102,7 @@ const overlayStyles = `
       0 0 0 1px rgb(255 255 255 / 8%);
   }
 
-  #${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
+  #${OVERLAY_HOST_ID}.ui-overlay-host--prompt-macro .ui-overlay-panel {
     background: transparent;
     box-shadow: none;
   }
@@ -135,9 +136,9 @@ function getPalettePanelUrl(): string {
   return chrome.runtime.getURL(PALETTE_PANEL_PATH);
 }
 
-function getRunMacroPanelUrl(macroId: string): string {
-  const url = new URL(chrome.runtime.getURL(RUN_MACRO_PANEL_PATH));
-  url.searchParams.set("macroId", macroId);
+function getPromptMacroPanelUrl(macroId: string): string {
+  const url = new URL(chrome.runtime.getURL(PALETTE_PANEL_PATH));
+  url.searchParams.set("promptMacro", macroId);
   return url.toString();
 }
 
@@ -169,6 +170,10 @@ function handlePanelMessage(event: MessageEvent): void {
   }
 
   if (event.data?.type !== PANEL_RESIZE_MESSAGE) {
+    return;
+  }
+
+  if (overlayHost?.classList.contains("ui-overlay-host--prompt-macro")) {
     return;
   }
 
@@ -204,7 +209,7 @@ function mountOverlay(options: {
   iframeSrc: string;
   ariaLabel: string;
   iframeTitle: string;
-  runMacro?: boolean;
+  promptMacro?: boolean;
   replaceExisting?: boolean;
 }): void {
   if (isOverlayOpen()) {
@@ -220,8 +225,8 @@ function mountOverlay(options: {
 
   overlayHost = document.createElement("div");
   overlayHost.id = OVERLAY_HOST_ID;
-  if (options.runMacro) {
-    overlayHost.classList.add("ui-overlay-host--run-macro");
+  if (options.promptMacro) {
+    overlayHost.classList.add("ui-overlay-host--prompt-macro");
   }
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
@@ -270,10 +275,10 @@ function openOverlay(): void {
 
 function openOverlayForMacro(macroId: string): void {
   mountOverlay({
-    iframeSrc: getRunMacroPanelUrl(macroId),
+    iframeSrc: getPromptMacroPanelUrl(macroId),
     ariaLabel: "Run macro",
     iframeTitle: "Run macro",
-    runMacro: true,
+    promptMacro: true,
     replaceExisting: true,
   });
 }
