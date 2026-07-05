@@ -81,7 +81,7 @@ export function MacroParamsEditor({
       {params.map((param, index) => {
         const nameLocked = scriptRefs.has(param.name);
         return (
-          <div key={`${param.name}-${index}`} className="ui-stack ui-stack--param">
+          <div key={index} className="ui-stack ui-stack--param">
             <label className="ui-field">
               <span className="ui-label">Name</span>
               <input
