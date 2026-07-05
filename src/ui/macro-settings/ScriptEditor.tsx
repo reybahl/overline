@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
+import { validateMacroScriptSignature } from "@/shared/macro-signature";
 import { formatScriptStep } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
@@ -50,13 +51,17 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
       return;
     }
 
+    const params = macro.signature?.params ?? [];
+    const syncError = validateMacroScriptSignature(result.data, params);
+    if (syncError) {
+      onError(syncError);
+      return;
+    }
+
     const response = await sendBackgroundMessage({
-      type: "SAVE_MACRO",
-      macro: {
-        ...macro,
-        script: result.data,
-        updatedAt: Date.now(),
-      },
+      type: "SAVE_MACRO_SCRIPT",
+      macroId: macro.id,
+      script: result.data,
     });
 
     if (!response.ok) {

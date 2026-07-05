@@ -5,7 +5,9 @@ import {
   instantiateMacroScript,
   macroNeedsParams,
   repairMacroSignature,
+  validateMacroForSave,
   validateMacroParamValues,
+  validateMacroScriptSignature,
 } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
@@ -141,6 +143,71 @@ describe("instantiateMacroScript", () => {
   });
 });
 
+describe("validateMacroScriptSignature", () => {
+  const branchScript = scriptWithSteps([
+    {
+      type: "click",
+      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+    },
+  ]);
+
+  test("rejects undeclared script placeholders", () => {
+    expect(validateMacroScriptSignature(branchScript, [])).toBe(
+      'Script uses {{branch}} but no param "branch" is defined. Add it in Params first.',
+    );
+  });
+
+  test("allows unused params", () => {
+    expect(
+      validateMacroScriptSignature(branchScript, [
+        { name: "branch", label: "Branch", type: "string" },
+        { name: "extra", label: "Extra", type: "string" },
+      ]),
+    ).toBeNull();
+  });
+
+  test("accepts matching script and params", () => {
+    expect(
+      validateMacroScriptSignature(branchScript, [
+        { name: "branch", label: "Branch", type: "string" },
+      ]),
+    ).toBeNull();
+  });
+});
+
+describe("validateMacroForSave", () => {
+  test("keeps unused params when script has no placeholders", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([CLICK_STEP]),
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch", type: "string" as const }],
+      },
+    } as Macro;
+
+    expect(validateMacroForSave(macro).signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
+  });
+
+  test("rejects script placeholders without declared params", () => {
+    const script = scriptWithSteps([
+      {
+        type: "click",
+        match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+      },
+    ]);
+    const macro = {
+      id: "test",
+      script,
+      signature: { version: 1 as const, params: [] },
+    } as Macro;
+
+    expect(() => validateMacroForSave(macro)).toThrow(/no param "branch"/);
+  });
+});
+
 describe("repairMacroSignature", () => {
   const branchScript = scriptWithSteps([
     {
@@ -172,7 +239,7 @@ describe("repairMacroSignature", () => {
     expect(repairMacroSignature(macro)).toBe(macro);
   });
 
-  test("clears orphan signature params", () => {
+  test("keeps unused signature params when script has no placeholders", () => {
     const macro = {
       id: "test",
       script: scriptWithSteps([CLICK_STEP]),
@@ -182,10 +249,12 @@ describe("repairMacroSignature", () => {
       },
     } as Macro;
 
-    expect(repairMacroSignature(macro).signature?.params).toEqual([]);
+    expect(repairMacroSignature(macro).signature?.params).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
   });
 
-  test("preserves existing param metadata when dropping orphans", () => {
+  test("preserves existing param metadata for script placeholders", () => {
     const macro = {
       id: "test",
       script: scriptWithSteps([
@@ -205,6 +274,7 @@ describe("repairMacroSignature", () => {
 
     expect(repairMacroSignature(macro).signature?.params).toEqual([
       { name: "prNumber", label: "PR number", type: "number" },
+      { name: "orphan", label: "Orphan", type: "string" },
     ]);
   });
 });

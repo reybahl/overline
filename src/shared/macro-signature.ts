@@ -80,7 +80,8 @@ function paramRefsIn(value: string): Set<string> {
   return names;
 }
 
-function paramRefsInScript(script: MacroScript): Set<string> {
+/** Placeholder names referenced in a compiled script. */
+export function getParamRefsInScript(script: MacroScript): Set<string> {
   const names = new Set<string>();
   for (const step of script.steps) {
     const values: string[] = [];
@@ -104,27 +105,56 @@ function paramRefsInScript(script: MacroScript): Set<string> {
   return names;
 }
 
-function signatureMismatch(script: MacroScript, params: MacroParam[]): string | null {
+/** Returns an error when the script references an undefined param. */
+export function validateMacroScriptSignature(
+  script: MacroScript,
+  params: MacroParam[],
+): string | null {
   const declared = new Set<string>();
   for (const param of params) {
     if (declared.has(param.name)) {
-      return `duplicate param: ${param.name}`;
+      return `Duplicate param name "${param.name}".`;
     }
     declared.add(param.name);
   }
 
-  const refs = paramRefsInScript(script);
-  for (const name of refs) {
+  for (const name of getParamRefsInScript(script)) {
     if (!declared.has(name)) {
-      return `undeclared param: ${name}`;
-    }
-  }
-  for (const param of params) {
-    if (!refs.has(param.name)) {
-      return `unused param: ${param.name}`;
+      return `Script uses {{${name}}} but no param "${name}" is defined. Add it in Params first.`;
     }
   }
   return null;
+}
+
+function stripOrphanSignature(macro: Macro): Macro {
+  if (!macro.script && (macro.signature?.params.length ?? 0) > 0) {
+    return { ...macro, signature: STANDALONE_MACRO_SIGNATURE };
+  }
+
+  return macro;
+}
+
+/** Validate script/signature sync before persisting a user-edited macro. */
+export function validateMacroForSave(macro: Macro): Macro {
+  const stripped = stripOrphanSignature(macro);
+  if (!stripped.script) {
+    return stripped;
+  }
+
+  const refs = getParamRefsInScript(stripped.script);
+  if (refs.size === 0) {
+    return stripped;
+  }
+
+  const error = validateMacroScriptSignature(
+    stripped.script,
+    stripped.signature?.params ?? [],
+  );
+  if (error) {
+    throw new Error(error);
+  }
+
+  return stripped;
 }
 
 function patchMismatch(
@@ -182,23 +212,20 @@ function dropPinnedId(step: ScriptStep): ScriptStep {
 
 /** Best-effort repair when script placeholders and signature metadata diverge. */
 export function repairMacroSignature(macro: Macro): Macro {
-  if (!macro.script) {
-    return (macro.signature?.params.length ?? 0) > 0
-      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
-      : macro;
+  const stripped = stripOrphanSignature(macro);
+  if (!stripped.script) {
+    return stripped;
   }
 
-  const refs = paramRefsInScript(macro.script);
-  const params = macro.signature?.params ?? [];
+  const refs = getParamRefsInScript(stripped.script);
+  const params = stripped.signature?.params ?? [];
 
   if (refs.size === 0) {
-    return params.length > 0
-      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
-      : macro;
+    return stripped;
   }
 
-  if (params.length > 0 && !signatureMismatch(macro.script, params)) {
-    return macro;
+  if (params.length > 0 && !validateMacroScriptSignature(stripped.script, params)) {
+    return stripped;
   }
 
   const existingByName = new Map(params.map((param) => [param.name, param]));
@@ -211,7 +238,7 @@ export function repairMacroSignature(macro: Macro): Macro {
       },
   );
   log.warn("macro signature repaired from script placeholders", { macroId: macro.id });
-  return { ...macro, signature: { version: 1, params: repairedParams } };
+  return { ...stripped, signature: { version: 1, params: repairedParams } };
 }
 
 function humanizeParamName(name: string): string {
@@ -328,7 +355,7 @@ export function applyInferredMacroSignature(
   };
   const signature = { version: 1 as const, params: inferred.params };
 
-  const signatureError = signatureMismatch(patchedScript, inferred.params);
+  const signatureError = validateMacroScriptSignature(patchedScript, inferred.params);
   if (signatureError) {
     log.warn("signature invalid after patch, using standalone", { error: signatureError });
     return standalone(script);
