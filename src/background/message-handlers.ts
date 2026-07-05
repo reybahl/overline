@@ -2,12 +2,13 @@ import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
 import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
+import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
 import { cancelPendingRecordSession } from "@/background/recording/recording-session";
 import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
-import { normalizeShortcut } from "@/shared/shortcut";
+import { normalizeShortcut, isReservedPaletteShortcut } from "@/shared/shortcut";
 import { validateRunScopePattern } from "@/shared/run-scope";
 import { getLlmSettings, saveLlmSettings } from "@/shared/clients/llm-settings";
 import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
@@ -69,7 +70,8 @@ async function runMacroById(
   }
 
   if (macroNeedsParams(macro) && !params) {
-    throw new Error(`"${macro.name}" requires inputs — run it from the palette.`);
+    await openOverlayForMacro(resolvedTabId, macroId, url);
+    return;
   }
 
   await runMacro(resolvedTabId, macro, { params });
@@ -95,6 +97,11 @@ export const backgroundHandlers = {
 
     if (message.macro.shortcut) {
       const normalized = normalizeShortcut(message.macro.shortcut);
+      if (isReservedPaletteShortcut(normalized)) {
+        throw new Error(
+          "Cmd/Ctrl+Shift+P is reserved for opening Overline. Choose a different shortcut.",
+        );
+      }
       const conflict = macros.find(
         (macro) =>
           macro.id !== message.macro.id &&

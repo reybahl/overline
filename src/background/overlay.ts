@@ -45,3 +45,22 @@ export async function closeOverlay(tabId: number): Promise<void> {
     // Overlay host may not be loaded, or overlay already closed.
   }
 }
+
+export async function openOverlayForMacro(
+  tabId: number,
+  macroId: string,
+  url?: string,
+): Promise<void> {
+  if (!isInjectableUrl(url)) {
+    throw new Error(getRestrictedPageMessage(url));
+  }
+
+  const response = await sendOverlayMessage(tabId, {
+    type: "OPEN_OVERLAY_RUN_MACRO",
+    macroId,
+  });
+
+  if (!response.ok) {
+    throw new Error(response.error ?? "Failed to open Overline.");
+  }
+}

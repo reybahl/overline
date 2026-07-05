@@ -25,7 +25,7 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["src/window/index.html"],
+      "resources": ["src/window/index.html", "src/window/run-macro.html"],
       "matches": ["http://*/*", "https://*/*"]
     }
   ],

@@ -2,7 +2,7 @@ import {
   migrateMacrosFromStorage,
   migratePendingRecordRaw,
 } from "@/shared/macro-migrate";
-import { normalizeShortcut } from "@/shared/shortcut";
+import { normalizeShortcut, isReservedPaletteShortcut } from "@/shared/shortcut";
 import { MacrosSchema, type Macro } from "@/shared/types/macro";
 import {
   PendingRecordSchema,
@@ -78,9 +78,14 @@ export async function getShortcutMap(): Promise<Map<string, string>> {
   const map = new Map<string, string>();
 
   for (const macro of macros) {
-    if (macro.shortcut) {
-      map.set(normalizeShortcut(macro.shortcut), macro.id);
+    if (!macro.shortcut) {
+      continue;
     }
+    const key = normalizeShortcut(macro.shortcut);
+    if (isReservedPaletteShortcut(key)) {
+      continue;
+    }
+    map.set(key, macro.id);
   }
 
   return map;

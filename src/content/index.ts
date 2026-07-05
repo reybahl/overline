@@ -25,6 +25,7 @@ function initializeContentScript(): void {
     ) => {
       if (
         message.type === "TOGGLE_OVERLAY" ||
+        message.type === "OPEN_OVERLAY_RUN_MACRO" ||
         message.type === "CLOSE_OVERLAY"
       ) {
         return false;

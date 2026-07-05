@@ -295,6 +295,17 @@
   background: rgb(0 0 0 / 0.35);
 }
 
+html.ui-run-macro-page,
+html.ui-run-macro-page body {
+  background: transparent;
+  margin: 0;
+}
+
+.ui-param-prompt--inline {
+  display: block;
+  margin: 0;
+}
+
 .ui-param-prompt__form {
   display: flex;
   flex-direction: column;

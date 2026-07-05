@@ -91,6 +91,7 @@ export type ContentMessage =
     }
   | { type: "PING" }
   | { type: "TOGGLE_OVERLAY" }
+  | { type: "OPEN_OVERLAY_RUN_MACRO"; macroId: string }
   | { type: "CLOSE_OVERLAY" };
 
 /** Viewport-relative center of an element, in CSS pixels. */

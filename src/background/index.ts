@@ -1,6 +1,6 @@
-import { toggleOverlay } from "@/background/overlay";
 import { handleBackgroundMessage } from "@/background/message-handlers";
 import { relayLogEntry } from "@/background/log-relay";
+import { toggleOverlay } from "@/background/overlay";
 import { bindLogRelay, createLogger } from "@/shared/logger";
 import type {
   BackgroundMessage,

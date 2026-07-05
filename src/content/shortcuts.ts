@@ -6,6 +6,7 @@ import {
 import {
   eventToShortcut,
   isEditableTarget,
+  isReservedPaletteShortcut,
   normalizeShortcut,
 } from "@/shared/shortcut";
 
@@ -38,15 +39,18 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
   await sendBackgroundMessage(message);
 }
 
+function resolveMacroIdSync(shortcut: string): string | undefined {
+  return shortcutToMacroId.get(normalizeShortcut(shortcut));
+}
+
 async function resolveMacroId(shortcut: string): Promise<string | undefined> {
-  const key = normalizeShortcut(shortcut);
-  const cached = shortcutToMacroId.get(key);
+  const cached = resolveMacroIdSync(shortcut);
   if (cached) {
     return cached;
   }
 
   await refreshShortcutMap();
-  return shortcutToMacroId.get(key);
+  return resolveMacroIdSync(shortcut);
 }
 
 function initializeShortcutsContentScript(): void {
@@ -69,6 +73,10 @@ function initializeShortcutsContentScript(): void {
             return;
           }
 
+          if (isReservedPaletteShortcut(shortcut)) {
+            return;
+          }
+
           const macroId = await resolveMacroId(shortcut);
           if (!macroId) {
             return;
@@ -76,7 +84,6 @@ function initializeShortcutsContentScript(): void {
 
           event.preventDefault();
           event.stopImmediatePropagation();
-
           void triggerMacroByShortcut(macroId);
         })();
       },

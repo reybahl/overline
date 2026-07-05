@@ -6,9 +6,12 @@ import {
   UI_SHELL_WIDTH,
 } from "@/ui/tokens";
 
+const RUN_MACRO_PANEL_WIDTH = 360;
+
 const OVERLAY_HOST_ID = "ui-overlay-host";
 const OVERLAY_STYLE_ID = "ui-overlay-styles";
-const PANEL_PATH = "src/window/index.html";
+const PALETTE_PANEL_PATH = "src/window/index.html";
+const RUN_MACRO_PANEL_PATH = "src/window/run-macro.html";
 
 /* Color values mirror src/ui/tokens.css */
 const overlayStyles = `
@@ -31,6 +34,18 @@ const overlayStyles = `
     0 2px 8px rgb(15 15 15 / 8%);
   flex-shrink: 0;
   overflow: hidden;
+}
+
+#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
+  width: ${RUN_MACRO_PANEL_WIDTH}px;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+#${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-frame {
+  border-radius: 0;
 }
 
 @keyframes ui-overlay-enter {
@@ -85,6 +100,11 @@ const overlayStyles = `
       0 24px 48px rgb(0 0 0 / 45%),
       0 0 0 1px rgb(255 255 255 / 8%);
   }
+
+  #${OVERLAY_HOST_ID}.ui-overlay-host--run-macro .ui-overlay-panel {
+    background: transparent;
+    box-shadow: none;
+  }
 }
 `;
 
@@ -111,8 +131,14 @@ function ensureOverlayStyles(): void {
   document.documentElement.appendChild(style);
 }
 
-function getPanelUrl(): string {
-  return chrome.runtime.getURL(PANEL_PATH);
+function getPalettePanelUrl(): string {
+  return chrome.runtime.getURL(PALETTE_PANEL_PATH);
+}
+
+function getRunMacroPanelUrl(macroId: string): string {
+  const url = new URL(chrome.runtime.getURL(RUN_MACRO_PANEL_PATH));
+  url.searchParams.set("macroId", macroId);
+  return url.toString();
 }
 
 function isOverlayOpen(): boolean {
@@ -132,7 +158,7 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
-  const extensionOrigin = new URL(getPanelUrl()).origin;
+  const extensionOrigin = new URL(getPalettePanelUrl()).origin;
   if (event.origin !== extensionOrigin) {
     return;
   }
@@ -174,9 +200,18 @@ function closeOverlay(): void {
   document.body.style.overflow = previousBodyOverflow;
 }
 
-function openOverlay(): void {
+function mountOverlay(options: {
+  iframeSrc: string;
+  ariaLabel: string;
+  iframeTitle: string;
+  runMacro?: boolean;
+  replaceExisting?: boolean;
+}): void {
   if (isOverlayOpen()) {
-    return;
+    if (!options.replaceExisting) {
+      return;
+    }
+    closeOverlay();
   }
 
   ensureOverlayStyles();
@@ -185,9 +220,12 @@ function openOverlay(): void {
 
   overlayHost = document.createElement("div");
   overlayHost.id = OVERLAY_HOST_ID;
+  if (options.runMacro) {
+    overlayHost.classList.add("ui-overlay-host--run-macro");
+  }
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
-  overlayHost.setAttribute("aria-label", "Overline");
+  overlayHost.setAttribute("aria-label", options.ariaLabel);
 
   overlayHost.addEventListener("mousedown", (event) => {
     if (event.target === overlayHost) {
@@ -199,8 +237,8 @@ function openOverlay(): void {
   panel.className = "ui-overlay-panel";
 
   const iframe = document.createElement("iframe");
-  iframe.src = getPanelUrl();
-  iframe.title = "Overline";
+  iframe.src = options.iframeSrc;
+  iframe.title = options.iframeTitle;
   iframe.className = "ui-overlay-frame";
   iframe.setAttribute("scrolling", "no");
 
@@ -220,6 +258,24 @@ function openOverlay(): void {
     }
   };
   document.addEventListener("keydown", keydownHandler, true);
+}
+
+function openOverlay(): void {
+  mountOverlay({
+    iframeSrc: getPalettePanelUrl(),
+    ariaLabel: "Overline",
+    iframeTitle: "Overline",
+  });
+}
+
+function openOverlayForMacro(macroId: string): void {
+  mountOverlay({
+    iframeSrc: getRunMacroPanelUrl(macroId),
+    ariaLabel: "Run macro",
+    iframeTitle: "Run macro",
+    runMacro: true,
+    replaceExisting: true,
+  });
 }
 
 function toggleOverlay(): void {
@@ -246,6 +302,18 @@ function initializeOverlayHost(): void {
       if (message.type === "CLOSE_OVERLAY") {
         closeOverlay();
         sendResponse({ ok: true });
+        return false;
+      }
+
+      if (message.type === "OPEN_OVERLAY_RUN_MACRO") {
+        try {
+          openOverlayForMacro(message.macroId);
+          sendResponse({ ok: true });
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Failed to open Overline";
+          sendResponse({ ok: false, error: errorMessage });
+        }
         return false;
       }
 
