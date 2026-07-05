@@ -147,6 +147,44 @@ export function isNavigableClick(demo: DemoScriptStep): boolean {
   return true;
 }
 
+/** True when navigate href repeats demo pageUrl slugs as literals instead of {{segmentN}}. */
+export function navigateHrefPinsDemoScope(
+  script: MacroScript,
+  demoSteps?: DemoScriptStep[],
+): boolean {
+  if (!demoSteps?.length) {
+    return false;
+  }
+
+  let demoIndex = 0;
+
+  for (const step of script.steps) {
+    if (step.type !== "navigate") {
+      continue;
+    }
+
+    const demo = demoSteps[demoIndex++];
+    if (!demo?.pageUrl) {
+      continue;
+    }
+
+    const pageSegments = new URL(demo.pageUrl).pathname.split("/").filter(Boolean);
+    const hrefPath = step.href.split("?")[0]?.split("#")[0] ?? "";
+    const hrefSegments = hrefPath.split("/").filter(Boolean);
+
+    for (let i = 0; i < pageSegments.length; i += 1) {
+      if (
+        hrefSegments[i] === pageSegments[i] &&
+        !step.href.includes(`{{segment${i}}}`)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 function navigateToClick(
   step: ScriptNavigateStep,
   demo: DemoScriptStep,

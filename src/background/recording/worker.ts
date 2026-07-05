@@ -4,6 +4,7 @@ import { z } from "zod";
 import { applyInferredMacroSignature } from "@/shared/macro-signature";
 import {
   buildDemoScriptForCompile,
+  navigateHrefPinsDemoScope,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
 import { getLlmSettings } from "@/shared/clients/llm-settings";
@@ -194,12 +195,13 @@ function buildCompileScriptPrompt(
     "",
     "Navigate (when demo click is pure link navigation):",
     "- Emit { type: \"navigate\", href } instead of click — href is pathname + search like recordedMatch.hrefSuffix",
+    "- NEVER emit recording-session slugs as literals when they match demo pageUrl — always {{segmentN}} for those",
     "- Compare demo pageUrl pathname to recordedMatch.hrefSuffix pathname segment by segment",
     "- Each segment equal to the same-index pageUrl segment → {{segment0}}, {{segment1}}, … (0 = first path segment)",
-    "- Segments in hrefSuffix not on pageUrl (static route parts) stay literal",
+    "- Segments in hrefSuffix not on pageUrl (static route parts like pulls, items, settings) stay literal",
     "- {{segmentN}} is resolved from the page at playback — never a runtime user param",
-    "- WRONG: /{{repoName}}/pulls or /{{projectSlug}}/items — never invent {{param}} for page scope",
-    "- WRONG: /acme/widget/pulls with demo literals left ungeneralized when pageUrl was /acme/widget",
+    "- WRONG: /{{repoName}}/pulls — invented param for page scope",
+    "- WRONG: /acme/widget/pulls when pageUrl was /acme/widget — demo slugs left as literals",
     "- RIGHT: pageUrl /acme/widget + hrefSuffix /acme/widget/pulls → /{{segment0}}/{{segment1}}/pulls",
     "- Fragment/hash hrefSuffix (#…) → never navigate; keep click",
     "- Query tabs (?tab=…) → navigate with query preserved in href",
@@ -588,16 +590,32 @@ export async function compileMacroScript(
   }
 
   const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
-  const result = await generateObjectWithModels<CompiledMacroOutput>(
+  const demoScript = buildDemoScriptForCompile(demoSteps);
+  let result = await generateObjectWithModels<CompiledMacroOutput>(
     CompiledMacroOutputSchema,
     prompt,
   );
+  let script = sanitizeCompiledScript(result.script, demoScript);
+
+  if (navigateHrefPinsDemoScope(script, demoScript)) {
+    log.warn("compile navigate href pins demo scope literals, retrying");
+    const retryPrompt = [
+      prompt,
+      "",
+      "Your navigate href still contains demo session path slugs as literals.",
+      "Any path segment that matches demo pageUrl at the same index must be {{segment0}}, {{segment1}}, … — not the recorded slug.",
+      "Only static route parts not on pageUrl (e.g. pulls, items) stay literal.",
+    ].join("\n");
+    result = await generateObjectWithModels<CompiledMacroOutput>(
+      CompiledMacroOutputSchema,
+      retryPrompt,
+    );
+    script = sanitizeCompiledScript(result.script, demoScript);
+  }
+
   return {
     ...result,
-    script: sanitizeCompiledScript(
-      result.script,
-      buildDemoScriptForCompile(demoSteps),
-    ),
+    script,
   };
 }
 

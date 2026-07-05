@@ -1,6 +1,47 @@
 import { describe, expect, test } from "bun:test";
 
-import { sanitizeCompiledScript } from "@/shared/script-sanitize";
+import {
+  navigateHrefPinsDemoScope,
+  sanitizeCompiledScript,
+} from "@/shared/script-sanitize";
+
+describe("navigateHrefPinsDemoScope", () => {
+  test("detects literal demo slugs in navigate href", () => {
+    expect(
+      navigateHrefPinsDemoScope(
+        {
+          version: 1,
+          steps: [{ type: "navigate", href: "/acme/widget/pulls" }],
+        },
+        [
+          {
+            type: "click",
+            pageUrl: "https://example.com/acme/widget",
+            recordedMatch: { hrefSuffix: "/acme/widget/pulls" },
+          },
+        ],
+      ),
+    ).toBe(true);
+  });
+
+  test("accepts generalized segment placeholders", () => {
+    expect(
+      navigateHrefPinsDemoScope(
+        {
+          version: 1,
+          steps: [{ type: "navigate", href: "/{{segment0}}/{{segment1}}/pulls" }],
+        },
+        [
+          {
+            type: "click",
+            pageUrl: "https://example.com/acme/widget",
+            recordedMatch: { hrefSuffix: "/acme/widget/pulls" },
+          },
+        ],
+      ),
+    ).toBe(false);
+  });
+});
 
 describe("sanitizeCompiledScript navigate", () => {
   test("passes through compile navigate href", () => {
