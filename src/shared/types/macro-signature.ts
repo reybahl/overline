@@ -3,8 +3,11 @@ import { z } from "zod";
 /** camelCase identifier used in script templates: {{prNumber}} */
 export const MacroParamNameSchema = z
   .string()
-  .min(1)
-  .regex(/^[a-z][a-zA-Z0-9]*$/, "camelCase identifier");
+  .min(1, "Param name is required.")
+  .regex(
+    /^[a-z][a-zA-Z0-9]*$/,
+    'Use camelCase: start with a lowercase letter, then letters or digits (e.g. "prNumber").',
+  );
 
 export const MacroParamTypeSchema = z.enum(["string", "number"]);
 

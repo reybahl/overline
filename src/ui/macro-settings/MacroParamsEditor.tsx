@@ -39,7 +39,11 @@ export function MacroParamsEditor({
   }
 
   async function saveParams(): Promise<void> {
-    const parsed = ParamsSchema.safeParse(params);
+    const normalized = params.map((param) => ({
+      ...param,
+      description: param.description?.trim() || undefined,
+    }));
+    const parsed = ParamsSchema.safeParse(normalized);
     if (!parsed.success) {
       onError(parsed.error.issues[0]?.message ?? "Invalid param.");
       return;
@@ -78,9 +82,7 @@ export function MacroParamsEditor({
       {params.length === 0 ? (
         <p className="ui-text-muted">No params defined.</p>
       ) : null}
-      {params.map((param, index) => {
-        const nameLocked = scriptRefs.has(param.name);
-        return (
+      {params.map((param, index) => (
           <div key={index} className="ui-stack ui-stack--param">
             <label className="ui-field">
               <span className="ui-label">Name</span>
@@ -88,7 +90,6 @@ export function MacroParamsEditor({
                 type="text"
                 className="ui-input ui-input--mono"
                 value={param.name}
-                readOnly={nameLocked}
                 spellCheck={false}
                 onChange={(event) => {
                   updateParam(index, { name: event.target.value });
@@ -114,9 +115,7 @@ export function MacroParamsEditor({
                 value={param.description ?? ""}
                 placeholder="Prompt helper text"
                 onChange={(event) => {
-                  updateParam(index, {
-                    description: event.target.value.trim() || undefined,
-                  });
+                  updateParam(index, { description: event.target.value });
                 }}
               />
             </label>
@@ -135,26 +134,18 @@ export function MacroParamsEditor({
                 <option value="number">number</option>
               </select>
             </label>
-            {nameLocked ? (
-              <p className="ui-text-muted">
-                {`{{${param.name}}}`} is used in the script — update the script before renaming or
-                removing.
-              </p>
-            ) : (
-              <button
-                type="button"
-                className="ui-btn ui-btn--sm ui-btn--ghost"
-                onClick={() => {
-                  setParams((current) => current.filter((_, i) => i !== index));
-                  setDirty(true);
-                }}
-              >
-                Remove
-              </button>
-            )}
+            <button
+              type="button"
+              className="ui-btn ui-btn--sm ui-btn--ghost"
+              onClick={() => {
+                setParams((current) => current.filter((_, i) => i !== index));
+                setDirty(true);
+              }}
+            >
+              Remove
+            </button>
           </div>
-        );
-      })}
+        ))}
       <div className="ui-inline-actions">
         <button
           type="button"
