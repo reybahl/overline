@@ -1,4 +1,5 @@
 import { macroNeedsParams } from "@/shared/macro-signature";
+import type { MacroParamValues } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { getMacrosForUrl, macroMatchesUrl } from "@/shared/macro-match";
@@ -227,6 +228,28 @@ export async function refreshMacros(preferredMacroId?: string): Promise<void> {
   renderMacroList(preferredMacroId);
 }
 
+export async function executeMacroById(
+  macroId: string,
+  params?: MacroParamValues,
+): Promise<void> {
+  const tab = await getActiveTab();
+  const tabId = tab.id;
+  if (tabId === undefined) {
+    throw new Error("No active tab found.");
+  }
+
+  const response = await sendBackgroundMessage({
+    type: "EXECUTE_MACRO",
+    tabId,
+    macroId,
+    ...(params && Object.keys(params).length > 0 ? { params } : {}),
+  });
+
+  if (!response.ok) {
+    throw new Error(response.error ?? "Failed to run macro.");
+  }
+}
+
 export async function handleRunMacro(macro?: Macro): Promise<void> {
   const selected =
     macro ?? paletteState.filteredMacros[paletteState.selectedIndex];
@@ -264,16 +287,7 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
 
     setStatus(`Running "${target.name}"…`);
 
-    const response = await sendBackgroundMessage({
-      type: "EXECUTE_MACRO",
-      tabId,
-      macroId: target.id,
-      ...(needsParams ? { params } : {}),
-    });
-
-    if (!response.ok) {
-      throw new Error(response.error ?? "Failed to run macro.");
-    }
+    await executeMacroById(target.id, needsParams ? params : undefined);
 
     setStatus(`Ran macro "${target.name}"`);
   } catch (error) {

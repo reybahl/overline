@@ -2,10 +2,11 @@ import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import {
   PANEL_CLOSE_MESSAGE,
   PANEL_RESIZE_MESSAGE,
-  RUN_MACRO_PANEL_WIDTH,
   UI_SHELL_MAX_HEIGHT,
   UI_SHELL_WIDTH,
 } from "@/ui/tokens";
+
+const RUN_MACRO_PANEL_WIDTH = 360;
 
 const OVERLAY_HOST_ID = "ui-overlay-host";
 const OVERLAY_STYLE_ID = "ui-overlay-styles";
@@ -199,9 +200,18 @@ function closeOverlay(): void {
   document.body.style.overflow = previousBodyOverflow;
 }
 
-function openOverlay(): void {
+function mountOverlay(options: {
+  iframeSrc: string;
+  ariaLabel: string;
+  iframeTitle: string;
+  runMacro?: boolean;
+  replaceExisting?: boolean;
+}): void {
   if (isOverlayOpen()) {
-    return;
+    if (!options.replaceExisting) {
+      return;
+    }
+    closeOverlay();
   }
 
   ensureOverlayStyles();
@@ -210,9 +220,12 @@ function openOverlay(): void {
 
   overlayHost = document.createElement("div");
   overlayHost.id = OVERLAY_HOST_ID;
+  if (options.runMacro) {
+    overlayHost.classList.add("ui-overlay-host--run-macro");
+  }
   overlayHost.setAttribute("role", "dialog");
   overlayHost.setAttribute("aria-modal", "true");
-  overlayHost.setAttribute("aria-label", "Overline");
+  overlayHost.setAttribute("aria-label", options.ariaLabel);
 
   overlayHost.addEventListener("mousedown", (event) => {
     if (event.target === overlayHost) {
@@ -224,8 +237,8 @@ function openOverlay(): void {
   panel.className = "ui-overlay-panel";
 
   const iframe = document.createElement("iframe");
-  iframe.src = getPalettePanelUrl();
-  iframe.title = "Overline";
+  iframe.src = options.iframeSrc;
+  iframe.title = options.iframeTitle;
   iframe.className = "ui-overlay-frame";
   iframe.setAttribute("scrolling", "no");
 
@@ -247,53 +260,22 @@ function openOverlay(): void {
   document.addEventListener("keydown", keydownHandler, true);
 }
 
-function openOverlayForMacro(macroId: string): void {
-  if (isOverlayOpen()) {
-    closeOverlay();
-  }
-
-  ensureOverlayStyles();
-  previousBodyOverflow = document.body.style.overflow;
-  document.body.style.overflow = "hidden";
-
-  overlayHost = document.createElement("div");
-  overlayHost.id = OVERLAY_HOST_ID;
-  overlayHost.classList.add("ui-overlay-host--run-macro");
-  overlayHost.setAttribute("role", "dialog");
-  overlayHost.setAttribute("aria-modal", "true");
-  overlayHost.setAttribute("aria-label", "Run macro");
-
-  overlayHost.addEventListener("mousedown", (event) => {
-    if (event.target === overlayHost) {
-      closeOverlay();
-    }
+function openOverlay(): void {
+  mountOverlay({
+    iframeSrc: getPalettePanelUrl(),
+    ariaLabel: "Overline",
+    iframeTitle: "Overline",
   });
+}
 
-  const panel = document.createElement("div");
-  panel.className = "ui-overlay-panel";
-
-  const iframe = document.createElement("iframe");
-  iframe.src = getRunMacroPanelUrl(macroId);
-  iframe.title = "Run macro";
-  iframe.className = "ui-overlay-frame";
-  iframe.setAttribute("scrolling", "no");
-
-  panel.appendChild(iframe);
-  overlayHost.appendChild(panel);
-  document.documentElement.appendChild(overlayHost);
-
-  panelElement = panel;
-  panelFrame = iframe;
-  window.addEventListener("message", handlePanelMessage);
-
-  keydownHandler = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      closeOverlay();
-    }
-  };
-  document.addEventListener("keydown", keydownHandler, true);
+function openOverlayForMacro(macroId: string): void {
+  mountOverlay({
+    iframeSrc: getRunMacroPanelUrl(macroId),
+    ariaLabel: "Run macro",
+    iframeTitle: "Run macro",
+    runMacro: true,
+    replaceExisting: true,
+  });
 }
 
 function toggleOverlay(): void {

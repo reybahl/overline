@@ -1,18 +1,11 @@
 import "@/ui/index.css";
-import "./run-macro.css";
 
 import { macroNeedsParams, validateMacroParamValues } from "@/shared/macro-signature";
+import type { MacroParam } from "@/shared/types/macro-signature";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { macroMatchesUrl } from "@/shared/macro-match";
-import {
-  getActiveTab,
-  getRestrictedPageMessage,
-  isInjectableUrl,
-} from "@/shared/tab";
-import {
-  appendMacroParamFields,
-  readMacroParamValues,
-} from "@/window/macro-param-fields";
+import { getActiveTab, isInjectableUrl } from "@/shared/tab";
+import { executeMacroById } from "@/window/palette/macros";
 import { closePalette, startPanelHeightObserver } from "@/window/palette/panel-host";
 
 const form = document.getElementById("run-macro-form") as HTMLFormElement;
@@ -21,36 +14,41 @@ const fieldsEl = document.getElementById("run-macro-fields") as HTMLDivElement;
 const errorEl = document.getElementById("run-macro-error") as HTMLParagraphElement;
 const cancelBtn = document.getElementById("run-macro-cancel") as HTMLButtonElement;
 
-function getMacroIdFromUrl(): string | null {
-  return new URLSearchParams(window.location.search).get("macroId");
-}
+function appendParamFields(
+  container: HTMLElement,
+  paramDefs: MacroParam[],
+): HTMLInputElement[] {
+  const inputs: HTMLInputElement[] = [];
 
-async function runMacro(macroId: string, params: Record<string, string>): Promise<void> {
-  const tab = await getActiveTab();
-  const tabId = tab.id;
-  const url = tab.url;
+  for (const param of paramDefs) {
+    const field = document.createElement("label");
+    field.className = "ui-param-prompt__field";
 
-  if (tabId === undefined) {
-    throw new Error("No active tab found.");
+    const label = document.createElement("span");
+    label.className = "ui-param-prompt__label";
+    label.textContent = param.label;
+
+    const input = document.createElement("input");
+    input.className = "ui-param-prompt__input";
+    input.name = param.name;
+    input.type = "text";
+    input.inputMode = param.type === "number" ? "numeric" : "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    if (param.description) {
+      input.placeholder = param.description;
+    }
+
+    field.append(label, input);
+    container.appendChild(field);
+    inputs.push(input);
   }
-  if (!url || !isInjectableUrl(url)) {
-    throw new Error(getRestrictedPageMessage(url));
-  }
 
-  const response = await sendBackgroundMessage({
-    type: "EXECUTE_MACRO",
-    tabId,
-    macroId,
-    ...(Object.keys(params).length > 0 ? { params } : {}),
-  });
-
-  if (!response.ok) {
-    throw new Error(response.error ?? "Failed to run macro.");
-  }
+  return inputs;
 }
 
 async function initialize(): Promise<void> {
-  const macroId = getMacroIdFromUrl();
+  const macroId = new URLSearchParams(window.location.search).get("macroId");
   if (!macroId) {
     closePalette();
     return;
@@ -77,13 +75,13 @@ async function initialize(): Promise<void> {
   titleEl.textContent = macro.name;
 
   if (!macroNeedsParams(macro) || !macro.signature) {
-    await runMacro(macro.id, {});
+    await executeMacroById(macro.id);
     closePalette();
     return;
   }
 
   const paramDefs = macro.signature.params;
-  const inputs = appendMacroParamFields(fieldsEl, paramDefs);
+  const inputs = appendParamFields(fieldsEl, paramDefs);
 
   cancelBtn.addEventListener("click", () => {
     closePalette();
@@ -92,24 +90,24 @@ async function initialize(): Promise<void> {
   form.addEventListener("submit", (event) => {
     event.preventDefault();
     void (async () => {
-      const values = readMacroParamValues(inputs);
+      const values = Object.fromEntries(
+        inputs.map((input) => [input.name, input.value.trim()]),
+      );
       const validationError = validateMacroParamValues(paramDefs, values);
       if (validationError) {
         errorEl.textContent = validationError;
         errorEl.hidden = false;
-        const invalid = inputs.find((input) => !input.value.trim());
-        (invalid ?? inputs[0])?.focus();
+        (inputs.find((input) => !input.value.trim()) ?? inputs[0])?.focus();
         return;
       }
 
       errorEl.hidden = true;
       try {
-        await runMacro(macro.id, values);
+        await executeMacroById(macro.id, values);
         closePalette();
       } catch (error) {
-        const message =
+        errorEl.textContent =
           error instanceof Error ? error.message : "Failed to run macro";
-        errorEl.textContent = message;
         errorEl.hidden = false;
       }
     })();
