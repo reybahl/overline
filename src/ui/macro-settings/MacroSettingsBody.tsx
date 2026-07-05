@@ -37,7 +37,7 @@ export function MacroSettingsBody({
 
       <div className="ui-section">
         <ScriptEditor
-          key={`${macro.id}-${macro.updatedAt}-script`}
+          key={macro.id}
           macro={macro}
           onSaved={onSaved}
           onError={onError}
