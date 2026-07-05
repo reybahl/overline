@@ -54,6 +54,23 @@ select.ui-input {
   font: 11px / 1.45 var(--ui-font-mono);
 }
 
+textarea.ui-input {
+  min-height: 10rem;
+  resize: vertical;
+  padding: var(--ui-space-3);
+}
+
+.ui-disclosure__summary--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-2);
+}
+
+.ui-disclosure__summary--row > button {
+  flex-shrink: 0;
+}
+
 /* Buttons */
 
 .ui-btn {
