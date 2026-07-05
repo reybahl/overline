@@ -34,6 +34,44 @@ describe("applyInferredMacroSignature", () => {
     expect(result.signature.params).toEqual([]);
   });
 
+  test("patches navigate href", () => {
+    const script = scriptWithSteps([
+      { type: "navigate", href: "/acme/widget/pull/1980" },
+    ]);
+    const result = applyInferredMacroSignature(script, {
+      standalone: false,
+      params: [{ name: "prNumber", label: "PR number", type: "number" }],
+      patches: [
+        {
+          stepIndex: 0,
+          field: "href",
+          template: "/{{segment0}}/{{segment1}}/pull/{{prNumber}}",
+        },
+      ],
+    });
+
+    expect(result.script.steps[0]).toEqual({
+      type: "navigate",
+      href: "/{{segment0}}/{{segment1}}/pull/{{prNumber}}",
+    });
+  });
+
+  test("substitutes placeholders in navigate href", () => {
+    const script = scriptWithSteps([
+      {
+        type: "navigate",
+        href: "/{{segment0}}/{{segment1}}/pull/{{prNumber}}",
+      },
+    ]);
+
+    const result = instantiateMacroScript(script, { prNumber: "42" });
+
+    expect(result.steps[0]).toEqual({
+      type: "navigate",
+      href: "/{{segment0}}/{{segment1}}/pull/42",
+    });
+  });
+
   test("patches click match href", () => {
     const script = scriptWithSteps([CLICK_STEP]);
     const result = applyInferredMacroSignature(script, {

@@ -181,6 +181,12 @@ async function attachRunScope(
   startUrl: string,
   endUrl: string,
 ): Promise<Macro> {
-  const runScope = await inferRunScope(intent, startUrl, endUrl, macro.steps);
+  const runScope = await inferRunScope(
+    intent,
+    startUrl,
+    endUrl,
+    macro.steps,
+    macro.script,
+  );
   return { ...macro, runScope };
 }

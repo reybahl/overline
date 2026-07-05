@@ -4,6 +4,7 @@ import { getAccessibleName } from "@/content/accessible-name";
 import { getVisibleText } from "@/content/element-text";
 import { isVisible } from "@/content/visibility";
 import { normalizeElementMatch } from "@/shared/script-match";
+import { resolveNavigateHref } from "@/shared/resolve-navigate-href";
 import { createLogger } from "@/shared/logger";
 import type { ContentPoint } from "@/shared/types/messages";
 import {
@@ -339,6 +340,10 @@ async function executeScriptStep(step: ScriptStep): Promise<void> {
         normalizeElementMatch(step.match),
         step.timeoutMs ?? DEFAULT_SCRIPT_WAIT_FOR_MS,
       );
+      return;
+    }
+    case "navigate": {
+      window.location.href = resolveNavigateHref(step.href, window.location.href);
       return;
     }
     default: {

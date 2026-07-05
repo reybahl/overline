@@ -5,8 +5,6 @@ import {
 } from "@/shared/types/pending-record";
 import { MacroScriptSchema, ScriptStepSchema } from "@/shared/types/script";
 
-const REMOVED_SCRIPT_STEP_TYPES = new Set(["navigate"]);
-
 function migrateScriptRaw(
   script: unknown,
 ): { script: unknown | undefined; changed: boolean } {
@@ -23,14 +21,6 @@ function migrateScriptRaw(
   let changed = false;
 
   for (const step of raw.steps) {
-    if (step && typeof step === "object") {
-      const type = (step as { type?: string }).type;
-      if (type && REMOVED_SCRIPT_STEP_TYPES.has(type)) {
-        changed = true;
-        continue;
-      }
-    }
-
     const parsed = ScriptStepSchema.safeParse(step);
     if (parsed.success) {
       keptSteps.push(parsed.data);

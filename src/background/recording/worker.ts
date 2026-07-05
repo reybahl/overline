@@ -4,6 +4,7 @@ import { z } from "zod";
 import { applyInferredMacroSignature } from "@/shared/macro-signature";
 import {
   buildDemoScriptForCompile,
+  navigateHrefPinsDemoScope,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
 import { getLlmSettings } from "@/shared/clients/llm-settings";
@@ -12,6 +13,7 @@ import {
   resolveLanguageModel,
 } from "@/shared/llm";
 import { createLogger } from "@/shared/logger";
+import { runScopeMayBeTooNarrowForScript } from "@/shared/run-scope";
 import type {
   DomElement,
   ListInteractivesOptions,
@@ -31,6 +33,7 @@ import {
 import {
   InferredMacroSignatureSchema,
   STANDALONE_MACRO_SIGNATURE,
+  type InferredMacroSignature,
   type MacroSignature,
 } from "@/shared/types/macro-signature";
 import type { MacroScript } from "@/shared/types/script";
@@ -173,7 +176,9 @@ function buildCompileScriptPrompt(
     `- description: ${MACRO_DESCRIPTION_RULE}`,
     "",
     "Rules:",
-    "- One output click/fill step per demo step — same count, same order",
+    "- One output step per demo step (click, fill, or navigate) — same count, same order",
+    "- Prefer navigate over click when the demo click was pure link navigation with generalizable recordedMatch.hrefSuffix",
+    "- Keep click when: no hrefSuffix, toggle/pressed state, in-page # fragment, button without href, or intent needs ordinal/relative targeting (first, latest, top)",
     "- Generalize each recordedMatch; never add fields absent from that step's recordedMatch (especially testId)",
     "- Unstable ids (React useId, _r_*, long hex) → drop id; use text/textContains, ariaLabel, or href from same recordedMatch",
     "- Stable semantic ids → keep id UNLESS intent marks that value as user-provided at run time (see below)",
@@ -189,7 +194,21 @@ function buildCompileScriptPrompt(
     "- Scoped paths (/org/project/items) → hrefPattern preserving segment count",
     "- Never combine hrefFromPathSegment with hrefPattern or text fields",
     "",
-    "Allowed: click, fill, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
+    "Navigate (when demo click is pure link navigation):",
+    "- Emit { type: \"navigate\", href } instead of click — href is pathname + search like recordedMatch.hrefSuffix",
+    "- NEVER emit recording-session slugs as literals when they match demo pageUrl — always {{segmentN}} for those",
+    "- Compare demo pageUrl pathname to recordedMatch.hrefSuffix pathname segment by segment",
+    "- Each segment equal to the same-index pageUrl segment → {{segment0}}, {{segment1}}, … (0 = first path segment)",
+    "- Segments in hrefSuffix not on pageUrl (static route parts like pulls, items, settings) stay literal",
+    "- {{segmentN}} is resolved from the page at playback — never a runtime user param",
+    "- WRONG: /{{repoName}}/pulls — invented param for page scope",
+    "- WRONG: /acme/widget/pulls when pageUrl was /acme/widget — demo slugs left as literals",
+    "- RIGHT: pageUrl /acme/widget + hrefSuffix /acme/widget/pulls → /{{segment0}}/{{segment1}}/pulls",
+    "- Fragment/hash hrefSuffix (#…) → never navigate; keep click",
+    "- Query tabs (?tab=…) → navigate with query preserved in href",
+    "- User-provided literals (only when intent marks them) stay in href for the signature pass",
+    "",
+    "Allowed: click, fill, navigate, wait, waitFor. Playback handles timing between steps — do not insert extra waitFor steps.",
     "- Keep demo literals in fill values and match fields for user-provided intent slots — do not replace them with open regexes (e.g. /items/\\\\d+)",
     "- Runtime parameterization ({{param}} templates) is applied in a later pass",
   ].join("\n");
@@ -202,17 +221,20 @@ const MACRO_SIGNATURE_RULES = [
   'Explicit signals include: "I give you", "I will input", "as input", "at playback", "each run", "user provides", "where X is".',
   "When those signals are present AND a demo/compiled field contains the example literal, you MUST return standalone: false with params and patches.",
   "",
-  "Return standalone: true ONLY when:",
+  "Return standalone: true when:",
   "- Intent describes a fixed action with no user-supplied slot, OR",
+  "- Intent refers to the current page / current scope (current project, this repo, here) — slugs come from {{segmentN}} in navigate href, not user params, OR",
   "- Intent mentions a user slot but no compiled or recordedMatch field contains the demo literal to template",
   "",
-  "Never infer params from demo values alone when intent does not mark them as user-provided.",
+  "Never infer params from demo URL slugs or recorded literals when intent does not explicitly mark them as user-provided.",
+  "{{segment0}}, {{segment1}}, … in navigate href are compile-time path scope from pageUrl — NOT macro params. Never declare repoName, projectSlug, ownerName, or similar for them.",
 ];
 
 const MACRO_SIGNATURE_PATCH_RULES = [
   "patches replace one script field with a template containing {{paramName}}",
-  "Allowed fields: value (fill only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
+  "Allowed fields: value (fill only), href (navigate only), match.id, match.ariaLabel, match.text, match.textContains, match.hrefSuffix, match.hrefContains, match.hrefPattern",
   "template is the FULL new string for that field",
+  "Only patch literals the user will supply at run time per intent — never patch {{segmentN}} placeholders",
   "Correlate the demo literal from recordedMatch or fill value with the param named in intent (item number → itemNumber, search text → searchTerm)",
   "When recordedMatch has hrefSuffix/hrefContains with the demo literal, prefer match.hrefContains or match.hrefSuffix over match.id",
   "When compiled script only has match.id embedding the demo literal, template the literal portion: e.g. item_{{itemNumber}}_link",
@@ -220,7 +242,7 @@ const MACRO_SIGNATURE_PATCH_RULES = [
 ];
 
 const MACRO_SIGNATURE_EXAMPLE = [
-  "Example A — intent: \"open item #N where N is the number I give you\" (works on any site with numeric item links)",
+  "Example A — intent: \"open item #N where N is the number I give you\"",
   "Compiled step 0: { type: \"click\", match: { id: \"item_42_link\" } }",
   "Demo recordedMatch: { hrefSuffix: \"/items/42\", ... }",
   "Correct output:",
@@ -246,11 +268,38 @@ const MACRO_SIGNATURE_EXAMPLE = [
     null,
     2,
   ),
-  "Alternate when href is absent from recordedMatch: patch match.id to embed {{paramName}} where the demo literal was",
   "",
   "Example B — intent: \"search for TERM where TERM is something I type each run\"",
   "Patch fill value to \"{{searchTerm}}\"",
+  "",
+  "Example C — intent: \"open the items list for the current project\" (no user-supplied slot)",
+  "Compiled step 0: { type: \"navigate\", href: \"/{{segment0}}/{{segment1}}/items\" }",
+  "Correct output: standalone true, params [], patches []",
+  "",
+  "Example D — WRONG (do not do this): same intent as C but you invent repoName/projectSlug",
+  "Wrong output: standalone false, params [{ name: \"repoName\" }], patches [{ field: \"href\", template: \"/{{repoName}}/items\" }]",
+  "Why wrong: scope slugs are already {{segmentN}} in the compiled script — not runtime user input",
 ];
+
+function signaturePatchStripsSegmentScope(
+  script: MacroScript,
+  inferred: InferredMacroSignature,
+): boolean {
+  for (const patch of inferred.patches) {
+    if (patch.field !== "href") {
+      continue;
+    }
+    const step = script.steps[patch.stepIndex];
+    if (
+      step?.type === "navigate" &&
+      step.href.includes("{{segment") &&
+      !patch.template.includes("{{segment")
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function summarizeScriptForSignature(script: MacroScript): Record<string, unknown>[] {
   return script.steps.map((step, stepIndex) => {
@@ -263,6 +312,8 @@ function summarizeScriptForSignature(script: MacroScript): Record<string, unknow
         return { ...base, match: step.match, ...(step.index ? { index: step.index } : {}) };
       case "waitFor":
         return { ...base, match: step.match };
+      case "navigate":
+        return { ...base, href: step.href };
       case "wait":
         return { ...base, ms: step.ms };
       default: {
@@ -540,16 +591,32 @@ export async function compileMacroScript(
   }
 
   const prompt = buildCompileScriptPrompt(intent, startUrl, endUrl, demoSteps);
-  const result = await generateObjectWithModels<CompiledMacroOutput>(
+  const demoScript = buildDemoScriptForCompile(demoSteps);
+  let result = await generateObjectWithModels<CompiledMacroOutput>(
     CompiledMacroOutputSchema,
     prompt,
   );
+  let script = sanitizeCompiledScript(result.script, demoScript);
+
+  if (navigateHrefPinsDemoScope(script, demoScript)) {
+    log.warn("compile navigate href pins demo scope literals, retrying");
+    const retryPrompt = [
+      prompt,
+      "",
+      "Your navigate href still contains demo session path slugs as literals.",
+      "Any path segment that matches demo pageUrl at the same index must be {{segment0}}, {{segment1}}, … — not the recorded slug.",
+      "Only static route parts not on pageUrl (e.g. pulls, items) stay literal.",
+    ].join("\n");
+    result = await generateObjectWithModels<CompiledMacroOutput>(
+      CompiledMacroOutputSchema,
+      retryPrompt,
+    );
+    script = sanitizeCompiledScript(result.script, demoScript);
+  }
+
   return {
     ...result,
-    script: sanitizeCompiledScript(
-      result.script,
-      buildDemoScriptForCompile(demoSteps),
-    ),
+    script,
   };
 }
 
@@ -558,20 +625,37 @@ function buildRunScopePrompt(
   startUrl: string,
   endUrl: string,
   steps: MacroStep[],
+  script?: MacroScript,
 ): string {
   const firstStepPageUrl = steps.find((step) => step.pageUrl)?.pageUrl ?? startUrl;
+  const scriptSummary = script
+    ? JSON.stringify(script.steps, null, 2)
+    : "(not available)";
 
   return [
-    "Return a RegExp (string) for where this macro may START, plus a short description.",
-    "One page type only — match startUrl / first step pageUrl, not endUrl.",
+    "Decide where this macro may START (run scope). Return a RegExp string + short description.",
+    "",
+    "Think from the compiled script and intent — not a fixed formula:",
+    "1. What does the script need from the current URL when playback begins?",
+    "2. If navigate href uses {{segment0}}, {{segment1}}, … — those segments must exist on the start page. Any URL with the same prefix is valid, including section/tab subpaths.",
+    "3. If the script clicks in-page UI on the current page, scope is narrower — the control must be present.",
     "",
     `Intent: "${intent}"`,
     `Started on: ${startUrl}`,
     `First step pageUrl: ${firstStepPageUrl}`,
     `Ended on: ${endUrl}`,
     "",
-    "Generalize slugs with [^/]+ but keep the same path segment count as the start URL.",
-    "Example: started on /owner/repo → repo pages only, not bare /owner profile URLs.",
+    "Compiled script:",
+    scriptSummary,
+    "",
+    "Rules:",
+    "- Generalize session slugs as [^/]+",
+    "- Scope is where START is allowed, not where the macro ends up",
+    "- WRONG: exact path depth of startUrl only when script only needs parent path segments and works from sibling sections",
+    "- WRONG: /org/project/?$ only — excludes /org/project/issues, /org/project/settings",
+    "- RIGHT: /org/project and all subpaths when script reads {{segment0}}/{{segment1}} and navigates elsewhere",
+    "- RIGHT: narrow scope when script depends on elements or state specific to one page type",
+    "- Escape regex metacharacters in literal domains (e.g. example\\.com)",
   ].join("\n");
 }
 
@@ -580,9 +664,24 @@ export async function inferRunScope(
   startUrl: string,
   endUrl: string,
   steps: MacroStep[],
+  script?: MacroScript,
 ): Promise<RunScope> {
-  const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps);
-  return generateObjectWithModels(RunScopeSchema, prompt);
+  const prompt = buildRunScopePrompt(intent, startUrl, endUrl, steps, script);
+  let runScope = await generateObjectWithModels(RunScopeSchema, prompt);
+
+  if (script && runScopeMayBeTooNarrowForScript(runScope.pattern, startUrl, script)) {
+    log.warn("run scope may be too narrow, retrying");
+    const retryPrompt = [
+      prompt,
+      "",
+      "Your pattern only matches the exact start URL depth.",
+      "The script uses {{segmentN}} from the current page — it can start from any page sharing that path prefix, including section subpaths.",
+      "Widen the pattern to include subpaths under the scope prefix the script needs.",
+    ].join("\n");
+    runScope = await generateObjectWithModels(RunScopeSchema, retryPrompt);
+  }
+
+  return runScope;
 }
 
 export type InferredMacroSignatureResult = {
@@ -615,6 +714,27 @@ export async function inferMacroSignature(
         "",
         "Your previous params/patches could not be applied to the compiled script.",
         "Return corrected standalone, params, and patches.",
+      ].join("\n");
+      inferred = await generateObjectWithModels(
+        InferredMacroSignatureSchema,
+        retryPrompt,
+      );
+      applied = applyInferredMacroSignature(script, inferred);
+    }
+
+    if (
+      !inferred.standalone &&
+      inferred.params.length > 0 &&
+      signaturePatchStripsSegmentScope(script, inferred)
+    ) {
+      log.warn("macro signature patch strips segment scope, retrying");
+      const retryPrompt = [
+        prompt,
+        "",
+        "Your previous href patch replaced {{segmentN}} scope placeholders with a runtime param.",
+        "Page scope uses {{segment0}}, {{segment1}}, … from pageUrl — not user params.",
+        "Return standalone: true with empty params and patches when intent refers to the current page.",
+        "Only declare params when intent explicitly marks a value the user supplies at run time.",
       ].join("\n");
       inferred = await generateObjectWithModels(
         InferredMacroSignatureSchema,

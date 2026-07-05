@@ -14,7 +14,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - **Recorder:** one LLM turn per click from live DOM + user intent. No separate recording plan (`steps`, `avoid`, `doneWhen`) or plan LLM call.
 - **Compile:** one output click/fill per demo step — same count, same order. Never drop navigation hops. Generalize each step's `recordedMatch`; do not invent targets.
 - **Sanitize:** deterministic post-compile only — not a second LLM pass.
-- **Run scope:** one start page type from `startUrl` / first step `pageUrl`, not `endUrl`. Same path segment count; slugs → `[^/]+`.
+- **Run scope:** where the macro may start — reason from compiled script + intent, not start URL shape alone. Prefix scope when the script only needs path segments from a parent scope; narrower when it depends on the current page's UI.
 - **Playback:** pre-click `waitFor` for the next target; navigation wait only when the previous click match has href fields.
 
 ## Recording
@@ -48,6 +48,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - **Query/tab hrefs** (`?tab=…`): `hrefPattern`, never `hrefFromPathSegment`.
 - Scoped paths: `hrefPattern` preserving segment count.
 - Never combine `hrefFromPathSegment` with `hrefPattern` or text fields.
+- **Navigate:** prefer `{ type: "navigate", href }` over click when demo click was pure link navigation with `recordedMatch.hrefSuffix`. Compare pageUrl to hrefSuffix segment by segment — shared segments → `{{segmentN}}`, static tail literal. `{{segmentN}}` is playback scope, not a user param. Never navigate for `#…` fragments, toggles (`pressed`), buttons without href, or ordinal intents (first/latest/top).
 - Do not insert extra `waitFor` steps — playback owns timing between actions.
 - Description from compile with generalized roles ("the owner", "the current repository") — not raw intent, session URLs, or slugs.
 
@@ -59,12 +60,13 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - Strip `text`/`textContains` when `hrefFromPathSegment` is set.
 - Strip `hrefFromPathSegment` when `hrefPattern` is set.
 - Sync `waitFor` step match to the next click's match after the above.
+- **Navigate steps:** downgrade to click when demo step was not a navigable anchor click (`isNavigableClick`). Ground `href` to demo `hrefSuffix` when compile diverges.
 
 ## Playback timing (critical)
 
 Order for step N click (N > 0):
 
-1. If step N−1 was a click and `clickMatchLikelyNavigates(step N−1 match)` → `waitForUrlChangeAfterClick` (poll up to 20s, then `PAGE_SETTLE_MS` = 750ms).
+1. If step N−1 was a click and `clickMatchLikelyNavigates(step N−1 match)` **or** step N−1 was `navigate` → `waitForUrlChangeAfterClick` (poll up to 20s, then `PAGE_SETTLE_MS` = 750ms).
 2. Unless step N−1 was `waitFor` with the same match → `waitForScriptMatchInTab` for step N's target (poll up to 20s; instant if already in DOM).
 3. Click.
 4. `settleAfterStep` = `waitForTabLoad` + `IN_PAGE_SETTLE_MS` (250ms). **No URL poll here.**
