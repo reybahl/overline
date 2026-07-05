@@ -1,6 +1,6 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
-import { macroNeedsParams, resolveMacroParams, validateMacroParamValues } from "@/shared/macro-signature";
+import { macroNeedsParams, validateMacroForSave, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
@@ -108,6 +108,11 @@ export const backgroundHandlers = {
       }
     }
 
+    const signatureError = validateMacroForSave(message.macro);
+    if (signatureError) {
+      throw new Error(signatureError);
+    }
+
     if (index >= 0) {
       macros[index] = message.macro;
     } else {
@@ -148,12 +153,14 @@ export const backgroundHandlers = {
       throw new Error(`"${macro.name}" does not run on this page.`);
     }
 
-    const paramDefs = resolveMacroParams(macro);
-    if (paramDefs.length > 0) {
+    if (macroNeedsParams(macro)) {
       if (!message.params) {
         throw new Error(`"${macro.name}" requires inputs.`);
       }
-      const validationError = validateMacroParamValues(paramDefs, message.params);
+      const validationError = validateMacroParamValues(
+        macro.signature!.params,
+        message.params,
+      );
       if (validationError) {
         throw new Error(validationError);
       }

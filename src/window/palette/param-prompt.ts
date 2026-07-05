@@ -1,8 +1,5 @@
 import type { MacroParamValues } from "@/shared/macro-signature";
-import {
-  resolveMacroParams,
-  validateMacroParamValues,
-} from "@/shared/macro-signature";
+import { macroNeedsParams, validateMacroParamValues } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import {
   paramPromptCancelBtn,
@@ -18,10 +15,11 @@ export function isParamPromptOpen(): boolean {
 }
 
 export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null> {
-  const paramDefs = resolveMacroParams(macro);
-  if (paramDefs.length === 0) {
+  if (!macroNeedsParams(macro) || !macro.signature) {
     return Promise.resolve({});
   }
+
+  const paramDefs = macro.signature.params;
 
   return new Promise((resolve) => {
     paramPromptTitleEl.textContent = macro.name;

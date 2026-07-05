@@ -180,36 +180,33 @@ function dropPinnedId(step: ScriptStep): ScriptStep {
   return { ...step, match };
 }
 
-function humanizeParamName(name: string): string {
-  const spaced = name.replace(/([A-Z])/g, " $1").replace(/_/g, " ");
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
+/** Returns an error message when the macro cannot be saved, otherwise null. */
+export function validateMacroForSave(macro: Macro): string | null {
+  const params = macro.signature?.params ?? [];
+  const refs = macro.script ? paramRefsInScript(macro.script) : new Set<string>();
 
-/** Runtime param defs from signature metadata plus any {{param}} refs in the script body. */
-export function resolveMacroParams(macro: Macro): MacroParam[] {
-  const byName = new Map<string, MacroParam>();
-
-  for (const param of macro.signature?.params ?? []) {
-    byName.set(param.name, param);
+  if (refs.size === 0 && params.length === 0) {
+    return null;
   }
 
-  if (macro.script) {
-    for (const name of paramRefsInScript(macro.script)) {
-      if (!byName.has(name)) {
-        byName.set(name, {
-          name,
-          label: humanizeParamName(name),
-          type: "string",
-        });
-      }
-    }
+  if (refs.size > 0 && params.length === 0) {
+    return "Macro script uses {{param}} placeholders but has no signature — re-record this macro.";
   }
 
-  return [...byName.values()];
+  if (!macro.script) {
+    return "Macro script is required when using {{param}} placeholders.";
+  }
+
+  const mismatch = signatureMismatch(macro.script, params);
+  if (mismatch) {
+    return `Macro signature does not match script: ${mismatch}`;
+  }
+
+  return null;
 }
 
 export function macroNeedsParams(macro: Macro): boolean {
-  return resolveMacroParams(macro).length > 0;
+  return (macro.signature?.params.length ?? 0) > 0;
 }
 
 export type MacroParamValues = Record<string, string>;

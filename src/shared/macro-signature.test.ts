@@ -4,9 +4,10 @@ import {
   applyInferredMacroSignature,
   instantiateMacroScript,
   macroNeedsParams,
-  resolveMacroParams,
+  validateMacroForSave,
   validateMacroParamValues,
 } from "@/shared/macro-signature";
+import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
 
 const CLICK_STEP: ScriptStep = {
@@ -140,40 +141,48 @@ describe("instantiateMacroScript", () => {
   });
 });
 
-describe("resolveMacroParams", () => {
-  test("uses signature metadata when present", () => {
+describe("validateMacroForSave", () => {
+  const branchScript = scriptWithSteps([
+    {
+      type: "click",
+      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+    },
+  ]);
+
+  test("accepts matching signature and script", () => {
     const macro = {
+      script: branchScript,
       signature: {
         version: 1 as const,
         params: [{ name: "branch", label: "Branch name", type: "string" as const }],
       },
-      script: scriptWithSteps([
-        {
-          type: "click",
-          match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
-        },
-      ]),
     };
 
-    expect(resolveMacroParams(macro as never)).toEqual([
-      { name: "branch", label: "Branch name", type: "string" },
-    ]);
+    expect(validateMacroForSave(macro as Macro)).toBeNull();
+    expect(macroNeedsParams(macro as Macro)).toBe(true);
   });
 
-  test("derives params from script placeholders when signature is missing", () => {
+  test("rejects script placeholders without signature", () => {
+    const macro = { script: branchScript };
+
+    expect(validateMacroForSave(macro as Macro)).toBe(
+      "Macro script uses {{param}} placeholders but has no signature — re-record this macro.",
+    );
+    expect(macroNeedsParams(macro as Macro)).toBe(false);
+  });
+
+  test("rejects unused signature params", () => {
     const macro = {
-      script: scriptWithSteps([
-        {
-          type: "click",
-          match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
-        },
-      ]),
+      script: scriptWithSteps([CLICK_STEP]),
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch", type: "string" as const }],
+      },
     };
 
-    expect(resolveMacroParams(macro as never)).toEqual([
-      { name: "branch", label: "Branch", type: "string" },
-    ]);
-    expect(macroNeedsParams(macro as never)).toBe(true);
+    expect(validateMacroForSave(macro as Macro)).toBe(
+      "Macro signature does not match script: unused param: branch",
+    );
   });
 });
 
