@@ -8,6 +8,12 @@
   min-height: 0;
 }
 
+.ui-shell--param-only {
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
 .ui-palette {
   display: flex;
   flex-direction: column;

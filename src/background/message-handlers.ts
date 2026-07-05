@@ -2,6 +2,7 @@ import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
 import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
+import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
 import { cancelPendingRecordSession } from "@/background/recording/recording-session";
@@ -69,7 +70,8 @@ async function runMacroById(
   }
 
   if (macroNeedsParams(macro) && !params) {
-    throw new Error(`"${macro.name}" requires inputs — run it from the palette.`);
+    await openOverlayForMacro(resolvedTabId, macroId, url);
+    return;
   }
 
   await runMacro(resolvedTabId, macro, { params });

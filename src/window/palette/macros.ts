@@ -10,6 +10,7 @@ import {
 } from "@/shared/tab";
 import { mountLucideIcon } from "@/ui/mount-icon";
 import { Plus, Settings } from "lucide";
+import { closePalette } from "@/window/palette/panel-host";
 import { openMacroSettings } from "@/window/palette/macro-settings-host";
 import { paletteActions } from "@/window/palette/actions";
 import { promptMacroParams } from "@/window/palette/param-prompt";
@@ -227,7 +228,14 @@ export async function refreshMacros(preferredMacroId?: string): Promise<void> {
   renderMacroList(preferredMacroId);
 }
 
-export async function handleRunMacro(macro?: Macro): Promise<void> {
+export type HandleRunMacroOptions = {
+  closeOnFinish?: boolean;
+};
+
+export async function handleRunMacro(
+  macro?: Macro,
+  options?: HandleRunMacroOptions,
+): Promise<void> {
   const selected =
     macro ?? paletteState.filteredMacros[paletteState.selectedIndex];
   if (!selected) {
@@ -258,7 +266,11 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
     const needsParams = macroNeedsParams(target);
     const params = needsParams ? await promptMacroParams(target) : {};
     if (params === null) {
-      setStatus("Cancelled.");
+      if (options?.closeOnFinish) {
+        closePalette();
+      } else {
+        setStatus("Cancelled.");
+      }
       return;
     }
 
@@ -276,10 +288,17 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
     }
 
     setStatus(`Ran macro "${target.name}"`);
+    if (options?.closeOnFinish) {
+      closePalette();
+    }
   } catch (error) {
     const errorMessage =
       error instanceof Error ? error.message : "Failed to run macro";
-    setStatus(errorMessage, true);
+    if (options?.closeOnFinish) {
+      closePalette();
+    } else {
+      setStatus(errorMessage, true);
+    }
   } finally {
     setBusy(false);
   }

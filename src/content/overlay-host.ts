@@ -111,8 +111,12 @@ function ensureOverlayStyles(): void {
   document.documentElement.appendChild(style);
 }
 
-function getPanelUrl(): string {
-  return chrome.runtime.getURL(PANEL_PATH);
+function getPanelUrl(macroId?: string): string {
+  const url = new URL(chrome.runtime.getURL(PANEL_PATH));
+  if (macroId) {
+    url.searchParams.set("runMacro", macroId);
+  }
+  return url.toString();
 }
 
 function isOverlayOpen(): boolean {
@@ -174,8 +178,11 @@ function closeOverlay(): void {
   document.body.style.overflow = previousBodyOverflow;
 }
 
-function openOverlay(): void {
+function openOverlay(macroId?: string): void {
   if (isOverlayOpen()) {
+    if (macroId && panelFrame) {
+      panelFrame.src = getPanelUrl(macroId);
+    }
     return;
   }
 
@@ -199,7 +206,7 @@ function openOverlay(): void {
   panel.className = "ui-overlay-panel";
 
   const iframe = document.createElement("iframe");
-  iframe.src = getPanelUrl();
+  iframe.src = getPanelUrl(macroId);
   iframe.title = "Overline";
   iframe.className = "ui-overlay-frame";
   iframe.setAttribute("scrolling", "no");
@@ -220,6 +227,10 @@ function openOverlay(): void {
     }
   };
   document.addEventListener("keydown", keydownHandler, true);
+}
+
+function openOverlayForMacro(macroId: string): void {
+  openOverlay(macroId);
 }
 
 function toggleOverlay(): void {
@@ -246,6 +257,18 @@ function initializeOverlayHost(): void {
       if (message.type === "CLOSE_OVERLAY") {
         closeOverlay();
         sendResponse({ ok: true });
+        return false;
+      }
+
+      if (message.type === "OPEN_OVERLAY_RUN_MACRO") {
+        try {
+          openOverlayForMacro(message.macroId);
+          sendResponse({ ok: true });
+        } catch (error: unknown) {
+          const errorMessage =
+            error instanceof Error ? error.message : "Failed to open Overline";
+          sendResponse({ ok: false, error: errorMessage });
+        }
         return false;
       }
 

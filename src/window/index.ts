@@ -13,7 +13,9 @@ import {
   generateBtn,
   intentInput,
   optionsLink,
+  palettePanelEl,
   searchInput,
+  statusEl,
 } from "@/window/palette/elements";
 import {
   getSelectableItemCount,
@@ -136,14 +138,46 @@ optionsLink.addEventListener("click", () => {
 
 startPanelHeightObserver();
 
+function getRunMacroIdFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get("runMacro");
+}
+
+function enableParamOnlyMode(): void {
+  document.querySelector(".ui-shell")?.classList.add("ui-shell--param-only");
+  palettePanelEl.hidden = true;
+  statusEl.hidden = true;
+}
+
+const runMacroId = getRunMacroIdFromUrl();
+const paramOnlyMode = runMacroId !== null;
+
+if (paramOnlyMode) {
+  enableParamOnlyMode();
+}
+
 void refreshMacros()
   .then(() => syncPendingRecord())
-  .then(() => {
-    searchInput.focus();
+  .then(async () => {
+    if (!runMacroId) {
+      searchInput.focus();
+      return;
+    }
+
+    const macro = paletteState.savedMacros.find((entry) => entry.id === runMacroId);
+    if (!macro) {
+      closePalette();
+      return;
+    }
+
+    await handleRunMacro(macro, { closeOnFinish: true });
   })
   .catch((error: unknown) => {
     const message =
       error instanceof Error ? error.message : "Failed to load macros";
+    if (paramOnlyMode) {
+      closePalette();
+      return;
+    }
     setStatus(message, true);
   });
 
