@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import {
@@ -60,11 +61,7 @@ function buildDraft(
   };
 }
 
-type LlmSettingsEditorProps = {
-  onError: (message: string | null) => void;
-};
-
-export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
+export function LlmSettingsEditor() {
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [savedSettings, setSavedSettings] = useState<LlmSettingsPublic | null>(
@@ -81,7 +78,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
   const [name, setName] = useState("openai-compatible");
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testStatus, setTestStatus] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -110,12 +106,12 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
           loadError instanceof Error
             ? loadError.message
             : "Failed to load AI settings";
-        onError(message);
+        toast.error(message);
       } finally {
         setLoading(false);
       }
     })();
-  }, [onError]);
+  }, []);
 
   function handleProviderChange(nextProvider: LlmProvider): void {
     setProvider(nextProvider);
@@ -123,7 +119,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
       kind: "catalog",
       modelId: defaultModelForProvider(nextProvider),
     });
-    setTestStatus(null);
   }
 
   function currentDraft(): LlmSettingsDraft {
@@ -132,8 +127,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
 
   async function handleSave(): Promise<void> {
     setSaving(true);
-    setTestStatus(null);
-    onError(null);
 
     try {
       const response = await sendBackgroundMessage({
@@ -148,11 +141,11 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
       setConfigured(true);
       setSavedSettings(response.settings);
       setApiKey("");
-      setTestStatus("Settings saved.");
+      toast.success("Settings saved");
     } catch (saveError) {
       const message =
         saveError instanceof Error ? saveError.message : "Failed to save settings";
-      onError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -160,8 +153,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
 
   async function handleTest(): Promise<void> {
     setTesting(true);
-    setTestStatus(null);
-    onError(null);
 
     try {
       const response = await sendBackgroundMessage({
@@ -173,13 +164,13 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
         throw new Error(response.error);
       }
 
-      setTestStatus("Connection successful.");
+      toast.success("Connection successful");
     } catch (testError) {
       const message =
         testError instanceof Error
           ? testError.message
           : "Connection test failed";
-      onError(message);
+      toast.error(message);
     } finally {
       setTesting(false);
     }
@@ -244,7 +235,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
               } else {
                 setModelSelection({ kind: "catalog", modelId: value });
               }
-              setTestStatus(null);
             }}
           >
             {catalog.map((entry) => (
@@ -266,7 +256,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
             }
             onChange={(event) => {
               setModelSelection({ kind: "custom", modelId: event.target.value });
-              setTestStatus(null);
             }}
           />
         ) : null}
@@ -283,7 +272,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
               value={baseURL}
               onChange={(event) => {
                 setBaseURL(event.target.value);
-                setTestStatus(null);
               }}
             />
           </label>
@@ -296,7 +284,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
               value={name}
               onChange={(event) => {
                 setName(event.target.value);
-                setTestStatus(null);
               }}
             />
           </label>
@@ -317,7 +304,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
           autoComplete="off"
           onChange={(event) => {
             setApiKey(event.target.value);
-            setTestStatus(null);
           }}
         />
       </label>
@@ -344,8 +330,6 @@ export function LlmSettingsEditor({ onError }: LlmSettingsEditorProps) {
           {testing ? "Testing…" : "Test connection"}
         </button>
       </div>
-
-      {testStatus ? <p className="ui-text-muted">{testStatus}</p> : null}
     </section>
   );
 }

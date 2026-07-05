@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
 import { LlmSettingsEditor } from "@/options/LlmSettingsEditor";
@@ -51,8 +52,6 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [shortcutError, setShortcutError] = useState<string | null>(null);
   const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
   const [clearAllPending, setClearAllPending] = useState(false);
 
@@ -69,7 +68,7 @@ export default function App() {
       } catch (loadError) {
         const message =
           loadError instanceof Error ? loadError.message : "Failed to load macros";
-        setError(message);
+        toast.error(message);
       } finally {
         setLoading(false);
       }
@@ -90,11 +89,16 @@ export default function App() {
     });
 
     if (!response.ok) {
-      setShortcutError(response.error);
+      toast.error(response.error);
       return;
     }
 
     setMacros(response.macros);
+  }
+
+  function handleMacroSaved(macros: Macro[]): void {
+    setMacros(macros);
+    toast.success("Saved");
   }
 
   async function confirmClearAll(): Promise<void> {
@@ -103,11 +107,10 @@ export default function App() {
     try {
       await saveMacros([]);
       setMacros([]);
-      setShortcutError(null);
     } catch (clearError) {
       const message =
         clearError instanceof Error ? clearError.message : "Failed to clear macros";
-      setShortcutError(message);
+      toast.error(message);
     }
   }
 
@@ -115,14 +118,6 @@ export default function App() {
     return (
       <main className="ui-page">
         <p className="ui-text-muted">Loading macros…</p>
-      </main>
-    );
-  }
-
-  if (error) {
-    return (
-      <main className="ui-page">
-        <p className="ui-status ui-status--error">{error}</p>
       </main>
     );
   }
@@ -152,11 +147,7 @@ export default function App() {
         </div>
       </header>
 
-      {shortcutError ? (
-        <p className="ui-alert ui-alert--error">{shortcutError}</p>
-      ) : null}
-
-      <LlmSettingsEditor onError={setShortcutError} />
+      <LlmSettingsEditor />
 
       {macros.length === 0 ? (
         <p className="ui-text-muted">
@@ -168,8 +159,12 @@ export default function App() {
             <li key={macro.id}>
               <MacroCard
                 macro={macro}
-                onSaved={setMacros}
-                onError={setShortcutError}
+                onSaved={handleMacroSaved}
+                onError={(message) => {
+                  if (message) {
+                    toast.error(message);
+                  }
+                }}
                 onDelete={() => {
                   setMacroPendingDelete(macro);
                 }}

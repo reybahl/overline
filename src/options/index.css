@@ -19,3 +19,8 @@
 .ui-page--options .ui-stack--loose {
   gap: var(--ui-space-2);
 }
+
+.ol-sonner-toast {
+  font-family: var(--ui-font);
+  font-size: var(--ui-text-base);
+}
