@@ -6,6 +6,7 @@ import {
   macroNeedsParams,
   repairMacroSignature,
   validateMacroParamValues,
+  validateMacroScriptSignature,
 } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
@@ -138,6 +139,40 @@ describe("instantiateMacroScript", () => {
     const result = instantiateMacroScript(script, { searchTerm: "react" });
 
     expect(result.steps[0]).toMatchObject({ value: "react" });
+  });
+});
+
+describe("validateMacroScriptSignature", () => {
+  const branchScript = scriptWithSteps([
+    {
+      type: "click",
+      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+    },
+  ]);
+
+  test("rejects undeclared script placeholders", () => {
+    expect(validateMacroScriptSignature(branchScript, [])).toBe(
+      'Script uses {{branch}} but no param "branch" is defined. Add it in Params first.',
+    );
+  });
+
+  test("rejects unused params", () => {
+    expect(
+      validateMacroScriptSignature(branchScript, [
+        { name: "branch", label: "Branch", type: "string" },
+        { name: "extra", label: "Extra", type: "string" },
+      ]),
+    ).toBe(
+      'Param "extra" is not used in the script. Use {{extra}} in the script or remove the param.',
+    );
+  });
+
+  test("accepts matching script and params", () => {
+    expect(
+      validateMacroScriptSignature(branchScript, [
+        { name: "branch", label: "Branch", type: "string" },
+      ]),
+    ).toBeNull();
   });
 });
 

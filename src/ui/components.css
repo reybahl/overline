@@ -132,6 +132,17 @@ textarea.ui-input {
   border-color: transparent;
 }
 
+.ui-stack--param {
+  gap: var(--ui-space-3);
+  padding-bottom: var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-stack--param:last-of-type {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
 .ui-btn--sm {
   padding: var(--ui-space-1) var(--ui-space-3);
   font-size: var(--ui-text-sm);

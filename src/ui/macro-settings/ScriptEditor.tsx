@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pencil } from "lucide-react";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
+import { validateMacroScriptSignature } from "@/shared/macro-signature";
 import { formatScriptStep } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
@@ -47,6 +48,13 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
     const result = MacroScriptSchema.safeParse(parsed);
     if (!result.success) {
       onError(result.error.issues[0]?.message ?? "Invalid script.");
+      return;
+    }
+
+    const params = macro.signature?.params ?? [];
+    const syncError = validateMacroScriptSignature(result.data, params);
+    if (syncError) {
+      onError(syncError);
       return;
     }
 

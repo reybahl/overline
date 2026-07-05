@@ -1,6 +1,6 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
-import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
+import { macroNeedsParams, validateMacroForSave, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
 import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
@@ -115,7 +115,7 @@ export const backgroundHandlers = {
       }
     }
 
-    const macro = repairMacroSignature(message.macro);
+    const macro = validateMacroForSave(message.macro);
 
     if (index >= 0) {
       macros[index] = macro;
