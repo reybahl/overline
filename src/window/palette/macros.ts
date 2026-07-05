@@ -209,11 +209,15 @@ export async function refreshMacros(preferredMacroId?: string): Promise<void> {
 }
 
 export async function handleRunMacro(macro?: Macro): Promise<void> {
-  const target = macro ?? paletteState.filteredMacros[paletteState.selectedIndex];
-  if (!target) {
+  const selected =
+    macro ?? paletteState.filteredMacros[paletteState.selectedIndex];
+  if (!selected) {
     setStatus("No macro selected.", true);
     return;
   }
+
+  const target =
+    paletteState.savedMacros.find((entry) => entry.id === selected.id) ?? selected;
 
   setBusy(true);
 
@@ -232,7 +236,8 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
       throw new Error(`"${target.name}" does not run on this page.`);
     }
 
-    const params = macroNeedsParams(target) ? await promptMacroParams(target) : {};
+    const needsParams = macroNeedsParams(target);
+    const params = needsParams ? await promptMacroParams(target) : {};
     if (params === null) {
       setStatus("Cancelled.");
       return;
@@ -244,7 +249,7 @@ export async function handleRunMacro(macro?: Macro): Promise<void> {
       type: "EXECUTE_MACRO",
       tabId,
       macroId: target.id,
-      ...(Object.keys(params).length > 0 ? { params } : {}),
+      ...(needsParams ? { params } : {}),
     });
 
     if (!response.ok) {

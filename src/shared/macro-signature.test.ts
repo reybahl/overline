@@ -3,9 +3,10 @@ import { describe, expect, test } from "bun:test";
 import {
   applyInferredMacroSignature,
   instantiateMacroScript,
+  macroNeedsParams,
+  resolveMacroParams,
   validateMacroParamValues,
 } from "@/shared/macro-signature";
-import type { MacroSignature } from "@/shared/types/macro-signature";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
 
 const CLICK_STEP: ScriptStep = {
@@ -139,30 +140,64 @@ describe("instantiateMacroScript", () => {
   });
 });
 
+describe("resolveMacroParams", () => {
+  test("uses signature metadata when present", () => {
+    const macro = {
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch name", type: "string" as const }],
+      },
+      script: scriptWithSteps([
+        {
+          type: "click",
+          match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+        },
+      ]),
+    };
+
+    expect(resolveMacroParams(macro as never)).toEqual([
+      { name: "branch", label: "Branch name", type: "string" },
+    ]);
+  });
+
+  test("derives params from script placeholders when signature is missing", () => {
+    const macro = {
+      script: scriptWithSteps([
+        {
+          type: "click",
+          match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
+        },
+      ]),
+    };
+
+    expect(resolveMacroParams(macro as never)).toEqual([
+      { name: "branch", label: "Branch", type: "string" },
+    ]);
+    expect(macroNeedsParams(macro as never)).toBe(true);
+  });
+});
+
 describe("validateMacroParamValues", () => {
-  const signature: MacroSignature = {
-    version: 1,
-    params: [
-      { name: "prNumber", label: "PR number", type: "number" },
-      { name: "searchTerm", label: "Search term", type: "string" },
-    ],
-  };
+  const params = [
+    { name: "prNumber", label: "PR number", type: "number" as const },
+    { name: "searchTerm", label: "Search term", type: "string" as const },
+  ];
 
   test("rejects empty values", () => {
-    expect(validateMacroParamValues(signature, { prNumber: "1", searchTerm: "" })).toBe(
+    expect(validateMacroParamValues(params, { prNumber: "1", searchTerm: "" })).toBe(
       "Search term is required.",
     );
   });
 
   test("rejects non-numeric number params", () => {
-    expect(validateMacroParamValues(signature, { prNumber: "abc", searchTerm: "x" })).toBe(
+    expect(validateMacroParamValues(params, { prNumber: "abc", searchTerm: "x" })).toBe(
       "PR number must be a number.",
     );
   });
 
   test("accepts valid values", () => {
     expect(
-      validateMacroParamValues(signature, { prNumber: "42", searchTerm: "react" }),
+      validateMacroParamValues(params, { prNumber: "42", searchTerm: "react" }),
     ).toBeNull();
   });
 });

@@ -1,5 +1,8 @@
 import type { MacroParamValues } from "@/shared/macro-signature";
-import { macroNeedsParams, validateMacroParamValues } from "@/shared/macro-signature";
+import {
+  resolveMacroParams,
+  validateMacroParamValues,
+} from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import {
   paramPromptCancelBtn,
@@ -15,7 +18,8 @@ export function isParamPromptOpen(): boolean {
 }
 
 export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null> {
-  if (!macroNeedsParams(macro) || !macro.signature) {
+  const paramDefs = resolveMacroParams(macro);
+  if (paramDefs.length === 0) {
     return Promise.resolve({});
   }
 
@@ -27,7 +31,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
 
     const inputs: HTMLInputElement[] = [];
 
-    for (const param of macro.signature!.params) {
+    for (const param of paramDefs) {
       const field = document.createElement("label");
       field.className = "ui-param-prompt__field";
 
@@ -69,7 +73,7 @@ export function promptMacroParams(macro: Macro): Promise<MacroParamValues | null
       const values = Object.fromEntries(
         inputs.map((input) => [input.name, input.value.trim()]),
       );
-      const error = validateMacroParamValues(macro.signature!, values);
+      const error = validateMacroParamValues(paramDefs, values);
       if (error) {
         paramPromptErrorEl.textContent = error;
         paramPromptErrorEl.hidden = false;

@@ -180,8 +180,36 @@ function dropPinnedId(step: ScriptStep): ScriptStep {
   return { ...step, match };
 }
 
+function humanizeParamName(name: string): string {
+  const spaced = name.replace(/([A-Z])/g, " $1").replace(/_/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** Runtime param defs from signature metadata plus any {{param}} refs in the script body. */
+export function resolveMacroParams(macro: Macro): MacroParam[] {
+  const byName = new Map<string, MacroParam>();
+
+  for (const param of macro.signature?.params ?? []) {
+    byName.set(param.name, param);
+  }
+
+  if (macro.script) {
+    for (const name of paramRefsInScript(macro.script)) {
+      if (!byName.has(name)) {
+        byName.set(name, {
+          name,
+          label: humanizeParamName(name),
+          type: "string",
+        });
+      }
+    }
+  }
+
+  return [...byName.values()];
+}
+
 export function macroNeedsParams(macro: Macro): boolean {
-  return (macro.signature?.params.length ?? 0) > 0;
+  return resolveMacroParams(macro).length > 0;
 }
 
 export type MacroParamValues = Record<string, string>;
@@ -237,11 +265,11 @@ export function instantiateMacroScript(
 
 /** Returns an error message when invalid, otherwise null. */
 export function validateMacroParamValues(
-  signature: NonNullable<Macro["signature"]>,
-  params: MacroParamValues,
+  params: MacroParam[],
+  values: MacroParamValues,
 ): string | null {
-  for (const param of signature.params) {
-    const value = params[param.name]?.trim() ?? "";
+  for (const param of params) {
+    const value = values[param.name]?.trim() ?? "";
     if (!value) {
       return `${param.label} is required.`;
     }
