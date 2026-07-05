@@ -1,5 +1,4 @@
 import { normalizeElementMatch } from "@/shared/script-match";
-import { generalizeNavigateHrefFromDemo } from "@/shared/resolve-navigate-href";
 import { isStableId } from "@/shared/stable-id";
 import type { MacroStep } from "@/shared/types/macro";
 import type {
@@ -160,15 +159,6 @@ function navigateToClick(
   };
 }
 
-function resolveNavigateHrefForDemo(demo: DemoScriptStep): string | undefined {
-  const suffix = demo.recordedMatch?.hrefSuffix;
-  if (!suffix || !demo.pageUrl) {
-    return undefined;
-  }
-
-  return generalizeNavigateHrefFromDemo(demo.pageUrl, suffix);
-}
-
 /**
  * Deterministic post-compile pass: ground each step's match to demo `recordedMatch`,
  * then apply structural fixes (normalize ids, strip unstable ids, sync waitFor).
@@ -196,10 +186,7 @@ export function sanitizeCompiledScript(
         return step;
       }
 
-      return {
-        ...step,
-        href: resolveNavigateHrefForDemo(demo) ?? step.href,
-      };
+      return step;
     }
 
     if (step.type !== "click" && step.type !== "waitFor" && step.type !== "fill") {

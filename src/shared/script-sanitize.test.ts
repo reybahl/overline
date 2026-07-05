@@ -3,11 +3,11 @@ import { describe, expect, test } from "bun:test";
 import { sanitizeCompiledScript } from "@/shared/script-sanitize";
 
 describe("sanitizeCompiledScript navigate", () => {
-  test("keeps navigate when demo click has hrefSuffix", () => {
+  test("passes through compile navigate href", () => {
     const script = sanitizeCompiledScript(
       {
         version: 1,
-        steps: [{ type: "navigate", href: "/wrong/repo/pulls" }],
+        steps: [{ type: "navigate", href: "/{{segment0}}/{{segment1}}/pulls" }],
       },
       [
         {
