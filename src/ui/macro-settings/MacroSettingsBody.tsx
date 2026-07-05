@@ -2,6 +2,7 @@ import { formatMacroStep } from "@/shared/macro-step-format";
 import type { Macro } from "@/shared/types/macro";
 
 import { MacroDetailsEditor } from "@/ui/macro-settings/MacroDetailsEditor";
+import { MacroParamsSummary } from "@/ui/macro-settings/MacroParamsSummary";
 import { RunScopeEditor } from "@/ui/macro-settings/RunScopeEditor";
 import { ScriptEditor } from "@/ui/macro-settings/ScriptEditor";
 import { ShortcutEditor } from "@/ui/macro-settings/ShortcutEditor";
@@ -34,6 +35,7 @@ export function MacroSettingsBody({
         onError={onError}
       />
       <ShortcutEditor macro={macro} onSaved={onSaved} onError={onError} />
+      <MacroParamsSummary macro={macro} />
 
       <div className="ui-section">
         <ScriptEditor
