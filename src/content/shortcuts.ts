@@ -6,6 +6,7 @@ import {
 import {
   eventToShortcut,
   isEditableTarget,
+  isOpenPaletteShortcut,
   normalizeShortcut,
 } from "@/shared/shortcut";
 
@@ -38,15 +39,35 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
   await sendBackgroundMessage(message);
 }
 
+async function togglePaletteFromShortcut(): Promise<void> {
+  const message = { type: "TOGGLE_PALETTE" } as const;
+
+  try {
+    await sendBackgroundMessage(message);
+    return;
+  } catch {
+    // Service worker may still be waking on a cold tab.
+  }
+
+  await new Promise((resolve) => {
+    window.setTimeout(resolve, 50);
+  });
+
+  await sendBackgroundMessage(message);
+}
+
+function resolveMacroIdSync(shortcut: string): string | undefined {
+  return shortcutToMacroId.get(normalizeShortcut(shortcut));
+}
+
 async function resolveMacroId(shortcut: string): Promise<string | undefined> {
-  const key = normalizeShortcut(shortcut);
-  const cached = shortcutToMacroId.get(key);
+  const cached = resolveMacroIdSync(shortcut);
   if (cached) {
     return cached;
   }
 
   await refreshShortcutMap();
-  return shortcutToMacroId.get(key);
+  return resolveMacroIdSync(shortcut);
 }
 
 function initializeShortcutsContentScript(): void {
@@ -70,14 +91,18 @@ function initializeShortcutsContentScript(): void {
           }
 
           const macroId = await resolveMacroId(shortcut);
-          if (!macroId) {
+          if (macroId) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void triggerMacroByShortcut(macroId);
             return;
           }
 
-          event.preventDefault();
-          event.stopImmediatePropagation();
-
-          void triggerMacroByShortcut(macroId);
+          if (isOpenPaletteShortcut(shortcut)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void togglePaletteFromShortcut();
+          }
         })();
       },
       true,

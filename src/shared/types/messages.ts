@@ -14,6 +14,7 @@ export type BackgroundMessage =
   | { type: "AGENTIC_RECORD"; intent: string; tabId: number; startUrl: string }
   | { type: "CANCEL_PENDING_RECORD" }
   | { type: "RUN_MACRO_BY_ID"; macroId: string }
+  | { type: "TOGGLE_PALETTE" }
   | { type: "EXECUTE_MACRO"; tabId: number; macroId: string; params?: MacroParamValues }
   | { type: "GET_MACROS" }
   | { type: "SAVE_MACRO"; macro: Macro }
@@ -30,6 +31,7 @@ export type BackgroundSuccessMap = {
   AGENTIC_RECORD: { ok: true };
   CANCEL_PENDING_RECORD: { ok: true; pendingRecord: PendingRecord | null };
   RUN_MACRO_BY_ID: { ok: true };
+  TOGGLE_PALETTE: { ok: true };
   EXECUTE_MACRO: { ok: true };
   GET_MACROS: { ok: true; macros: Macro[] };
   SAVE_MACRO: { ok: true; macros: Macro[] };

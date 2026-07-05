@@ -33,6 +33,12 @@ export function eventToShortcut(event: KeyboardEvent): string | null {
   return [...mods, key].join("+");
 }
 
+const OPEN_PALETTE_SHORTCUTS = new Set(["meta+shift+p", "ctrl+shift+p"]);
+
+export function isOpenPaletteShortcut(shortcut: string): boolean {
+  return OPEN_PALETTE_SHORTCUTS.has(normalizeShortcut(shortcut));
+}
+
 export function formatShortcutForDisplay(shortcut: string): string {
   const isMac =
     typeof navigator !== "undefined" &&

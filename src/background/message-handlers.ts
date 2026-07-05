@@ -2,7 +2,7 @@ import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
 import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
-import { openOverlayForMacro } from "@/background/overlay";
+import { openOverlayForMacro, toggleOverlay } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
 import { cancelPendingRecordSession } from "@/background/recording/recording-session";
@@ -136,6 +136,16 @@ export const backgroundHandlers = {
     return { ok: true as const };
   },
 
+  TOGGLE_PALETTE: async (_message, { sender }) => {
+    const tabId = sender.tab?.id;
+    if (tabId === undefined) {
+      throw new Error("No active tab found.");
+    }
+    const tab = await chrome.tabs.get(tabId);
+    await toggleOverlay(tabId, tab.url);
+    return { ok: true as const };
+  },
+
   EXECUTE_MACRO: async (message, _context) => {
     const tab = await chrome.tabs.get(message.tabId);
     const url = tab.url;
@@ -243,6 +253,8 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.DELETE_MACRO(message, context);
     case "RUN_MACRO_BY_ID":
       return backgroundHandlers.RUN_MACRO_BY_ID(message, context);
+    case "TOGGLE_PALETTE":
+      return backgroundHandlers.TOGGLE_PALETTE(message, context);
     case "EXECUTE_MACRO":
       return backgroundHandlers.EXECUTE_MACRO(message, context);
     case "DEV_LOG":
