@@ -6,6 +6,7 @@ import type {
   BackgroundMessage,
   BackgroundResponse,
 } from "@/shared/types/messages";
+import { getActiveTab } from "@/shared/tab";
 
 const log = createLogger("bg");
 
@@ -25,6 +26,28 @@ chrome.action.onClicked.addListener((tab) => {
       error: error instanceof Error ? error.message : String(error),
     });
   });
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  try {
+    switch (command) {
+      case "open-palette": {
+        const tab = await getActiveTab();
+        if (tab.id === undefined) {
+          throw new Error("No active tab found.");
+        }
+        await toggleOverlay(tab.id, tab.url);
+        break;
+      }
+      default:
+        log.warn("unknown command", { command });
+    }
+  } catch (error) {
+    log.error("command failed", {
+      command,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 });
 
 chrome.runtime.onMessage.addListener(

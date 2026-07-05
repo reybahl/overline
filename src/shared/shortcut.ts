@@ -35,7 +35,7 @@ export function eventToShortcut(event: KeyboardEvent): string | null {
 
 const OPEN_PALETTE_SHORTCUTS = new Set(["meta+shift+p", "ctrl+shift+p"]);
 
-export function isOpenPaletteShortcut(shortcut: string): boolean {
+export function isReservedPaletteShortcut(shortcut: string): boolean {
   return OPEN_PALETTE_SHORTCUTS.has(normalizeShortcut(shortcut));
 }
 

@@ -2,13 +2,13 @@ import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
 import { macroNeedsParams, repairMacroSignature, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
-import { openOverlayForMacro, toggleOverlay } from "@/background/overlay";
+import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
 import { startAgenticRecordSession } from "@/background/recording/record-session";
 import { cancelPendingRecordSession } from "@/background/recording/recording-session";
 import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
-import { normalizeShortcut } from "@/shared/shortcut";
+import { normalizeShortcut, isReservedPaletteShortcut } from "@/shared/shortcut";
 import { validateRunScopePattern } from "@/shared/run-scope";
 import { getLlmSettings, saveLlmSettings } from "@/shared/clients/llm-settings";
 import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
@@ -97,6 +97,11 @@ export const backgroundHandlers = {
 
     if (message.macro.shortcut) {
       const normalized = normalizeShortcut(message.macro.shortcut);
+      if (isReservedPaletteShortcut(normalized)) {
+        throw new Error(
+          "Cmd/Ctrl+Shift+P is reserved for opening Overline. Choose a different shortcut.",
+        );
+      }
       const conflict = macros.find(
         (macro) =>
           macro.id !== message.macro.id &&
@@ -133,16 +138,6 @@ export const backgroundHandlers = {
 
   RUN_MACRO_BY_ID: async (message, { sender }) => {
     await runMacroById(message.macroId, sender.tab?.id);
-    return { ok: true as const };
-  },
-
-  TOGGLE_PALETTE: async (_message, { sender }) => {
-    const tabId = sender.tab?.id;
-    if (tabId === undefined) {
-      throw new Error("No active tab found.");
-    }
-    const tab = await chrome.tabs.get(tabId);
-    await toggleOverlay(tabId, tab.url);
     return { ok: true as const };
   },
 
@@ -253,8 +248,6 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.DELETE_MACRO(message, context);
     case "RUN_MACRO_BY_ID":
       return backgroundHandlers.RUN_MACRO_BY_ID(message, context);
-    case "TOGGLE_PALETTE":
-      return backgroundHandlers.TOGGLE_PALETTE(message, context);
     case "EXECUTE_MACRO":
       return backgroundHandlers.EXECUTE_MACRO(message, context);
     case "DEV_LOG":

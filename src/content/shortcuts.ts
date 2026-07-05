@@ -6,7 +6,6 @@ import {
 import {
   eventToShortcut,
   isEditableTarget,
-  isOpenPaletteShortcut,
   normalizeShortcut,
 } from "@/shared/shortcut";
 
@@ -39,35 +38,8 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
   await sendBackgroundMessage(message);
 }
 
-async function togglePaletteFromShortcut(): Promise<void> {
-  const message = { type: "TOGGLE_PALETTE" } as const;
-
-  try {
-    await sendBackgroundMessage(message);
-    return;
-  } catch {
-    // Service worker may still be waking on a cold tab.
-  }
-
-  await new Promise((resolve) => {
-    window.setTimeout(resolve, 50);
-  });
-
-  await sendBackgroundMessage(message);
-}
-
-function resolveMacroIdSync(shortcut: string): string | undefined {
+function resolveMacroId(shortcut: string): string | undefined {
   return shortcutToMacroId.get(normalizeShortcut(shortcut));
-}
-
-async function resolveMacroId(shortcut: string): Promise<string | undefined> {
-  const cached = resolveMacroIdSync(shortcut);
-  if (cached) {
-    return cached;
-  }
-
-  await refreshShortcutMap();
-  return resolveMacroIdSync(shortcut);
 }
 
 function initializeShortcutsContentScript(): void {
@@ -80,30 +52,23 @@ function initializeShortcutsContentScript(): void {
     document.addEventListener(
       "keydown",
       (event) => {
-        void (async () => {
-          if (event.repeat || isEditableTarget(event.target)) {
-            return;
-          }
+        if (event.repeat || isEditableTarget(event.target)) {
+          return;
+        }
 
-          const shortcut = eventToShortcut(event);
-          if (!shortcut) {
-            return;
-          }
+        const shortcut = eventToShortcut(event);
+        if (!shortcut) {
+          return;
+        }
 
-          const macroId = await resolveMacroId(shortcut);
-          if (macroId) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            void triggerMacroByShortcut(macroId);
-            return;
-          }
+        const macroId = resolveMacroId(shortcut);
+        if (!macroId) {
+          return;
+        }
 
-          if (isOpenPaletteShortcut(shortcut)) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
-            void togglePaletteFromShortcut();
-          }
-        })();
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void triggerMacroByShortcut(macroId);
       },
       true,
     );
