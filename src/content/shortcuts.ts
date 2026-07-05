@@ -6,6 +6,7 @@ import {
 import {
   eventToShortcut,
   isEditableTarget,
+  isReservedPaletteShortcut,
   normalizeShortcut,
 } from "@/shared/shortcut";
 
@@ -38,8 +39,18 @@ async function triggerMacroByShortcut(macroId: string): Promise<void> {
   await sendBackgroundMessage(message);
 }
 
-function resolveMacroId(shortcut: string): string | undefined {
+function resolveMacroIdSync(shortcut: string): string | undefined {
   return shortcutToMacroId.get(normalizeShortcut(shortcut));
+}
+
+async function resolveMacroId(shortcut: string): Promise<string | undefined> {
+  const cached = resolveMacroIdSync(shortcut);
+  if (cached) {
+    return cached;
+  }
+
+  await refreshShortcutMap();
+  return resolveMacroIdSync(shortcut);
 }
 
 function initializeShortcutsContentScript(): void {
@@ -52,23 +63,29 @@ function initializeShortcutsContentScript(): void {
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.repeat || isEditableTarget(event.target)) {
-          return;
-        }
+        void (async () => {
+          if (event.repeat || isEditableTarget(event.target)) {
+            return;
+          }
 
-        const shortcut = eventToShortcut(event);
-        if (!shortcut) {
-          return;
-        }
+          const shortcut = eventToShortcut(event);
+          if (!shortcut) {
+            return;
+          }
 
-        const macroId = resolveMacroId(shortcut);
-        if (!macroId) {
-          return;
-        }
+          if (isReservedPaletteShortcut(shortcut)) {
+            return;
+          }
 
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void triggerMacroByShortcut(macroId);
+          const macroId = await resolveMacroId(shortcut);
+          if (!macroId) {
+            return;
+          }
+
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          void triggerMacroByShortcut(macroId);
+        })();
       },
       true,
     );
