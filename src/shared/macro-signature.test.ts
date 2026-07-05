@@ -2,16 +2,13 @@ import { describe, expect, test } from "bun:test";
 
 import {
   applyInferredMacroSignature,
-  finalizeInferredMacroSignature,
   instantiateMacroScript,
   macroNeedsParams,
   repairMacroSignature,
-  validateMacroForSave,
   validateMacroParamValues,
 } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import type { MacroScript, ScriptStep } from "@/shared/types/script";
-import { STANDALONE_MACRO_SIGNATURE } from "@/shared/types/macro-signature";
 
 const CLICK_STEP: ScriptStep = {
   type: "click",
@@ -144,51 +141,6 @@ describe("instantiateMacroScript", () => {
   });
 });
 
-describe("validateMacroForSave", () => {
-  const branchScript = scriptWithSteps([
-    {
-      type: "click",
-      match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
-    },
-  ]);
-
-  test("accepts matching signature and script", () => {
-    const macro = {
-      script: branchScript,
-      signature: {
-        version: 1 as const,
-        params: [{ name: "branch", label: "Branch name", type: "string" as const }],
-      },
-    };
-
-    expect(validateMacroForSave(macro as Macro)).toBeNull();
-    expect(macroNeedsParams(macro as Macro)).toBe(true);
-  });
-
-  test("rejects script placeholders without signature", () => {
-    const macro = { script: branchScript };
-
-    expect(validateMacroForSave(macro as Macro)).toBe(
-      "Macro script uses {{param}} placeholders but has no signature — re-record this macro.",
-    );
-    expect(macroNeedsParams(macro as Macro)).toBe(false);
-  });
-
-  test("rejects unused signature params", () => {
-    const macro = {
-      script: scriptWithSteps([CLICK_STEP]),
-      signature: {
-        version: 1 as const,
-        params: [{ name: "branch", label: "Branch", type: "string" as const }],
-      },
-    };
-
-    expect(validateMacroForSave(macro as Macro)).toBe(
-      "Macro signature does not match script: unused param: branch",
-    );
-  });
-});
-
 describe("repairMacroSignature", () => {
   const branchScript = scriptWithSteps([
     {
@@ -201,10 +153,10 @@ describe("repairMacroSignature", () => {
     const macro = { id: "test", script: branchScript } as Macro;
     const repaired = repairMacroSignature(macro);
 
-    expect(validateMacroForSave(repaired)).toBeNull();
     expect(repaired.signature?.params).toEqual([
       { name: "branch", label: "Branch", type: "string" },
     ]);
+    expect(macroNeedsParams(repaired)).toBe(true);
   });
 
   test("leaves valid macros unchanged", () => {
@@ -219,24 +171,18 @@ describe("repairMacroSignature", () => {
 
     expect(repairMacroSignature(macro)).toBe(macro);
   });
-});
 
-describe("finalizeInferredMacroSignature", () => {
-  test("falls back to concrete compiled script when invalid", () => {
-    const compiled = scriptWithSteps([
-      { type: "click", match: { ariaLabel: "fixes", text: "fixes" } },
-    ]);
-    const invalid = {
-      script: scriptWithSteps([
-        { type: "click", match: { ariaLabel: "{{branch}}", text: "{{branch}}" } },
-      ]),
-      signature: STANDALONE_MACRO_SIGNATURE,
-    };
+  test("clears orphan signature params", () => {
+    const macro = {
+      id: "test",
+      script: scriptWithSteps([CLICK_STEP]),
+      signature: {
+        version: 1 as const,
+        params: [{ name: "branch", label: "Branch", type: "string" as const }],
+      },
+    } as Macro;
 
-    const result = finalizeInferredMacroSignature(compiled, invalid);
-
-    expect(result.script).toEqual(compiled);
-    expect(result.signature).toEqual(STANDALONE_MACRO_SIGNATURE);
+    expect(repairMacroSignature(macro).signature?.params).toEqual([]);
   });
 });
 

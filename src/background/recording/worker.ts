@@ -3,10 +3,6 @@ import { z } from "zod";
 
 import { applyInferredMacroSignature } from "@/shared/macro-signature";
 import {
-  finalizeInferredMacroSignature,
-  validateMacroForSave,
-} from "@/shared/macro-signature";
-import {
   buildDemoScriptForCompile,
   sanitizeCompiledScript,
 } from "@/shared/script-sanitize";
@@ -28,7 +24,6 @@ import {
   RunScopeSchema,
   type AgentTurn,
   type CompiledMacroOutput,
-  type Macro,
   type MacroGenerationStep,
   type MacroStep,
   type RunScope,
@@ -609,19 +604,16 @@ export async function inferMacroSignature(
     );
     let applied = applyInferredMacroSignature(script, inferred);
 
-    let validationError = validateMacroForSave({
-      script: applied.script,
-      signature: applied.signature,
-    } as Macro);
-
-    if (validationError && !inferred.standalone && inferred.params.length > 0) {
-      log.warn("macro signature inference invalid, retrying", {
-        error: validationError,
-      });
+    if (
+      !inferred.standalone &&
+      inferred.params.length > 0 &&
+      applied.signature.params.length === 0
+    ) {
+      log.warn("macro signature patches did not apply, retrying");
       const retryPrompt = [
         prompt,
         "",
-        `Your previous output was invalid: ${validationError}`,
+        "Your previous params/patches could not be applied to the compiled script.",
         "Return corrected standalone, params, and patches.",
       ].join("\n");
       inferred = await generateObjectWithModels(
@@ -629,30 +621,20 @@ export async function inferMacroSignature(
         retryPrompt,
       );
       applied = applyInferredMacroSignature(script, inferred);
-      validationError = validateMacroForSave({
-        script: applied.script,
-        signature: applied.signature,
-      } as Macro);
-      if (validationError) {
-        log.warn("macro signature inference retry still invalid", {
-          error: validationError,
-        });
-      }
     }
 
-    const finalized = finalizeInferredMacroSignature(script, applied);
     log.info("macro signature inferred", {
       standalone: inferred.standalone,
-      paramCount: finalized.signature.params.length,
+      paramCount: applied.signature.params.length,
       patchCount: inferred.patches.length,
-      ...(finalized.signature.params.length > 0
+      ...(applied.signature.params.length > 0
         ? {
             params: inferred.params.map((param) => param.name),
             patches: inferred.patches,
           }
         : {}),
     });
-    return finalized;
+    return applied;
   } catch (error) {
     log.warn("macro signature inference failed, using standalone", {
       error: error instanceof Error ? error.message : String(error),

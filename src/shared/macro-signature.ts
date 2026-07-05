@@ -3,7 +3,6 @@ import {
   STANDALONE_MACRO_SIGNATURE,
   type InferredMacroSignature,
   type MacroParam,
-  type MacroSignature,
   type MacroScriptPatchField,
 } from "@/shared/types/macro-signature";
 import type { Macro } from "@/shared/types/macro";
@@ -181,93 +180,39 @@ function dropPinnedId(step: ScriptStep): ScriptStep {
   return { ...step, match };
 }
 
-/** Returns an error message when the macro cannot be saved, otherwise null. */
-export function validateMacroForSave(macro: Macro): string | null {
-  const params = macro.signature?.params ?? [];
-  const refs = macro.script ? paramRefsInScript(macro.script) : new Set<string>();
-
-  if (refs.size === 0 && params.length === 0) {
-    return null;
-  }
-
-  if (refs.size > 0 && params.length === 0) {
-    return "Macro script uses {{param}} placeholders but has no signature — re-record this macro.";
-  }
-
+/** Best-effort repair when script placeholders and signature metadata diverge. */
+export function repairMacroSignature(macro: Macro): Macro {
   if (!macro.script) {
-    return "Macro script is required when using {{param}} placeholders.";
+    return (macro.signature?.params.length ?? 0) > 0
+      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
+      : macro;
   }
 
-  const mismatch = signatureMismatch(macro.script, params);
-  if (mismatch) {
-    return `Macro signature does not match script: ${mismatch}`;
+  const refs = paramRefsInScript(macro.script);
+  const params = macro.signature?.params ?? [];
+
+  if (refs.size === 0) {
+    return params.length > 0
+      ? { ...macro, signature: STANDALONE_MACRO_SIGNATURE }
+      : macro;
   }
 
-  return null;
+  if (params.length > 0 && !signatureMismatch(macro.script, params)) {
+    return macro;
+  }
+
+  const synthesized = [...refs].map((name) => ({
+    name,
+    label: humanizeParamName(name),
+    type: "string" as const,
+  }));
+  log.warn("macro signature repaired from script placeholders", { macroId: macro.id });
+  return { ...macro, signature: { version: 1, params: synthesized } };
 }
 
 function humanizeParamName(name: string): string {
   const spaced = name.replace(/([A-Z])/g, " $1").replace(/_/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
-}
-
-/** Best-effort repair when script placeholders and signature metadata diverge. */
-export function repairMacroSignature(macro: Macro): Macro {
-  const error = validateMacroForSave(macro);
-  if (!error) {
-    return macro;
-  }
-
-  log.warn("macro signature invalid, attempting repair", {
-    macroId: macro.id,
-    error,
-  });
-
-  if (!macro.script) {
-    return { ...macro, signature: STANDALONE_MACRO_SIGNATURE };
-  }
-
-  const refs = paramRefsInScript(macro.script);
-  if (refs.size === 0) {
-    return { ...macro, signature: STANDALONE_MACRO_SIGNATURE };
-  }
-
-  const params = [...refs].map((name) => ({
-    name,
-    label: humanizeParamName(name),
-    type: "string" as const,
-  }));
-
-  const repaired: Macro = {
-    ...macro,
-    signature: { version: 1, params },
-  };
-  if (!validateMacroForSave(repaired)) {
-    return repaired;
-  }
-
-  log.warn("macro signature repair failed, using standalone", {
-    macroId: macro.id,
-    error: validateMacroForSave(repaired),
-  });
-  return { ...macro, signature: STANDALONE_MACRO_SIGNATURE };
-}
-
-/** After inference, fall back to the concrete compiled script when still invalid. */
-export function finalizeInferredMacroSignature(
-  compiledScript: MacroScript,
-  applied: { script: MacroScript; signature: MacroSignature },
-): { script: MacroScript; signature: MacroSignature } {
-  const error = validateMacroForSave({
-    script: applied.script,
-    signature: applied.signature,
-  } as Macro);
-  if (!error) {
-    return applied;
-  }
-
-  log.warn("inferred macro signature invalid, using standalone", { error });
-  return standalone(compiledScript);
 }
 
 export function macroNeedsParams(macro: Macro): boolean {
