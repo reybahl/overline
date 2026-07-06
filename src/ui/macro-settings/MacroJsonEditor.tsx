@@ -4,6 +4,7 @@ import { toast } from "sonner";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import {
+  addMacroParamToText,
   formatMacroForEdit,
   parseMacroEditJson,
 } from "@/shared/macro-edit";
@@ -114,6 +115,15 @@ export function MacroJsonEditor({
               Cancel
             </Button>
           ) : null}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              updateText(addMacroParamToText(text, macro));
+            }}
+          >
+            Add parameter
+          </Button>
         </div>
         {onDelete ? (
           <Button
