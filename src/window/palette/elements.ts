@@ -6,6 +6,7 @@ export function requireElement<T extends HTMLElement>(id: string): T {
   return element as T;
 }
 
+export const searchIconEl = requireElement<HTMLSpanElement>("search-icon");
 export const searchInput = requireElement<HTMLInputElement>("search-input");
 export const intentInput = requireElement<HTMLInputElement>("intent-input");
 export const macroListEl = requireElement<HTMLUListElement>("macro-list");

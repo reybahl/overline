@@ -2,7 +2,7 @@ import "@/ui/index.css";
 
 import { subscribeStorage } from "@/shared/clients/storage";
 import { mountLucideIcon } from "@/ui/mount-icon";
-import { Braces, Plus, Settings } from "lucide";
+import { Braces, Plus, Search, Settings } from "lucide";
 import { paletteActions } from "@/window/palette/actions";
 import { handleCaptureDom } from "@/window/palette/capture-dom";
 import {
@@ -13,6 +13,7 @@ import {
   generateBtn,
   intentInput,
   optionsLink,
+  searchIconEl,
   searchInput,
 } from "@/window/palette/elements";
 import {
@@ -40,6 +41,7 @@ import { setStatus } from "@/window/palette/ui";
 mountLucideIcon(captureBtn, Braces);
 mountLucideIcon(optionsLink, Settings);
 mountLucideIcon(generateBtn, Plus);
+mountLucideIcon(searchIconEl, Search);
 
 initMacroSettingsHost();
 
@@ -67,7 +69,7 @@ searchInput.addEventListener("keydown", (event) => {
       return;
     }
     event.preventDefault();
-    paletteState.selectedIndex = Math.min(paletteState.selectedIndex + 1, itemCount - 1);
+    paletteState.selectedIndex = (paletteState.selectedIndex + 1) % itemCount;
     renderMacroList();
     scrollSelectedIntoView();
     return;
@@ -78,7 +80,10 @@ searchInput.addEventListener("keydown", (event) => {
       return;
     }
     event.preventDefault();
-    paletteState.selectedIndex = Math.max(paletteState.selectedIndex - 1, 0);
+    paletteState.selectedIndex =
+      paletteState.selectedIndex === 0
+        ? itemCount - 1
+        : paletteState.selectedIndex - 1;
     renderMacroList();
     scrollSelectedIntoView();
     return;

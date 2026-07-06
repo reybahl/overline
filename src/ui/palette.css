@@ -17,14 +17,26 @@
 }
 
 .ui-palette__search-wrap {
+  display: flex;
   flex-shrink: 0;
+  align-items: center;
+  gap: var(--ui-space-3);
+  padding: 0 var(--ui-space-6);
   border-bottom: 1px solid var(--ui-border);
 }
 
+.ui-palette__search-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  color: var(--ui-fg-secondary);
+}
+
 .ui-palette__search {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   border: 0;
-  padding: var(--ui-space-5) var(--ui-space-6);
+  padding: var(--ui-space-5) 0;
   font: inherit;
   font-size: var(--ui-text-base);
   color: var(--ui-fg);
