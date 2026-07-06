@@ -504,8 +504,14 @@ html.ol-prompt-only #macro-settings-root {
 
 .ui-macro-view__script .ui-list--stack {
   margin-top: 0;
-  padding-top: var(--ui-space-3);
+  padding-top: var(--ui-space-2);
   border-top: 0;
+  gap: var(--ui-space-1);
+}
+
+.ui-macro-view__script .ui-code-item {
+  padding: var(--ui-space-1) 0;
+  background: transparent;
 }
 
 .ui-macro-view__empty-script {
