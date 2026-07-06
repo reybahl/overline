@@ -66,7 +66,3 @@ export function DialogDescription({ children, className }: DialogDescriptionProp
     </BaseDialog.Description>
   );
 }
-
-export function DialogClose(props: BaseDialog.Close.Props) {
-  return <BaseDialog.Close {...props} />;
-}
