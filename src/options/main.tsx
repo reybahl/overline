@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import App from "@/options/App";
-import { OverlineToaster } from "@/ui/OverlineToaster";
+import { Toaster } from "@/ui/components";
 import "@/options/index.css";
 
 const root = document.getElementById("root");
@@ -14,7 +14,7 @@ createRoot(root).render(
   <StrictMode>
     <div className="ui-root">
       <App />
-      <OverlineToaster />
+      <Toaster />
     </div>
   </StrictMode>,
 );

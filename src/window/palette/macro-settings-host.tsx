@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import type { Macro } from "@/shared/types/macro";
 import { isAnyDialogOpen } from "@/ui/components/dialog-open";
-import { OverlineToaster } from "@/ui/OverlineToaster";
+import { Toaster } from "@/ui/components";
 import { MacroSettingsHost } from "@/window/palette/MacroSettingsHost";
 
 let dispatchOpen: ((macro: Macro) => void) | null = null;
@@ -27,7 +27,7 @@ export function initMacroSettingsHost(): void {
     return (
       <>
         <MacroSettingsHost onRegisterOpen={onRegisterOpen} />
-        <OverlineToaster />
+        <Toaster />
       </>
     );
   }
