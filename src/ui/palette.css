@@ -523,9 +523,18 @@ html.ol-prompt-only #macro-settings-root {
 .ui-macro-view__row {
   display: grid;
   grid-template-columns: 6.5rem 1fr;
+  align-items: start;
   gap: var(--ui-space-1) var(--ui-space-3);
   padding: var(--ui-space-3) 0;
   border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-macro-view__row--shortcut {
+  align-items: center;
+}
+
+.ui-macro-view__row--shortcut .ui-inline-actions {
+  min-height: 28px;
 }
 
 .ui-macro-view__row:last-child {

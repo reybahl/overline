@@ -70,7 +70,7 @@ export function MacroEditableView({ macro, onSaved }: MacroEditableViewProps) {
             <dd className="ui-macro-view__value">{formatFieldValue(key, document)}</dd>
           </div>
         ))}
-        <div className="ui-macro-view__row">
+        <div className="ui-macro-view__row ui-macro-view__row--shortcut">
           <dt className="ui-macro-view__label ui-text-muted">Shortcut</dt>
           <dd className="ui-macro-view__value">
             <ShortcutCapture macro={macro} onSaved={onSaved} variant="inline" />
