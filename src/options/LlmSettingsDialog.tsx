@@ -30,7 +30,7 @@ export function LlmSettingsDialog({ open, onClose }: LlmSettingsDialogProps) {
 
         <div className="ui-macro-settings__body">
           <div className="ui-macro-settings__content">
-            <LlmSettingsEditor />
+            <LlmSettingsEditor onSaved={onClose} />
           </div>
         </div>
       </div>

@@ -9,10 +9,15 @@ import { cancelPendingRecordSession } from "@/background/recording/recording-ses
 import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut, isReservedPaletteShortcut } from "@/shared/shortcut";
-import { getLlmSettings, saveLlmSettings } from "@/shared/clients/llm-settings";
+import {
+  getLlmProviderKeys,
+  getLlmSettings,
+  saveLlmSettings,
+} from "@/shared/clients/llm-settings";
 import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
 import {
   LlmSettingsDraftSchema,
+  maskProviderKeys,
   mergeLlmSettingsDraft,
   toPublicLlmSettings,
 } from "@/shared/llm";
@@ -189,18 +194,25 @@ export const backgroundHandlers = {
   },
 
   GET_LLM_SETTINGS: async (_message, _context) => {
-    const settings = await getLlmSettings();
+    const [settings, providerKeys] = await Promise.all([
+      getLlmSettings(),
+      getLlmProviderKeys(),
+    ]);
     return {
       ok: true as const,
       configured: settings !== null,
       settings: settings ? toPublicLlmSettings(settings) : null,
+      providerKeysMasked: maskProviderKeys(providerKeys),
     };
   },
 
   SAVE_LLM_SETTINGS: async (message, _context) => {
     const parsedDraft = LlmSettingsDraftSchema.parse(message.draft);
-    const existing = await getLlmSettings();
-    const settings = mergeLlmSettingsDraft(parsedDraft, existing);
+    const [existing, providerKeys] = await Promise.all([
+      getLlmSettings(),
+      getLlmProviderKeys(),
+    ]);
+    const settings = mergeLlmSettingsDraft(parsedDraft, existing, providerKeys);
     await saveLlmSettings(settings);
     return {
       ok: true as const,
@@ -209,7 +221,10 @@ export const backgroundHandlers = {
   },
 
   TEST_LLM_SETTINGS: async (message, _context) => {
-    const existing = await getLlmSettings();
+    const [existing, providerKeys] = await Promise.all([
+      getLlmSettings(),
+      getLlmProviderKeys(),
+    ]);
     const draft = message.draft
       ? LlmSettingsDraftSchema.parse(message.draft)
       : null;
@@ -219,7 +234,7 @@ export const backgroundHandlers = {
     }
 
     const settings = draft
-      ? mergeLlmSettingsDraft(draft, existing)
+      ? mergeLlmSettingsDraft(draft, existing, providerKeys)
       : existing!;
 
     await testLlmConnection(settings);
