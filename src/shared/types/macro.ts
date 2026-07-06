@@ -57,16 +57,20 @@ export type RunScope = z.infer<typeof RunScopeSchema>;
 export type Macro = z.infer<typeof MacroSchema>;
 
 /** User-editable macro fields shown in the JSON settings editor. */
-export const MacroEditableDocumentSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  runScope: RunScopeSchema.optional(),
-  shortcut: z.string().min(1).optional(),
-  signature: MacroSignatureSchema.optional(),
-  script: MacroScriptSchema.optional(),
+export const MacroEditableDocumentSchema = MacroSchema.pick({
+  name: true,
+  description: true,
+  runScope: true,
+  shortcut: true,
+  signature: true,
+  script: true,
 });
 
 export type MacroEditableDocument = z.infer<typeof MacroEditableDocumentSchema>;
+
+export const macroEditableFieldKeys = Object.keys(
+  MacroEditableDocumentSchema.shape,
+) as (keyof MacroEditableDocument)[];
 
 export const MacrosSchema = z.array(MacroSchema);
 

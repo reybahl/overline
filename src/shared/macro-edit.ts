@@ -5,6 +5,7 @@ import { validateRunScopePattern } from "@/shared/run-scope";
 import {
   MacroEditableDocumentSchema,
   MacroSchema,
+  macroEditableFieldKeys,
   type Macro,
   type MacroEditableDocument,
 } from "@/shared/types/macro";
@@ -54,39 +55,20 @@ function applyMacroSemanticChecks(
 }
 
 export function macroEditableDocumentFromMacro(macro: Macro): MacroEditableDocument {
-  const document: MacroEditableDocument = { name: macro.name };
-
-  if (macro.description !== undefined) {
-    document.description = macro.description;
-  }
-  if (macro.runScope !== undefined) {
-    document.runScope = macro.runScope;
-  }
-  if (macro.shortcut !== undefined) {
-    document.shortcut = macro.shortcut;
-  }
-  if (macro.signature !== undefined) {
-    document.signature = macro.signature;
-  }
-  if (macro.script !== undefined) {
-    document.script = macro.script;
-  }
-
-  return document;
+  return MacroEditableDocumentSchema.parse(macro);
 }
 
 export function mergeEditableDocument(
   original: Macro,
   document: MacroEditableDocument,
 ): Macro {
+  const editableFields = Object.fromEntries(
+    macroEditableFieldKeys.map((key) => [key, document[key]]),
+  ) as MacroEditableDocument;
+
   return {
     ...original,
-    name: document.name,
-    description: document.description,
-    runScope: document.runScope,
-    shortcut: document.shortcut,
-    signature: document.signature,
-    script: document.script,
+    ...editableFields,
     updatedAt: Date.now(),
   };
 }
