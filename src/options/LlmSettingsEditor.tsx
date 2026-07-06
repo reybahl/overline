@@ -193,8 +193,6 @@ export function LlmSettingsEditor() {
 
   return (
     <section className="ui-section">
-      <p className="ui-section__title">AI settings</p>
-
       {!configured ? (
         <p className="ui-alert">
           Add your API key and model to enable recording and compile.

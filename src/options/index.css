@@ -9,6 +9,13 @@
   margin-bottom: var(--ui-space-5);
 }
 
+.ui-options-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--ui-space-4);
+}
+
 .ui-options-footer {
   display: flex;
   justify-content: flex-end;

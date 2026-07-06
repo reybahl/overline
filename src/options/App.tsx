@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
-import { LlmSettingsEditor } from "@/options/LlmSettingsEditor";
+import { LlmSettingsDialog } from "@/options/LlmSettingsDialog";
 import { MacroTable } from "@/options/MacroTable";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { saveMacros } from "@/shared/clients/storage";
@@ -16,6 +16,7 @@ export default function App() {
   const [editingMacro, setEditingMacro] = useState<Macro | null>(null);
   const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
   const [clearAllPending, setClearAllPending] = useState(false);
+  const [llmSettingsOpen, setLlmSettingsOpen] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -87,13 +88,24 @@ export default function App() {
     <>
       <main className="ui-page ui-page--options">
         <header className="ui-page-header">
-          <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
-          <p className="ui-header__subtitle">
-            AI settings, saved macros, shortcuts, and run scope.
-          </p>
+          <div className="ui-options-header">
+            <div>
+              <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
+              <p className="ui-header__subtitle">
+                Saved macros, shortcuts, and run scope.
+              </p>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setLlmSettingsOpen(true);
+              }}
+            >
+              AI settings
+            </Button>
+          </div>
         </header>
-
-        <LlmSettingsEditor />
 
         {macros.length === 0 ? (
           <p className="ui-text-muted">
@@ -120,6 +132,13 @@ export default function App() {
           </>
         )}
       </main>
+
+      <LlmSettingsDialog
+        open={llmSettingsOpen}
+        onClose={() => {
+          setLlmSettingsOpen(false);
+        }}
+      />
 
       {editingMacro ? (
         <MacroSettingsDialog

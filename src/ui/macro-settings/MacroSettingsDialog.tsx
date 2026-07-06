@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -77,21 +78,7 @@ export function MacroSettingsDialog({
               aria-label="Close settings"
               onClick={requestClose}
             >
-              <svg
-                className="ui-icon"
-                width="16"
-                height="16"
-                viewBox="0 0 16 16"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M4 4l8 8M12 4l-8 8"
-                  stroke="currentColor"
-                  strokeWidth="1.25"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <X className="ui-icon" size={16} strokeWidth={2} aria-hidden />
             </Button>
           </header>
 
