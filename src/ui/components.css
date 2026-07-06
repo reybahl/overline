@@ -270,6 +270,10 @@ textarea.ui-input {
   border-top: 1px solid var(--ui-border);
 }
 
+.ui-card__footer--split {
+  justify-content: space-between;
+}
+
 .ui-btn--icon {
   display: inline-flex;
   align-items: center;
