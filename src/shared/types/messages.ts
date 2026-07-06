@@ -1,4 +1,8 @@
-import type { LlmSettingsDraft, LlmSettingsPublic } from "@/shared/llm";
+import type {
+  LlmProvider,
+  LlmSettingsDraft,
+  LlmSettingsPublic,
+} from "@/shared/llm";
 import type { LogEntry } from "@/shared/types/log";
 import type { Macro, MacroStep } from "@/shared/types/macro";
 import type { MacroParamValues } from "@/shared/macro-signature";
@@ -39,6 +43,7 @@ export type BackgroundSuccessMap = {
     ok: true;
     configured: boolean;
     settings: LlmSettingsPublic | null;
+    providerKeysMasked: Partial<Record<LlmProvider, string>>;
   };
   SAVE_LLM_SETTINGS: { ok: true; settings: LlmSettingsPublic };
   TEST_LLM_SETTINGS: { ok: true };

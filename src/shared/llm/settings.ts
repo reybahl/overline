@@ -64,11 +64,26 @@ export type LlmSettingsPublic = {
   };
 }[LlmProvider];
 
+export type LlmProviderKeys = Partial<Record<LlmProvider, string>>;
+
 export function maskApiKey(apiKey: string): string {
   if (apiKey.length <= 4) {
     return "••••";
   }
   return `…${apiKey.slice(-4)}`;
+}
+
+export function maskProviderKeys(
+  keys: LlmProviderKeys,
+): Partial<Record<LlmProvider, string>> {
+  const masked: Partial<Record<LlmProvider, string>> = {};
+  for (const entry of LLM_PROVIDERS) {
+    const apiKey = keys[entry];
+    if (apiKey) {
+      masked[entry] = maskApiKey(apiKey);
+    }
+  }
+  return masked;
 }
 
 export function toPublicLlmSettings(settings: LlmSettings): LlmSettingsPublic {
@@ -92,8 +107,12 @@ export const LlmSettingsDraftSchema = llmSettingsSchema(
 export function mergeLlmSettingsDraft(
   draft: LlmSettingsDraft,
   existing: LlmSettings | null,
+  providerKeys: LlmProviderKeys = {},
 ): LlmSettings {
-  const apiKey = draft.apiKey?.trim() || existing?.apiKey;
+  const apiKey =
+    draft.apiKey?.trim() ||
+    providerKeys[draft.provider] ||
+    (existing?.provider === draft.provider ? existing.apiKey : undefined);
   if (!apiKey) {
     throw new Error("API key is required.");
   }

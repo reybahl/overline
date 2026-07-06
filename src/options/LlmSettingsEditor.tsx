@@ -62,7 +62,7 @@ function buildDraft(
   };
 }
 
-export function LlmSettingsEditor() {
+export function LlmSettingsEditor({ onSaved }: { onSaved?: () => void }) {
   const [loading, setLoading] = useState(true);
   const [configured, setConfigured] = useState(false);
   const [savedSettings, setSavedSettings] = useState<LlmSettingsPublic | null>(
@@ -74,7 +74,12 @@ export function LlmSettingsEditor() {
     kind: "catalog",
     modelId: defaultModelForProvider("openai"),
   });
-  const [apiKey, setApiKey] = useState("");
+  const [providerKeyInputs, setProviderKeyInputs] = useState<
+    Partial<Record<LlmProvider, string>>
+  >({});
+  const [providerKeysMasked, setProviderKeysMasked] = useState<
+    Partial<Record<LlmProvider, string>>
+  >({});
   const [baseURL, setBaseURL] = useState("");
   const [name, setName] = useState("openai-compatible");
   const [saving, setSaving] = useState(false);
@@ -90,6 +95,7 @@ export function LlmSettingsEditor() {
 
         setConfigured(response.configured);
         setSavedSettings(response.settings);
+        setProviderKeysMasked(response.providerKeysMasked);
 
         if (response.settings) {
           const loaded = response.settings;
@@ -123,7 +129,13 @@ export function LlmSettingsEditor() {
   }
 
   function currentDraft(): LlmSettingsDraft {
-    return buildDraft(provider, modelSelection, apiKey, baseURL, name);
+    return buildDraft(
+      provider,
+      modelSelection,
+      providerKeyInputs[provider] ?? "",
+      baseURL,
+      name,
+    );
   }
 
   async function handleSave(): Promise<void> {
@@ -141,8 +153,17 @@ export function LlmSettingsEditor() {
 
       setConfigured(true);
       setSavedSettings(response.settings);
-      setApiKey("");
+      setProviderKeysMasked((current) => ({
+        ...current,
+        [provider]: response.settings.apiKeyMasked,
+      }));
+      setProviderKeyInputs((current) => {
+        const next = { ...current };
+        delete next[provider];
+        return next;
+      });
       toast.success("Settings saved");
+      onSaved?.();
     } catch (saveError) {
       const message =
         saveError instanceof Error ? saveError.message : "Failed to save settings";
@@ -182,6 +203,8 @@ export function LlmSettingsEditor() {
     modelSelection.kind === "catalog"
       ? modelSelection.modelId
       : CUSTOM_MODEL_VALUE;
+  const apiKeyInput = providerKeyInputs[provider] ?? "";
+  const savedKeyMasked = providerKeysMasked[provider];
 
   if (loading) {
     return (
@@ -284,14 +307,15 @@ export function LlmSettingsEditor() {
           type="password"
           mono
           placeholder={
-            savedSettings?.apiKeyMasked
-              ? `Saved (${savedSettings.apiKeyMasked})`
-              : "sk-…"
+            savedKeyMasked ? `Saved (${savedKeyMasked})` : "sk-…"
           }
-          value={apiKey}
+          value={apiKeyInput}
           autoComplete="off"
           onChange={(event) => {
-            setApiKey(event.target.value);
+            setProviderKeyInputs((current) => ({
+              ...current,
+              [provider]: event.target.value,
+            }));
           }}
         />
       </FieldGroup>
