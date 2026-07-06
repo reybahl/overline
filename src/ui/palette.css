@@ -475,9 +475,8 @@ html.ol-prompt-only #macro-settings-root {
 }
 
 .ui-macro-view__script-summary {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   padding: var(--ui-space-3) 0;
   font-weight: 500;
