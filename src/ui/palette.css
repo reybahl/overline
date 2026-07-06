@@ -61,6 +61,25 @@
   max-height: 280px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ui-fg) 20%, transparent) transparent;
+}
+
+.ui-palette__list-wrap::-webkit-scrollbar {
+  width: 2px;
+}
+
+.ui-palette__list-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ui-palette__list-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ui-fg) 18%, transparent);
+  border-radius: 999px;
+}
+
+.ui-palette__list-wrap::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ui-fg) 32%, transparent);
 }
 
 .ui-palette__list {
