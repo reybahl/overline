@@ -3,48 +3,17 @@ import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
 import { LlmSettingsEditor } from "@/options/LlmSettingsEditor";
+import { MacroTable } from "@/options/MacroTable";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { saveMacros } from "@/shared/clients/storage";
 import type { Macro } from "@/shared/types/macro";
-import { formatShortcutForDisplay } from "@/shared/shortcut";
-import { MacroSettingsBody } from "@/ui/macro-settings/MacroSettingsBody";
-import { Button, Card } from "@/ui/components";
-
-type MacroCardProps = {
-  macro: Macro;
-  onSaved: (macros: Macro[]) => void;
-  onDelete: () => void;
-};
-
-function MacroCard({ macro, onSaved, onDelete }: MacroCardProps) {
-  const summaryDescription = macro.description ?? macro.intent;
-
-  return (
-    <Card
-      summary={
-        <div className="ui-card__summary-main">
-          <div className="ui-card__heading">
-            <span className="ui-card__title">{macro.name}</span>
-            {macro.shortcut ? (
-              <kbd className="ui-kbd ui-kbd--compact">
-                {formatShortcutForDisplay(macro.shortcut)}
-              </kbd>
-            ) : null}
-          </div>
-          {summaryDescription ? (
-            <p className="ui-card__meta">{summaryDescription}</p>
-          ) : null}
-        </div>
-      }
-    >
-      <MacroSettingsBody macro={macro} onSaved={onSaved} onDelete={onDelete} />
-    </Card>
-  );
-}
+import { MacroSettingsDialog } from "@/ui/macro-settings/MacroSettingsDialog";
+import { Button } from "@/ui/components";
 
 export default function App() {
   const [macros, setMacros] = useState<Macro[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingMacro, setEditingMacro] = useState<Macro | null>(null);
   const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
   const [clearAllPending, setClearAllPending] = useState(false);
 
@@ -89,8 +58,8 @@ export default function App() {
     setMacros(response.macros);
   }
 
-  function handleMacroSaved(macros: Macro[]): void {
-    setMacros(macros);
+  function handleMacroSaved(nextMacros: Macro[]): void {
+    setMacros(nextMacros);
   }
 
   async function confirmClearAll(): Promise<void> {
@@ -117,50 +86,54 @@ export default function App() {
   return (
     <>
       <main className="ui-page ui-page--options">
-      <header className="ui-page-header">
-        <div className="ui-options-header">
-          <div>
-            <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
-            <p className="ui-header__subtitle">
-              AI settings, saved macros, shortcuts, and run scope.
-            </p>
-          </div>
-          {macros.length > 0 ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                setClearAllPending(true);
-              }}
-            >
-              Clear all
-            </Button>
-          ) : null}
-        </div>
-      </header>
-
-      <LlmSettingsEditor />
-
-      {macros.length === 0 ? (
-        <p className="ui-text-muted">
-          No macros yet. Open Overline on a page and choose Record.
-        </p>
-      ) : (
-        <ul className="ui-stack ui-stack--loose">
-          {macros.map((macro) => (
-            <li key={macro.id}>
-              <MacroCard
-                macro={macro}
-                onSaved={handleMacroSaved}
-                onDelete={() => {
-                  setMacroPendingDelete(macro);
+        <header className="ui-page-header">
+          <div className="ui-options-header">
+            <div>
+              <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
+              <p className="ui-header__subtitle">
+                AI settings, saved macros, shortcuts, and run scope.
+              </p>
+            </div>
+            {macros.length > 0 ? (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setClearAllPending(true);
                 }}
-              />
-            </li>
-          ))}
-        </ul>
-      )}
+              >
+                Clear all
+              </Button>
+            ) : null}
+          </div>
+        </header>
+
+        <LlmSettingsEditor />
+
+        {macros.length === 0 ? (
+          <p className="ui-text-muted">
+            No macros yet. Open Overline on a page and choose Record.
+          </p>
+        ) : (
+          <MacroTable
+            macros={macros}
+            onEdit={setEditingMacro}
+            onDelete={setMacroPendingDelete}
+          />
+        )}
       </main>
+
+      {editingMacro ? (
+        <MacroSettingsDialog
+          key={`${editingMacro.id}-${editingMacro.updatedAt}`}
+          macro={editingMacro}
+          open
+          onClose={() => {
+            setEditingMacro(null);
+          }}
+          onSaved={handleMacroSaved}
+        />
+      ) : null}
 
       <ConfirmDialog
         open={clearAllPending}

@@ -1,7 +1,7 @@
 @import "../ui/index.css";
 
 .ui-page--options {
-  max-width: 34rem;
+  max-width: 64rem;
   padding-top: var(--ui-space-6);
 }
 
@@ -16,8 +16,37 @@
   gap: var(--ui-space-4);
 }
 
-.ui-page--options .ui-stack--loose {
-  gap: var(--ui-space-2);
+.ui-macro-table-wrap {
+  overflow-x: auto;
+}
+
+.ui-macro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ui-text-sm);
+}
+
+.ui-macro-table th,
+.ui-macro-table td {
+  padding: var(--ui-space-3) var(--ui-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-macro-table th {
+  font-weight: 500;
+  color: var(--ui-fg-secondary);
+  white-space: nowrap;
+}
+
+.ui-macro-table td {
+  line-height: 1.5;
+}
+
+.ui-macro-table__actions {
+  display: flex;
+  gap: var(--ui-space-1);
 }
 
 .ol-sonner-toast {
