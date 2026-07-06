@@ -1,73 +1,29 @@
-import { formatMacroStep } from "@/shared/macro-step-format";
 import type { Macro } from "@/shared/types/macro";
-import { Button, Disclosure } from "@/ui/components";
+import { Button } from "@/ui/components";
 
-import { MacroDetailsEditor } from "@/ui/macro-settings/MacroDetailsEditor";
-import { MacroParamsEditor } from "@/ui/macro-settings/MacroParamsEditor";
-import { RunScopeEditor } from "@/ui/macro-settings/RunScopeEditor";
-import { ScriptEditor } from "@/ui/macro-settings/ScriptEditor";
-import { ShortcutEditor } from "@/ui/macro-settings/ShortcutEditor";
+import { MacroJsonEditor } from "@/ui/macro-settings/MacroJsonEditor";
 
 type MacroSettingsBodyProps = {
   macro: Macro;
   onSaved: (macros: Macro[]) => void;
-  onError: (message: string | null) => void;
+  onDirtyChange?: (dirty: boolean) => void;
   onDelete?: () => void;
 };
 
 export function MacroSettingsBody({
   macro,
   onSaved,
-  onError,
+  onDirtyChange,
   onDelete,
 }: MacroSettingsBodyProps) {
   return (
     <>
-      <MacroDetailsEditor
-        key={`${macro.id}-${macro.updatedAt}-details`}
+      <MacroJsonEditor
+        key={`${macro.id}-${macro.updatedAt}`}
         macro={macro}
         onSaved={onSaved}
-        onError={onError}
+        onDirtyChange={onDirtyChange}
       />
-      <RunScopeEditor
-        key={`${macro.id}-${macro.updatedAt}-scope`}
-        macro={macro}
-        onSaved={onSaved}
-        onError={onError}
-      />
-      <ShortcutEditor macro={macro} onSaved={onSaved} onError={onError} />
-      <MacroParamsEditor
-        key={`${macro.id}-${macro.updatedAt}-params`}
-        macro={macro}
-        onSaved={onSaved}
-        onError={onError}
-      />
-
-      <div className="ui-section">
-        <ScriptEditor
-          key={macro.id}
-          macro={macro}
-          onSaved={onSaved}
-          onError={onError}
-        />
-
-        <Disclosure
-          summary={
-            <>
-              {macro.steps.length} demo {macro.steps.length === 1 ? "step" : "steps"}{" "}
-              (recording reference)
-            </>
-          }
-        >
-          <ol className="ui-list--stack">
-            {macro.steps.map((step, index) => (
-              <li key={step.id} className="ui-code-item">
-                {formatMacroStep(step, index)}
-              </li>
-            ))}
-          </ol>
-        </Disclosure>
-      </div>
 
       {onDelete ? (
         <div className="ui-card__footer">

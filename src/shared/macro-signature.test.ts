@@ -213,16 +213,28 @@ describe("validateMacroScriptSignature", () => {
   });
 });
 
+const TEST_MACRO_ID = "550e8400-e29b-41d4-a716-446655440000";
+
+function testMacro(overrides: Partial<Macro> = {}): Macro {
+  return {
+    id: TEST_MACRO_ID,
+    name: "Test macro",
+    steps: [],
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides,
+  };
+}
+
 describe("validateMacroForSave", () => {
   test("keeps unused params when script has no placeholders", () => {
-    const macro = {
-      id: "test",
+    const macro = testMacro({
       script: scriptWithSteps([CLICK_STEP]),
       signature: {
         version: 1 as const,
         params: [{ name: "branch", label: "Branch", type: "string" as const }],
       },
-    } as Macro;
+    });
 
     expect(validateMacroForSave(macro).signature?.params).toEqual([
       { name: "branch", label: "Branch", type: "string" },
@@ -236,11 +248,10 @@ describe("validateMacroForSave", () => {
         match: { ariaLabel: "{{branch}}", text: "{{branch}}" },
       },
     ]);
-    const macro = {
-      id: "test",
+    const macro = testMacro({
       script,
       signature: { version: 1 as const, params: [] },
-    } as Macro;
+    });
 
     expect(() => validateMacroForSave(macro)).toThrow(/no param "branch"/);
   });

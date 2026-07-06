@@ -1,6 +1,6 @@
 import { testLlmConnection } from "@/background/llm-test";
 import { relayLogEntry } from "@/background/log-relay";
-import { macroNeedsParams, validateMacroForSave, validateMacroParamValues, validateMacroScriptSignature } from "@/shared/macro-signature";
+import { macroNeedsParams, validateMacroForSave, validateMacroParamValues } from "@/shared/macro-signature";
 import type { MacroParamValues } from "@/shared/macro-signature";
 import { openOverlayForMacro } from "@/background/overlay";
 import { runMacro } from "@/background/playback/play";
@@ -9,7 +9,6 @@ import { cancelPendingRecordSession } from "@/background/recording/recording-ses
 import { createLogger } from "@/shared/logger";
 import { macroMatchesUrl } from "@/shared/macro-match";
 import { normalizeShortcut, isReservedPaletteShortcut } from "@/shared/shortcut";
-import { validateRunScopePattern } from "@/shared/run-scope";
 import { getLlmSettings, saveLlmSettings } from "@/shared/clients/llm-settings";
 import { getMacros, getPendingRecord, saveMacros } from "@/shared/clients/storage";
 import {
@@ -88,13 +87,6 @@ export const backgroundHandlers = {
     const macros = await getMacros();
     const index = macros.findIndex((macro) => macro.id === message.macro.id);
 
-    if (message.macro.runScope) {
-      const patternError = validateRunScopePattern(message.macro.runScope.pattern);
-      if (patternError) {
-        throw new Error(`Invalid run scope regex: ${patternError}`);
-      }
-    }
-
     if (message.macro.shortcut) {
       const normalized = normalizeShortcut(message.macro.shortcut);
       if (isReservedPaletteShortcut(normalized)) {
@@ -122,35 +114,6 @@ export const backgroundHandlers = {
     } else {
       macros.push(macro);
     }
-    await saveMacros(macros);
-
-    return { ok: true as const, macros };
-  },
-
-  SAVE_MACRO_SCRIPT: async (message, _context) => {
-    const macros = await getMacros();
-    const index = macros.findIndex((macro) => macro.id === message.macroId);
-    if (index < 0) {
-      throw new Error("Macro not found.");
-    }
-    if (!message.script) {
-      throw new Error("Script is required.");
-    }
-
-    const existing = macros[index];
-    const syncError = validateMacroScriptSignature(
-      message.script,
-      existing.signature?.params ?? [],
-    );
-    if (syncError) {
-      throw new Error(syncError);
-    }
-
-    macros[index] = {
-      ...existing,
-      script: message.script,
-      updatedAt: Date.now(),
-    };
     await saveMacros(macros);
 
     return { ok: true as const, macros };
@@ -273,8 +236,6 @@ export async function handleBackgroundMessage(
       return backgroundHandlers.GET_MACROS(message, context);
     case "SAVE_MACRO":
       return backgroundHandlers.SAVE_MACRO(message, context);
-    case "SAVE_MACRO_SCRIPT":
-      return backgroundHandlers.SAVE_MACRO_SCRIPT(message, context);
     case "DELETE_MACRO":
       return backgroundHandlers.DELETE_MACRO(message, context);
     case "RUN_MACRO_BY_ID":

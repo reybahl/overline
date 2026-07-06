@@ -13,11 +13,10 @@ import { Button, Card } from "@/ui/components";
 type MacroCardProps = {
   macro: Macro;
   onSaved: (macros: Macro[]) => void;
-  onError: (message: string | null) => void;
   onDelete: () => void;
 };
 
-function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
+function MacroCard({ macro, onSaved, onDelete }: MacroCardProps) {
   const summaryDescription = macro.description ?? macro.intent;
 
   return (
@@ -38,12 +37,7 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
         </div>
       }
     >
-      <MacroSettingsBody
-        macro={macro}
-        onSaved={onSaved}
-        onError={onError}
-        onDelete={onDelete}
-      />
+      <MacroSettingsBody macro={macro} onSaved={onSaved} onDelete={onDelete} />
     </Card>
   );
 }
@@ -97,7 +91,6 @@ export default function App() {
 
   function handleMacroSaved(macros: Macro[]): void {
     setMacros(macros);
-    toast.success("Saved");
   }
 
   async function confirmClearAll(): Promise<void> {
@@ -159,11 +152,6 @@ export default function App() {
               <MacroCard
                 macro={macro}
                 onSaved={handleMacroSaved}
-                onError={(message) => {
-                  if (message) {
-                    toast.error(message);
-                  }
-                }}
                 onDelete={() => {
                   setMacroPendingDelete(macro);
                 }}
