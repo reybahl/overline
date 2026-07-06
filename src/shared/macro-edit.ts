@@ -180,3 +180,37 @@ export function patchMacroShortcutInText(
 
   return JSON.stringify(base, null, 2);
 }
+
+export function addMacroParamToText(text: string, fallback: Macro): string {
+  const syntax = parseJsonSyntax(text);
+  const base =
+    syntax.ok && typeof syntax.value === "object" && syntax.value !== null
+      ? { ...(syntax.value as Record<string, unknown>) }
+      : { ...macroEditableDocumentFromMacro(fallback) };
+
+  const signature =
+    typeof base.signature === "object" && base.signature !== null
+      ? (base.signature as { version?: number; params?: unknown[] })
+      : { version: 1, params: [] };
+
+  const params = Array.isArray(signature.params) ? [...signature.params] : [];
+  const used = new Set(
+    params
+      .map((param) =>
+        typeof param === "object" && param !== null && "name" in param
+          ? String((param as { name: unknown }).name)
+          : "",
+      )
+      .filter(Boolean),
+  );
+
+  let name = "newParam";
+  for (let n = 2; used.has(name); n++) {
+    name = `newParam${n}`;
+  }
+
+  params.push({ name, label: "New parameter", type: "string" });
+  base.signature = { version: 1, params };
+
+  return JSON.stringify(base, null, 2);
+}

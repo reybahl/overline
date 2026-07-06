@@ -6,6 +6,7 @@ import {
   mergeEditableDocument,
   parseMacroEditJson,
   patchMacroShortcutInText,
+  addMacroParamToText,
   readShortcutFromText,
   validateMacroEdit,
 } from "@/shared/macro-edit";
@@ -182,5 +183,33 @@ describe("shortcut helpers", () => {
     const next = patchMacroShortcutInText(text, macro, undefined);
 
     expect(readShortcutFromText(next, macro)).toBeUndefined();
+  });
+});
+
+describe("addMacroParamToText", () => {
+  test("appends a placeholder param to the signature", () => {
+    const macro = baseMacro();
+    const next = addMacroParamToText(formatMacroForEdit(macro), macro);
+    const parsed = JSON.parse(next) as { signature: { params: { name: string }[] } };
+
+    expect(parsed.signature.params).toEqual([
+      { name: "newParam", label: "New parameter", type: "string" },
+    ]);
+  });
+
+  test("picks a unique placeholder name", () => {
+    const macro = baseMacro({
+      signature: {
+        version: 1,
+        params: [{ name: "newParam", label: "Existing", type: "string" }],
+      },
+    });
+    const next = addMacroParamToText(formatMacroForEdit(macro), macro);
+    const parsed = JSON.parse(next) as { signature: { params: { name: string }[] } };
+
+    expect(parsed.signature.params.map((param) => param.name)).toEqual([
+      "newParam",
+      "newParam2",
+    ]);
   });
 });

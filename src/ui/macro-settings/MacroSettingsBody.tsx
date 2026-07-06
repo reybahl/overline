@@ -7,6 +7,7 @@ type MacroSettingsBodyProps = {
   onSaved: (macros: Macro[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onDelete?: () => void;
+  onClose?: () => void;
 };
 
 export function MacroSettingsBody({
@@ -14,6 +15,7 @@ export function MacroSettingsBody({
   onSaved,
   onDirtyChange,
   onDelete,
+  onClose,
 }: MacroSettingsBodyProps) {
   return (
     <MacroJsonEditor
@@ -22,6 +24,7 @@ export function MacroSettingsBody({
       onSaved={onSaved}
       onDirtyChange={onDirtyChange}
       onDelete={onDelete}
+      onClose={onClose}
     />
   );
 }
