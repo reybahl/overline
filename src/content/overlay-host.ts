@@ -22,18 +22,27 @@ const overlayStyles = `
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgb(15 15 15 / 28%);
+  color-scheme: light dark;
+  background: light-dark(rgb(15 15 15 / 28%), rgb(0 0 0 / 55%));
 }
 
 #${OVERLAY_HOST_ID} .ui-overlay-panel {
   width: ${UI_SHELL_WIDTH}px;
-  background: #ffffff;
+  background: light-dark(#ffffff, #121212);
   border-radius: 12px;
   box-shadow:
     0 24px 48px rgb(15 15 15 / 16%),
     0 2px 8px rgb(15 15 15 / 8%);
   flex-shrink: 0;
   overflow: hidden;
+}
+
+@media (prefers-color-scheme: dark) {
+  #${OVERLAY_HOST_ID} .ui-overlay-panel {
+    box-shadow:
+      0 24px 48px rgb(0 0 0 / 45%),
+      0 0 0 1px rgb(255 255 255 / 8%);
+  }
 }
 
 #${OVERLAY_HOST_ID}.ui-overlay-host--prompt-macro .ui-overlay-panel {
@@ -88,24 +97,8 @@ const overlayStyles = `
   border: 0;
   display: block;
   border-radius: 12px;
-}
-
-@media (prefers-color-scheme: dark) {
-  #${OVERLAY_HOST_ID} {
-    background: rgb(0 0 0 / 55%);
-  }
-
-  #${OVERLAY_HOST_ID} .ui-overlay-panel {
-    background: #121212;
-    box-shadow:
-      0 24px 48px rgb(0 0 0 / 45%),
-      0 0 0 1px rgb(255 255 255 / 8%);
-  }
-
-  #${OVERLAY_HOST_ID}.ui-overlay-host--prompt-macro .ui-overlay-panel {
-    background: transparent;
-    box-shadow: none;
-  }
+  color-scheme: light dark;
+  background: light-dark(#ffffff, #121212);
 }
 `;
 

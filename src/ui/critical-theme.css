@@ -1,0 +1,22 @@
+/* Paint html/body before the module bundle loads. Colors mirror tokens.css. */
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  background: #ffffff;
+  color: #1b1b1f;
+}
+
+@media (prefers-color-scheme: dark) {
+  html {
+    background: #121212;
+    color: #ededed;
+  }
+}
+
+body {
+  margin: 0;
+  background: inherit;
+  color: inherit;
+}

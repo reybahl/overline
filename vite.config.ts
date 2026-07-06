@@ -27,6 +27,7 @@ export default defineConfig({
       disableAutoLaunch: true,
       additionalInputs: [
         "src/window/index.html",
+        "src/ui/theme-paint.js",
         "src/content/index.ts",
         "src/content/dom-capture.ts",
         "src/content/shortcuts.ts",
