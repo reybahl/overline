@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
@@ -19,8 +20,8 @@ export function MacroSettingsDialog({
   onClose,
   onSaved,
 }: MacroSettingsDialogProps) {
-  const [error, setError] = useState<string | null>(null);
   const [editedMacro, setEditedMacro] = useState(macro);
+  const [dirty, setDirty] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
 
   function handleSaved(macros: Macro[]): void {
@@ -29,6 +30,13 @@ export function MacroSettingsDialog({
     if (updated) {
       setEditedMacro(updated);
     }
+  }
+
+  function requestClose(): void {
+    if (dirty && !window.confirm("Discard unsaved changes?")) {
+      return;
+    }
+    onClose();
   }
 
   async function confirmDelete(): Promise<void> {
@@ -40,7 +48,7 @@ export function MacroSettingsDialog({
     setDeletePending(false);
 
     if (!response.ok) {
-      setError(response.error);
+      toast.error(response.error);
       return;
     }
 
@@ -53,9 +61,10 @@ export function MacroSettingsDialog({
       <Dialog
         open={open}
         onOpenChange={(nextOpen) => {
-          if (!nextOpen) {
-            onClose();
+          if (nextOpen) {
+            return;
           }
+          requestClose();
         }}
         popupClassName="ui-macro-settings"
         trackId="macro-settings"
@@ -66,7 +75,7 @@ export function MacroSettingsDialog({
             <Button
               variant="icon"
               aria-label="Close settings"
-              onClick={onClose}
+              onClick={requestClose}
             >
               <svg
                 className="ui-icon"
@@ -86,14 +95,12 @@ export function MacroSettingsDialog({
             </Button>
           </header>
 
-          {error ? <p className="ui-alert ui-alert--error">{error}</p> : null}
-
           <div className="ui-macro-settings__body">
             <div className="ui-macro-settings__content">
               <MacroSettingsBody
                 macro={editedMacro}
                 onSaved={handleSaved}
-                onError={setError}
+                onDirtyChange={setDirty}
                 onDelete={() => {
                   setDeletePending(true);
                 }}

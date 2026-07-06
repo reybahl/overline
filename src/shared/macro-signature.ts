@@ -1,3 +1,4 @@
+import { assertMacroEditable } from "@/shared/macro-edit";
 import { createLogger } from "@/shared/logger";
 import { isPathSegmentPlaceholder } from "@/shared/resolve-navigate-href";
 import {
@@ -153,25 +154,7 @@ function stripOrphanSignature(macro: Macro): Macro {
 
 /** Validate script/signature sync before persisting a user-edited macro. */
 export function validateMacroForSave(macro: Macro): Macro {
-  const stripped = stripOrphanSignature(macro);
-  if (!stripped.script) {
-    return stripped;
-  }
-
-  const refs = getParamRefsInScript(stripped.script);
-  if (refs.size === 0) {
-    return stripped;
-  }
-
-  const error = validateMacroScriptSignature(
-    stripped.script,
-    stripped.signature?.params ?? [],
-  );
-  if (error) {
-    throw new Error(error);
-  }
-
-  return stripped;
+  return assertMacroEditable(stripOrphanSignature(macro));
 }
 
 function patchMismatch(

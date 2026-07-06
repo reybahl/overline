@@ -376,9 +376,9 @@ html.ol-prompt-only #macro-settings-root {
 }
 
 .ui-bui-popup.ui-macro-settings {
-  width: min(100%, 440px);
+  width: min(100%, 520px);
   max-width: calc(100vw - var(--ui-space-8));
-  max-height: min(80vh, 560px);
+  max-height: min(85vh, 680px);
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ui-fg);
@@ -393,7 +393,7 @@ html.ol-prompt-only #macro-settings-root {
 .ui-macro-settings__form {
   display: flex;
   flex-direction: column;
-  max-height: min(80vh, 560px);
+  max-height: min(85vh, 680px);
 }
 
 .ui-macro-settings__header {
@@ -453,4 +453,25 @@ html.ol-prompt-only #macro-settings-root {
 
 .ui-macro-settings .ui-alert {
   margin: var(--ui-space-3) var(--ui-space-4) 0;
+}
+
+.ui-macro-json-editor__textarea {
+  min-height: 16rem;
+  resize: vertical;
+}
+
+.ui-macro-shortcut {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.ui-macro-shortcut__hint {
+  margin: var(--ui-space-2) 0 0;
+  font-size: var(--ui-text-sm);
+}
+
+.ui-macro-shortcut__hint code {
+  font-family: var(--ui-font-mono);
+  font-size: 0.92em;
 }

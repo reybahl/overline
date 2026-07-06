@@ -1,6 +1,6 @@
 import { Toaster } from "sonner";
 
-export function OptionsToaster() {
+export function OverlineToaster() {
   return (
     <Toaster
       theme="system"
