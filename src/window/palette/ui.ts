@@ -3,15 +3,10 @@ import {
   cancelRecordBtn,
   confirmSaveBtn,
   discardBtn,
-  intentInput,
   macroListEl,
   searchInput,
   statusEl,
 } from "@/window/palette/elements";
-
-export function setIntentInputVisible(visible: boolean): void {
-  intentInput.hidden = !visible;
-}
 
 export function setStatus(message: string, isError = false): void {
   statusEl.textContent = message;
@@ -23,7 +18,6 @@ export function setBusy(disabled: boolean): void {
     button.toggleAttribute("disabled", disabled);
   }
   searchInput.toggleAttribute("disabled", disabled);
-  intentInput.toggleAttribute("disabled", disabled);
   confirmSaveBtn.toggleAttribute("disabled", disabled);
   discardBtn.toggleAttribute("disabled", disabled);
 

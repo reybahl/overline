@@ -11,7 +11,6 @@ import {
   isInjectableUrl,
 } from "@/shared/tab";
 import {
-  intentInput,
   palettePanelEl,
   searchInput,
 } from "@/window/palette/elements";
@@ -20,7 +19,6 @@ import { getPendingMacro, hideReview, showReview } from "@/window/palette/review
 import { paletteState } from "@/window/palette/state";
 import {
   setBusy,
-  setIntentInputVisible,
   setRecordingUi,
   setStatus,
 } from "@/window/palette/ui";
@@ -145,34 +143,14 @@ export async function handleCreateMacroFromSearch(): Promise<void> {
   await handleRecordMacro(query);
 }
 
-export async function handleRecordMacro(intentOverride?: string): Promise<void> {
+export async function handleRecordMacro(intent: string): Promise<void> {
   hideReview();
 
-  let intent: string;
-
-  if (intentOverride !== undefined) {
-    intent = intentOverride.trim();
-    if (!intent) {
-      return;
-    }
-  } else {
-    const wasIntentHidden = intentInput.hidden;
-    setIntentInputVisible(true);
-
-    intent = intentInput.value.trim();
-    if (!intent) {
-      intentInput.focus();
-      if (wasIntentHidden) {
-        setStatus("");
-        return;
-      }
-      setStatus("Enter an intent first.", true);
-      return;
-    }
+  const trimmedIntent = intent.trim();
+  if (!trimmedIntent) {
+    return;
   }
 
-  intentInput.value = intent;
-  setIntentInputVisible(false);
   setBusy(true);
 
   try {
@@ -202,7 +180,7 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
 
     void sendBackgroundMessage({
       type: "AGENTIC_RECORD",
-      intent,
+      intent: trimmedIntent,
       tabId,
       startUrl,
     })
@@ -241,7 +219,6 @@ export async function handleRecordMacro(intentOverride?: string): Promise<void> 
       error instanceof Error ? error.message : "Failed to record macro";
     setStatus(errorMessage, true);
     setBusy(false);
-    setIntentInputVisible(false);
   }
 }
 
@@ -266,8 +243,6 @@ export async function handleConfirmSave(): Promise<void> {
     const macroName = pendingMacro.name;
     hideReview();
     palettePanelEl.hidden = false;
-    intentInput.value = "";
-    setIntentInputVisible(false);
     await clearPendingRecord();
     await refreshMacros(macroId);
     setStatus(`Saved macro "${macroName}"`);
@@ -284,8 +259,6 @@ export async function handleConfirmSave(): Promise<void> {
 export function handleDiscard(): void {
   hideReview();
   palettePanelEl.hidden = false;
-  intentInput.value = "";
-  setIntentInputVisible(false);
   clearRecordingSession();
   void clearPendingRecord().then(() => {
     setStatus("Recording discarded.");
@@ -299,8 +272,6 @@ export async function handleCancelRecording(): Promise<void> {
   setBusy(false);
   setRecordingUi(false);
   palettePanelEl.hidden = false;
-  intentInput.value = "";
-  setIntentInputVisible(false);
 
   try {
     const response = await sendBackgroundMessage({

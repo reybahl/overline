@@ -2,7 +2,7 @@ import "@/ui/index.css";
 
 import { subscribeStorage } from "@/shared/clients/storage";
 import { mountLucideIcon } from "@/ui/mount-icon";
-import { Braces, Plus, Search, Settings } from "lucide";
+import { Braces, Search, Settings } from "lucide";
 import { paletteActions } from "@/window/palette/actions";
 import { handleCaptureDom } from "@/window/palette/capture-dom";
 import {
@@ -10,8 +10,6 @@ import {
   cancelRecordBtn,
   confirmSaveBtn,
   discardBtn,
-  generateBtn,
-  intentInput,
   optionsLink,
   searchIconEl,
   searchInput,
@@ -32,7 +30,6 @@ import {
   handleConfirmSave,
   handleCreateMacroFromSearch,
   handleDiscard,
-  handleRecordMacro,
   syncPendingRecord,
 } from "@/window/palette/recording-flow";
 import { paletteState } from "@/window/palette/state";
@@ -40,7 +37,6 @@ import { setStatus } from "@/window/palette/ui";
 
 mountLucideIcon(captureBtn, Braces);
 mountLucideIcon(optionsLink, Settings);
-mountLucideIcon(generateBtn, Plus);
 mountLucideIcon(searchIconEl, Search);
 
 initMacroSettingsHost();
@@ -106,17 +102,6 @@ document.addEventListener("keydown", (event) => {
 
   event.preventDefault();
   closePalette();
-});
-
-generateBtn.addEventListener("click", () => {
-  void handleRecordMacro();
-});
-
-intentInput.addEventListener("keydown", (event) => {
-  if (event.key === "Enter") {
-    event.preventDefault();
-    void handleRecordMacro();
-  }
 });
 
 captureBtn.addEventListener("click", () => {

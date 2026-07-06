@@ -8,12 +8,10 @@ export function requireElement<T extends HTMLElement>(id: string): T {
 
 export const searchIconEl = requireElement<HTMLSpanElement>("search-icon");
 export const searchInput = requireElement<HTMLInputElement>("search-input");
-export const intentInput = requireElement<HTMLInputElement>("intent-input");
 export const macroListEl = requireElement<HTMLUListElement>("macro-list");
 export const macroEmptyEl = requireElement<HTMLParagraphElement>("macro-empty");
 export const palettePanelEl = requireElement<HTMLElement>("palette-panel");
 export const captureBtn = requireElement<HTMLButtonElement>("capture-btn");
-export const generateBtn = requireElement<HTMLButtonElement>("generate-btn");
 export const statusEl = requireElement<HTMLParagraphElement>("status");
 export const captureOutputEl = requireElement<HTMLPreElement>("capture-output");
 export const reviewPanelEl = requireElement<HTMLElement>("review-panel");
@@ -32,4 +30,4 @@ export const paramPromptFieldsEl = requireElement<HTMLDivElement>("param-prompt-
 export const paramPromptErrorEl = requireElement<HTMLParagraphElement>("param-prompt-error");
 export const paramPromptCancelBtn = requireElement<HTMLButtonElement>("param-prompt-cancel");
 
-export const actionButtons = [generateBtn, captureBtn];
+export const actionButtons = [captureBtn];
