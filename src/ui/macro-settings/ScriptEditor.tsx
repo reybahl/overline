@@ -6,6 +6,7 @@ import { validateMacroScriptSignature } from "@/shared/macro-signature";
 import { formatScriptStepBody } from "@/shared/script-format";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
+import { Button, Disclosure, FieldGroup, TextArea } from "@/ui/components";
 
 type ScriptEditorProps = {
   macro: Macro;
@@ -78,10 +79,9 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
   if (editing) {
     return (
       <>
-        <label className="ui-field">
-          <span className="ui-label">Script JSON</span>
-          <textarea
-            className="ui-input ui-input--mono"
+        <FieldGroup label="Script JSON">
+          <TextArea
+            mono
             rows={12}
             spellCheck={false}
             value={text}
@@ -90,49 +90,41 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
               setDirty(true);
             }}
           />
-        </label>
+        </FieldGroup>
         <div className="ui-inline-actions">
-          <button
-            type="button"
-            className="ui-btn ui-btn--sm"
-            disabled={!dirty}
-            onClick={() => {
-              void saveScript();
-            }}
-          >
+          <Button size="sm" disabled={!dirty} onClick={() => void saveScript()}>
             Save script
-          </button>
-          <button
-            type="button"
-            className="ui-btn ui-btn--sm ui-btn--ghost"
-            onClick={cancelEditing}
-          >
+          </Button>
+          <Button size="sm" variant="ghost" onClick={cancelEditing}>
             Cancel
-          </button>
+          </Button>
         </div>
       </>
     );
   }
 
   return (
-    <details className="ui-disclosure">
-      <summary className="ui-disclosure__summary ui-disclosure__summary--row">
-        <span>
-          {macro.script.steps.length} script step
-          {macro.script.steps.length === 1 ? "" : "s"}
-        </span>
-        <button
-          type="button"
-          className="ui-btn ui-btn--icon"
-          aria-label="Edit script"
-          onClick={(event) => {
-            event.preventDefault();
-            startEditing();
-          }}
-        >
-          <Pencil className="ui-icon" size={16} strokeWidth={2} aria-hidden />
-        </button>
-      </summary>
+    <Disclosure
+      summaryClassName="ui-disclosure__summary--row"
+      summary={
+        <>
+          <span>
+            {macro.script.steps.length} script step
+            {macro.script.steps.length === 1 ? "" : "s"}
+          </span>
+          <Button
+            variant="icon"
+            aria-label="Edit script"
+            onClick={(event) => {
+              event.stopPropagation();
+              startEditing();
+            }}
+          >
+            <Pencil className="ui-icon" size={16} strokeWidth={2} aria-hidden />
+          </Button>
+        </>
+      }
+    >
       <ol className="ui-list--stack">
         {macro.script.steps.map((step, index) => (
           <li key={`${macro.id}-script-${index}`} className="ui-code-item ui-code-item--row">
@@ -147,10 +139,9 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
           </li>
         ))}
       </ol>
-      <details className="ui-disclosure">
-        <summary className="ui-disclosure__summary">Raw script JSON</summary>
+      <Disclosure summary="Raw script JSON">
         <pre className="ui-code">{JSON.stringify(macro.script, null, 2)}</pre>
-      </details>
-    </details>
+      </Disclosure>
+    </Disclosure>
   );
 }

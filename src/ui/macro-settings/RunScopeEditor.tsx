@@ -3,6 +3,7 @@ import { useState } from "react";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import type { Macro, RunScope } from "@/shared/types/macro";
 import { validateRunScopePattern } from "@/shared/run-scope";
+import { Button, FieldGroup, TextInput } from "@/ui/components";
 
 type RunScopeEditorProps = {
   macro: Macro;
@@ -54,11 +55,8 @@ export function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps)
   return (
     <div className="ui-section">
       <p className="ui-section__title">Run on</p>
-      <label className="ui-field">
-        <span className="ui-label">Description</span>
-        <input
-          type="text"
-          className="ui-input"
+      <FieldGroup label="Description">
+        <TextInput
           placeholder="e.g. Any repository page on this site"
           value={description}
           onChange={(event) => {
@@ -66,12 +64,10 @@ export function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps)
             setDirty(true);
           }}
         />
-      </label>
-      <label className="ui-field">
-        <span className="ui-label">URL regex</span>
-        <input
-          type="text"
-          className="ui-input ui-input--mono"
+      </FieldGroup>
+      <FieldGroup label="URL regex">
+        <TextInput
+          mono
           placeholder="^https://…"
           value={pattern}
           onChange={(event) => {
@@ -79,17 +75,11 @@ export function RunScopeEditor({ macro, onSaved, onError }: RunScopeEditorProps)
             setDirty(true);
           }}
         />
-      </label>
+      </FieldGroup>
       {dirty ? (
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm"
-          onClick={() => {
-            void saveRunScope();
-          }}
-        >
+        <Button size="sm" onClick={() => void saveRunScope()}>
           Save run scope
-        </button>
+        </Button>
       ) : macro.runScope ? null : (
         <p className="ui-text-muted">
           No run scope yet. Record a new macro or fill in both fields above.

@@ -8,6 +8,7 @@ import { saveMacros } from "@/shared/clients/storage";
 import type { Macro } from "@/shared/types/macro";
 import { formatShortcutForDisplay } from "@/shared/shortcut";
 import { MacroSettingsBody } from "@/ui/macro-settings/MacroSettingsBody";
+import { Button, Card } from "@/ui/components";
 
 type MacroCardProps = {
   macro: Macro;
@@ -20,8 +21,8 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
   const summaryDescription = macro.description ?? macro.intent;
 
   return (
-    <details className="ui-card">
-      <summary className="ui-card__summary">
+    <Card
+      summary={
         <div className="ui-card__summary-main">
           <div className="ui-card__heading">
             <span className="ui-card__title">{macro.name}</span>
@@ -35,17 +36,15 @@ function MacroCard({ macro, onSaved, onError, onDelete }: MacroCardProps) {
             <p className="ui-card__meta">{summaryDescription}</p>
           ) : null}
         </div>
-      </summary>
-
-      <div className="ui-card__body">
-        <MacroSettingsBody
-          macro={macro}
-          onSaved={onSaved}
-          onError={onError}
-          onDelete={onDelete}
-        />
-      </div>
-    </details>
+      }
+    >
+      <MacroSettingsBody
+        macro={macro}
+        onSaved={onSaved}
+        onError={onError}
+        onDelete={onDelete}
+      />
+    </Card>
   );
 }
 
@@ -134,15 +133,15 @@ export default function App() {
             </p>
           </div>
           {macros.length > 0 ? (
-            <button
-              type="button"
-              className="ui-btn ui-btn--sm ui-btn--destructive"
+            <Button
+              size="sm"
+              variant="destructive"
               onClick={() => {
                 setClearAllPending(true);
               }}
             >
               Clear all
-            </button>
+            </Button>
           ) : null}
         </div>
       </header>

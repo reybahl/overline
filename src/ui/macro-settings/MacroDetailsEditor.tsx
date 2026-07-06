@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import type { Macro } from "@/shared/types/macro";
+import { Button, FieldGroup, TextInput } from "@/ui/components";
 
 type MacroDetailsEditorProps = {
   macro: Macro;
@@ -47,23 +48,17 @@ export function MacroDetailsEditor({
 
   return (
     <div className="ui-section">
-      <label className="ui-field">
-        <span className="ui-label">Name</span>
-        <input
-          type="text"
-          className="ui-input"
+      <FieldGroup label="Name">
+        <TextInput
           value={name}
           onChange={(event) => {
             setName(event.target.value);
             setDirty(true);
           }}
         />
-      </label>
-      <label className="ui-field">
-        <span className="ui-label">Description</span>
-        <input
-          type="text"
-          className="ui-input"
+      </FieldGroup>
+      <FieldGroup label="Description">
+        <TextInput
           placeholder={
             macro.intent && !macro.description
               ? macro.intent
@@ -75,17 +70,11 @@ export function MacroDetailsEditor({
             setDirty(true);
           }}
         />
-      </label>
+      </FieldGroup>
       {dirty ? (
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm"
-          onClick={() => {
-            void saveDetails();
-          }}
-        >
+        <Button size="sm" onClick={() => void saveDetails()}>
           Save
-        </button>
+        </Button>
       ) : null}
     </div>
   );

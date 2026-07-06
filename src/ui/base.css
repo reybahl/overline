@@ -10,10 +10,15 @@ body {
 }
 
 body {
+  position: relative;
   background: var(--ui-bg);
   color: var(--ui-fg);
   font: var(--ui-text-base) / 1.4 var(--ui-font);
   -webkit-font-smoothing: antialiased;
+}
+
+.ui-root {
+  isolation: isolate;
 }
 
 .ui-shell {

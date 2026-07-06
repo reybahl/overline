@@ -9,6 +9,7 @@ import {
 } from "@/shared/macro-signature";
 import type { Macro } from "@/shared/types/macro";
 import { MacroParamSchema, type MacroParam } from "@/shared/types/macro-signature";
+import { Button, FieldGroup, Select, TextInput } from "@/ui/components";
 
 const ParamsSchema = z.array(MacroParamSchema);
 
@@ -84,72 +85,62 @@ export function MacroParamsEditor({
       ) : null}
       {params.map((param, index) => (
           <div key={index} className="ui-stack ui-stack--param">
-            <label className="ui-field">
-              <span className="ui-label">Name</span>
-              <input
-                type="text"
-                className="ui-input ui-input--mono"
+            <FieldGroup label="Name">
+              <TextInput
+                mono
                 value={param.name}
                 spellCheck={false}
                 onChange={(event) => {
                   updateParam(index, { name: event.target.value });
                 }}
               />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Label</span>
-              <input
-                type="text"
-                className="ui-input"
+            </FieldGroup>
+            <FieldGroup label="Label">
+              <TextInput
                 value={param.label}
                 onChange={(event) => {
                   updateParam(index, { label: event.target.value });
                 }}
               />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Description</span>
-              <input
-                type="text"
-                className="ui-input"
-                value={param.description ?? ""}
+            </FieldGroup>
+            <FieldGroup label="Description">
+              <TextInput
                 placeholder="Prompt helper text"
+                value={param.description ?? ""}
                 onChange={(event) => {
                   updateParam(index, { description: event.target.value });
                 }}
               />
-            </label>
-            <label className="ui-field">
-              <span className="ui-label">Type</span>
-              <select
-                className="ui-input"
+            </FieldGroup>
+            <FieldGroup label="Type">
+              <Select
                 value={param.type}
-                onChange={(event) => {
+                onValueChange={(value) => {
                   updateParam(index, {
-                    type: event.target.value as MacroParam["type"],
+                    type: value as MacroParam["type"],
                   });
                 }}
-              >
-                <option value="string">string</option>
-                <option value="number">number</option>
-              </select>
-            </label>
-            <button
-              type="button"
-              className="ui-btn ui-btn--sm ui-btn--ghost"
+                items={[
+                  { value: "string", label: "string" },
+                  { value: "number", label: "number" },
+                ]}
+              />
+            </FieldGroup>
+            <Button
+              size="sm"
+              variant="ghost"
               onClick={() => {
                 setParams((current) => current.filter((_, i) => i !== index));
                 setDirty(true);
               }}
             >
               Remove
-            </button>
+            </Button>
           </div>
         ))}
       <div className="ui-inline-actions">
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm"
+        <Button
+          size="sm"
           onClick={() => {
             setParams((current) => [
               ...current,
@@ -159,17 +150,11 @@ export function MacroParamsEditor({
           }}
         >
           Add param
-        </button>
+        </Button>
         {dirty ? (
-          <button
-            type="button"
-            className="ui-btn ui-btn--sm"
-            onClick={() => {
-              void saveParams();
-            }}
-          >
+          <Button size="sm" onClick={() => void saveParams()}>
             Save params
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

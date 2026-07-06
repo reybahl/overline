@@ -11,6 +11,7 @@ import {
   type LlmSettingsDraft,
   type LlmSettingsPublic,
 } from "@/shared/llm";
+import { Button, FieldGroup, Select, TextInput } from "@/ui/components";
 
 const CUSTOM_MODEL_VALUE = "__custom__";
 
@@ -205,51 +206,45 @@ export function LlmSettingsEditor() {
         </p>
       )}
 
-      <label className="ui-field">
-        <span className="ui-label">Provider</span>
-        <select
-          className="ui-input"
+      <FieldGroup label="Provider">
+        <Select
           value={provider}
-          onChange={(event) => {
-            handleProviderChange(event.target.value as LlmProvider);
+          onValueChange={(value) => {
+            handleProviderChange(value as LlmProvider);
           }}
-        >
-          {LLM_PROVIDERS.map((entry) => (
-            <option key={entry} value={entry}>
-              {providerLabel(entry)}
-            </option>
-          ))}
-        </select>
-      </label>
+          items={LLM_PROVIDERS.map((entry) => ({
+            value: entry,
+            label: providerLabel(entry),
+          }))}
+        />
+      </FieldGroup>
 
-      <label className="ui-field">
-        <span className="ui-label">Model</span>
+      <FieldGroup label="Model">
         {catalog.length > 0 ? (
-          <select
-            className="ui-input"
+          <Select
             value={selectValue}
-            onChange={(event) => {
-              const value = event.target.value;
+            onValueChange={(value) => {
               if (value === CUSTOM_MODEL_VALUE) {
                 setModelSelection({ kind: "custom", modelId: "" });
               } else {
                 setModelSelection({ kind: "catalog", modelId: value });
               }
             }}
-          >
-            {catalog.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.label}
-                {"note" in entry && entry.note ? ` — ${entry.note}` : ""}
-              </option>
-            ))}
-            <option value={CUSTOM_MODEL_VALUE}>Custom model ID…</option>
-          </select>
+            items={[
+              ...catalog.map((entry) => ({
+                value: entry.id,
+                label:
+                  "note" in entry && entry.note
+                    ? `${entry.label} — ${entry.note}`
+                    : entry.label,
+              })),
+              { value: CUSTOM_MODEL_VALUE, label: "Custom model ID…" },
+            ]}
+          />
         ) : null}
         {catalog.length === 0 || modelSelection.kind === "custom" ? (
-          <input
-            type="text"
-            className="ui-input ui-input--mono"
+          <TextInput
+            mono
             placeholder="model-id"
             value={
               modelSelection.kind === "custom" ? modelSelection.modelId : ""
@@ -259,42 +254,37 @@ export function LlmSettingsEditor() {
             }}
           />
         ) : null}
-      </label>
+      </FieldGroup>
 
       {provider === "openai-compatible" ? (
         <>
-          <label className="ui-field">
-            <span className="ui-label">Base URL</span>
-            <input
+          <FieldGroup label="Base URL">
+            <TextInput
               type="url"
-              className="ui-input ui-input--mono"
+              mono
               placeholder="https://api.example.com/v1"
               value={baseURL}
               onChange={(event) => {
                 setBaseURL(event.target.value);
               }}
             />
-          </label>
-          <label className="ui-field">
-            <span className="ui-label">Provider name</span>
-            <input
-              type="text"
-              className="ui-input"
+          </FieldGroup>
+          <FieldGroup label="Provider name">
+            <TextInput
               placeholder="openai-compatible"
               value={name}
               onChange={(event) => {
                 setName(event.target.value);
               }}
             />
-          </label>
+          </FieldGroup>
         </>
       ) : null}
 
-      <label className="ui-field">
-        <span className="ui-label">API key</span>
-        <input
+      <FieldGroup label="API key">
+        <TextInput
           type="password"
-          className="ui-input ui-input--mono"
+          mono
           placeholder={
             savedSettings?.apiKeyMasked
               ? `Saved (${savedSettings.apiKeyMasked})`
@@ -306,29 +296,20 @@ export function LlmSettingsEditor() {
             setApiKey(event.target.value);
           }}
         />
-      </label>
+      </FieldGroup>
 
       <div className="ui-inline-actions">
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm"
-          disabled={saving}
-          onClick={() => {
-            void handleSave();
-          }}
-        >
+        <Button size="sm" disabled={saving} onClick={() => void handleSave()}>
           {saving ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm ui-btn--ghost"
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
           disabled={testing}
-          onClick={() => {
-            void handleTest();
-          }}
+          onClick={() => void handleTest()}
         >
           {testing ? "Testing…" : "Test connection"}
-        </button>
+        </Button>
       </div>
     </section>
   );

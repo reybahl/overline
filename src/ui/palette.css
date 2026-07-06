@@ -375,21 +375,19 @@ html.ol-prompt-only #macro-settings-root {
   gap: var(--ui-space-2);
 }
 
-.ui-macro-settings {
+.ui-bui-popup.ui-macro-settings {
   width: min(100%, 440px);
   max-width: calc(100vw - var(--ui-space-8));
   max-height: min(80vh, 560px);
-  margin: auto;
-  padding: 0;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: var(--ui-radius);
   color: var(--ui-fg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-lg);
-}
-
-.ui-macro-settings::backdrop {
-  background: rgb(0 0 0 / 0.35);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .ui-macro-settings__form {

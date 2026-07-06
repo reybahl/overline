@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import type { Macro } from "@/shared/types/macro";
+import { Button, Dialog } from "@/ui/components";
 import { MacroSettingsBody } from "@/ui/macro-settings/MacroSettingsBody";
 
 type MacroSettingsDialogProps = {
@@ -18,26 +19,9 @@ export function MacroSettingsDialog({
   onClose,
   onSaved,
 }: MacroSettingsDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [editedMacro, setEditedMacro] = useState(macro);
   const [deletePending, setDeletePending] = useState(false);
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-
-    if (open && !dialog.open) {
-      dialog.showModal();
-      return;
-    }
-
-    if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
 
   function handleSaved(macros: Macro[]): void {
     onSaved(macros);
@@ -66,21 +50,21 @@ export function MacroSettingsDialog({
 
   return (
     <>
-      <dialog
-        ref={dialogRef}
-        className="ui-macro-settings"
-        onClose={onClose}
-        onCancel={(event) => {
-          event.preventDefault();
-          onClose();
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            onClose();
+          }
         }}
+        popupClassName="ui-macro-settings"
+        trackId="macro-settings"
       >
-        <form method="dialog" className="ui-macro-settings__form">
+        <div className="ui-macro-settings__form">
           <header className="ui-macro-settings__header">
             <h2 className="ui-macro-settings__title">{editedMacro.name}</h2>
-            <button
-              type="button"
-              className="ui-btn ui-btn--icon"
+            <Button
+              variant="icon"
               aria-label="Close settings"
               onClick={onClose}
             >
@@ -99,7 +83,7 @@ export function MacroSettingsDialog({
                   strokeLinecap="round"
                 />
               </svg>
-            </button>
+            </Button>
           </header>
 
           {error ? <p className="ui-alert ui-alert--error">{error}</p> : null}
@@ -116,8 +100,8 @@ export function MacroSettingsDialog({
               />
             </div>
           </div>
-        </form>
-      </dialog>
+        </div>
+      </Dialog>
 
       <ConfirmDialog
         open={deletePending}
