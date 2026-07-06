@@ -91,6 +91,7 @@ export function MacroSettingsDialog({
                 onDelete={() => {
                   setDeletePending(true);
                 }}
+                onClose={requestClose}
               />
             </div>
           </div>
