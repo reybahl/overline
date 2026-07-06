@@ -96,7 +96,7 @@ const overlayStyles = `
   }
 
   #${OVERLAY_HOST_ID} .ui-overlay-panel {
-    background: #202020;
+    background: #121212;
     box-shadow:
       0 24px 48px rgb(0 0 0 / 45%),
       0 0 0 1px rgb(255 255 255 / 8%);

@@ -52,9 +52,9 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --ui-bg: #202020;
-    --ui-surface: #262626;
-    --ui-surface-muted: #2f2f2f;
+    --ui-bg: #121212;
+    --ui-surface: #181818;
+    --ui-surface-muted: #222222;
     --ui-fg: #ededed;
     --ui-fg-secondary: #9b9b9b;
     --ui-border: rgb(255 255 255 / 10%);
