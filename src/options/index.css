@@ -1,7 +1,7 @@
 @import "../ui/index.css";
 
 .ui-page--options {
-  max-width: 34rem;
+  max-width: 64rem;
   padding-top: var(--ui-space-6);
 }
 
@@ -9,15 +9,87 @@
   margin-bottom: var(--ui-space-5);
 }
 
-.ui-options-header {
+.ui-options-footer {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ui-space-4);
+  justify-content: flex-end;
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-border);
 }
 
-.ui-page--options .ui-stack--loose {
-  gap: var(--ui-space-2);
+.ui-macro-table-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.ui-macro-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ui-macro-table-search {
+  width: min(100%, 16rem);
+}
+
+.ui-macro-table-wrap {
+  overflow-x: auto;
+}
+
+.ui-macro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ui-text-sm);
+}
+
+.ui-macro-table th,
+.ui-macro-table td {
+  padding: var(--ui-space-3) var(--ui-space-3);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.ui-macro-table th {
+  font-weight: 500;
+  color: var(--ui-fg-secondary);
+  white-space: nowrap;
+}
+
+.ui-macro-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ui-macro-table__sort:hover {
+  color: var(--ui-fg);
+}
+
+.ui-macro-table__sort-indicator {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+.ui-macro-table__empty {
+  color: var(--ui-fg-secondary);
+  text-align: center;
+}
+
+.ui-macro-table td {
+  line-height: 1.5;
+}
+
+.ui-macro-table__actions {
+  display: flex;
+  gap: var(--ui-space-1);
 }
 
 .ol-sonner-toast {
