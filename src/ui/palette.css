@@ -553,6 +553,24 @@ html.ol-prompt-only #macro-settings-root {
   overflow-wrap: anywhere;
 }
 
+.ui-macro-view__run-scope {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-1);
+}
+
+.ui-macro-view__run-scope-pattern {
+  font-family: var(--ui-font-mono);
+  font-size: var(--ui-text-sm);
+  color: var(--ui-fg);
+}
+
+.ui-macro-view__run-scope-description {
+  margin: 0;
+  font-size: var(--ui-text-sm);
+  line-height: 1.45;
+}
+
 .ui-macro-shortcut {
   margin-top: 0;
   padding-top: 0;

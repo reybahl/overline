@@ -3,6 +3,7 @@ import {
   macroEditableFieldKeys,
   type Macro,
   type MacroEditableDocument,
+  type RunScope,
 } from "@/shared/types/macro";
 import { Disclosure } from "@/ui/components";
 
@@ -27,11 +28,6 @@ function formatFieldValue(
       return document.name;
     case "description":
       return document.description ?? "—";
-    case "runScope":
-      if (!document.runScope) {
-        return "—";
-      }
-      return `${document.runScope.description} · ${document.runScope.pattern}`;
     case "signature": {
       const params = document.signature?.params ?? [];
       return params.map((param) => param.name).join(", ");
@@ -39,6 +35,31 @@ function formatFieldValue(
     default:
       return "—";
   }
+}
+
+function RunScopeValue({ runScope }: { runScope: RunScope }) {
+  return (
+    <div className="ui-macro-view__run-scope">
+      <code className="ui-macro-view__run-scope-pattern">{runScope.pattern}</code>
+      <p className="ui-macro-view__run-scope-description ui-text-muted">
+        {runScope.description}
+      </p>
+    </div>
+  );
+}
+
+function renderFieldValue(
+  key: keyof MacroEditableDocument,
+  document: MacroEditableDocument,
+) {
+  if (key === "runScope") {
+    if (!document.runScope) {
+      return "—";
+    }
+    return <RunScopeValue runScope={document.runScope} />;
+  }
+
+  return formatFieldValue(key, document);
 }
 
 function viewFieldKeys(document: MacroEditableDocument): (keyof MacroEditableDocument)[] {
@@ -67,7 +88,7 @@ export function MacroEditableView({ macro, onSaved }: MacroEditableViewProps) {
         {viewFieldKeys(document).map((key) => (
           <div key={key} className="ui-macro-view__row">
             <dt className="ui-macro-view__label ui-text-muted">{FIELD_LABELS[key]}</dt>
-            <dd className="ui-macro-view__value">{formatFieldValue(key, document)}</dd>
+            <dd className="ui-macro-view__value">{renderFieldValue(key, document)}</dd>
           </div>
         ))}
         <div className="ui-macro-view__row ui-macro-view__row--shortcut">
