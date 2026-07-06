@@ -16,6 +16,21 @@
   gap: var(--ui-space-4);
 }
 
+.ui-macro-table-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ui-space-3);
+}
+
+.ui-macro-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ui-macro-table-search {
+  width: min(100%, 16rem);
+}
+
 .ui-macro-table-wrap {
   overflow-x: auto;
 }
@@ -38,6 +53,33 @@
   font-weight: 500;
   color: var(--ui-fg-secondary);
   white-space: nowrap;
+}
+
+.ui-macro-table__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 500;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ui-macro-table__sort:hover {
+  color: var(--ui-fg);
+}
+
+.ui-macro-table__sort-indicator {
+  font-size: 0.75em;
+  opacity: 0.6;
+}
+
+.ui-macro-table__empty {
+  color: var(--ui-fg-secondary);
+  text-align: center;
 }
 
 .ui-macro-table td {

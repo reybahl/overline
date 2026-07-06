@@ -1,9 +1,19 @@
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type SortingState,
+} from "@tanstack/react-table";
 import { Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 import { macroEditableDocumentFromMacro } from "@/shared/macro-edit";
 import { formatShortcutForDisplay } from "@/shared/shortcut";
 import type { Macro } from "@/shared/types/macro";
-import { Button } from "@/ui/components";
+import { Button, TextInput } from "@/ui/components";
 
 type MacroTableProps = {
   macros: Macro[];
@@ -11,90 +21,216 @@ type MacroTableProps = {
   onDelete: (macro: Macro) => void;
 };
 
-export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
-  return (
-    <div className="ui-macro-table-wrap">
-      <table className="ui-macro-table">
-        <thead>
-          <tr>
-            <th scope="col">Name</th>
-            <th scope="col">Description</th>
-            <th scope="col">Run on</th>
-            <th scope="col">Params</th>
-            <th scope="col">Shortcut</th>
-            <th scope="col">Script</th>
-            <th scope="col">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {macros.map((macro) => {
-            const document = macroEditableDocumentFromMacro(macro);
-            const params = document.signature?.params ?? [];
-            const paramsLabel = params.length > 0 ? params.map((p) => p.name).join(", ") : "—";
+const columnHelper = createColumnHelper<Macro>();
 
+function scriptLabel(macro: Macro): string {
+  const document = macroEditableDocumentFromMacro(macro);
+  if (!document.script) {
+    return "No compiled script — re-record this macro.";
+  }
+  const count = document.script.steps.length;
+  return `${count} step${count === 1 ? "" : "s"}`;
+}
+
+function paramsLabel(macro: Macro): string {
+  const params = macroEditableDocumentFromMacro(macro).signature?.params ?? [];
+  return params.length > 0 ? params.map((param) => param.name).join(", ") : "—";
+}
+
+function runScopeSearchText(macro: Macro): string {
+  const runScope = macroEditableDocumentFromMacro(macro).runScope;
+  if (!runScope) {
+    return "";
+  }
+  return `${runScope.pattern} ${runScope.description}`;
+}
+
+export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor((macro) => macroEditableDocumentFromMacro(macro).name, {
+        id: "name",
+        header: "Name",
+        cell: ({ getValue }) => getValue(),
+      }),
+      columnHelper.accessor(
+        (macro) => macroEditableDocumentFromMacro(macro).description ?? "—",
+        {
+          id: "description",
+          header: "Description",
+          cell: ({ getValue }) => getValue(),
+        },
+      ),
+      columnHelper.accessor(runScopeSearchText, {
+        id: "runScope",
+        header: "Run on",
+        cell: ({ row }) => {
+          const runScope = macroEditableDocumentFromMacro(row.original).runScope;
+          if (!runScope) {
+            return "—";
+          }
+          return (
+            <div className="ui-macro-view__run-scope">
+              <code className="ui-macro-view__run-scope-pattern">{runScope.pattern}</code>
+              <p className="ui-macro-view__run-scope-description ui-text-muted">
+                {runScope.description}
+              </p>
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor(paramsLabel, {
+        id: "params",
+        header: "Params",
+        cell: ({ getValue }) => getValue(),
+      }),
+      columnHelper.accessor(
+        (macro) =>
+          macro.shortcut ? formatShortcutForDisplay(macro.shortcut) : "—",
+        {
+          id: "shortcut",
+          header: "Shortcut",
+          cell: ({ row }) => {
+            const shortcut = row.original.shortcut;
+            if (!shortcut) {
+              return "—";
+            }
             return (
-              <tr key={macro.id}>
-                <td>{document.name}</td>
-                <td>{document.description ?? "—"}</td>
-                <td>
-                  {document.runScope ? (
-                    <div className="ui-macro-view__run-scope">
-                      <code className="ui-macro-view__run-scope-pattern">
-                        {document.runScope.pattern}
-                      </code>
-                      <p className="ui-macro-view__run-scope-description ui-text-muted">
-                        {document.runScope.description}
-                      </p>
-                    </div>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>{paramsLabel}</td>
-                <td>
-                  {macro.shortcut ? (
-                    <kbd className="ui-kbd ui-kbd--compact">
-                      {formatShortcutForDisplay(macro.shortcut)}
-                    </kbd>
-                  ) : (
-                    "—"
-                  )}
-                </td>
-                <td>
-                  {document.script
-                    ? `${document.script.steps.length} step${
-                        document.script.steps.length === 1 ? "" : "s"
-                      }`
-                    : "No compiled script — re-record this macro."}
-                </td>
-                <td>
-                  <div className="ui-macro-table__actions">
-                    <Button
-                      variant="icon"
-                      aria-label={`Edit ${macro.name}`}
-                      onClick={() => {
-                        onEdit(macro);
-                      }}
-                    >
-                      <Pencil className="ui-icon" size={16} strokeWidth={2} aria-hidden />
-                    </Button>
-                    <Button
-                      variant="icon"
-                      className="ui-btn--danger"
-                      aria-label={`Delete ${macro.name}`}
-                      onClick={() => {
-                        onDelete(macro);
-                      }}
-                    >
-                      <Trash2 className="ui-icon" size={16} strokeWidth={2} aria-hidden />
-                    </Button>
-                  </div>
+              <kbd className="ui-kbd ui-kbd--compact">
+                {formatShortcutForDisplay(shortcut)}
+              </kbd>
+            );
+          },
+        },
+      ),
+      columnHelper.accessor(
+        (macro) => macroEditableDocumentFromMacro(macro).script?.steps.length ?? -1,
+        {
+          id: "script",
+          header: "Script",
+          cell: ({ row }) => scriptLabel(row.original),
+        },
+      ),
+      columnHelper.display({
+        id: "actions",
+        header: "Actions",
+        enableSorting: false,
+        enableGlobalFilter: false,
+        cell: ({ row }) => (
+          <div className="ui-macro-table__actions">
+            <Button
+              variant="icon"
+              aria-label={`Edit ${row.original.name}`}
+              onClick={() => {
+                onEdit(row.original);
+              }}
+            >
+              <Pencil className="ui-icon" size={16} strokeWidth={2} aria-hidden />
+            </Button>
+            <Button
+              variant="icon"
+              className="ui-btn--danger"
+              aria-label={`Delete ${row.original.name}`}
+              onClick={() => {
+                onDelete(row.original);
+              }}
+            >
+              <Trash2 className="ui-icon" size={16} strokeWidth={2} aria-hidden />
+            </Button>
+          </div>
+        ),
+      }),
+    ],
+    [onDelete, onEdit],
+  );
+
+  const table = useReactTable({
+    data: macros,
+    columns,
+    state: { sorting, globalFilter },
+    onSortingChange: setSorting,
+    onGlobalFilterChange: setGlobalFilter,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  const rows = table.getRowModel().rows;
+
+  return (
+    <div className="ui-macro-table-section">
+      <div className="ui-macro-table-toolbar">
+        <TextInput
+          type="search"
+          className="ui-macro-table-search"
+          placeholder="Search macros…"
+          value={globalFilter}
+          onChange={(event) => {
+            setGlobalFilter(event.target.value);
+          }}
+          aria-label="Search macros"
+        />
+      </div>
+
+      <div className="ui-macro-table-wrap">
+        <table className="ui-macro-table">
+          <thead>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map((header) => {
+                  const canSort = header.column.getCanSort();
+                  const sortDirection = header.column.getIsSorted();
+
+                  return (
+                    <th key={header.id} scope="col">
+                      {header.isPlaceholder ? null : canSort ? (
+                        <button
+                          type="button"
+                          className="ui-macro-table__sort"
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                          <span className="ui-macro-table__sort-indicator" aria-hidden>
+                            {sortDirection === "asc"
+                              ? " ↑"
+                              : sortDirection === "desc"
+                                ? " ↓"
+                                : " ↕"}
+                          </span>
+                        </button>
+                      ) : (
+                        flexRender(header.column.columnDef.header, header.getContext())
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            ))}
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td className="ui-macro-table__empty" colSpan={columns.length}>
+                  No matching macros
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
+            ) : (
+              rows.map((row) => (
+                <tr key={row.id}>
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
