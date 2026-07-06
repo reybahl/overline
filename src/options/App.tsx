@@ -57,6 +57,7 @@ export default function App() {
     }
 
     setMacros(response.macros);
+    toast.success(`Deleted "${macro.name}"`);
   }
 
   function handleMacroSaved(nextMacros: Macro[]): void {

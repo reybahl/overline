@@ -53,6 +53,7 @@ export function MacroSettingsDialog({
       return;
     }
 
+    toast.success(`Deleted "${editedMacro.name}"`);
     onSaved(response.macros);
     onClose();
   }

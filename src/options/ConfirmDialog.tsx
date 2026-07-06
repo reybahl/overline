@@ -39,7 +39,7 @@ export function ConfirmDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogDescription>{message}</DialogDescription>
       <div className="ui-dialog__actions">
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="default" onClick={onCancel}>
           {cancelLabel}
         </Button>
         <Button
