@@ -9,11 +9,12 @@
   margin-bottom: var(--ui-space-5);
 }
 
-.ui-options-header {
+.ui-options-footer {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--ui-space-4);
+  justify-content: flex-end;
+  margin-top: var(--ui-space-5);
+  padding-top: var(--ui-space-4);
+  border-top: 1px solid var(--ui-border);
 }
 
 .ui-macro-table-section {

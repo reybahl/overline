@@ -87,25 +87,10 @@ export default function App() {
     <>
       <main className="ui-page ui-page--options">
         <header className="ui-page-header">
-          <div className="ui-options-header">
-            <div>
-              <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
-              <p className="ui-header__subtitle">
-                AI settings, saved macros, shortcuts, and run scope.
-              </p>
-            </div>
-            {macros.length > 0 ? (
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => {
-                  setClearAllPending(true);
-                }}
-              >
-                Clear all
-              </Button>
-            ) : null}
-          </div>
+          <h1 className="ui-header__title ui-header__title--lg">Overline</h1>
+          <p className="ui-header__subtitle">
+            AI settings, saved macros, shortcuts, and run scope.
+          </p>
         </header>
 
         <LlmSettingsEditor />
@@ -115,11 +100,24 @@ export default function App() {
             No macros yet. Open Overline on a page and choose Record.
           </p>
         ) : (
-          <MacroTable
-            macros={macros}
-            onEdit={setEditingMacro}
-            onDelete={setMacroPendingDelete}
-          />
+          <>
+            <MacroTable
+              macros={macros}
+              onEdit={setEditingMacro}
+              onDelete={setMacroPendingDelete}
+            />
+            <div className="ui-options-footer">
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setClearAllPending(true);
+                }}
+              >
+                Clear all
+              </Button>
+            </div>
+          </>
         )}
       </main>
 
