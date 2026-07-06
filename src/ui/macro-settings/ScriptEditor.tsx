@@ -4,6 +4,7 @@ import { Pencil } from "lucide-react";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import { validateMacroScriptSignature } from "@/shared/macro-signature";
 import { formatScriptStepBody } from "@/shared/script-format";
+import { SCRIPT_STEP_TYPE_STYLE } from "@/shared/script-step-type-style";
 import type { Macro } from "@/shared/types/macro";
 import { MacroScriptSchema } from "@/shared/types/script";
 import { Button, Disclosure, FieldGroup, TextArea } from "@/ui/components";
@@ -130,7 +131,12 @@ export function ScriptEditor({ macro, onSaved, onError }: ScriptEditorProps) {
           <li key={`${macro.id}-script-${index}`} className="ui-code-item ui-code-item--row">
             <span className="ui-code-item__lead">
               {index + 1}.
-              <span className="ui-badge">{step.type}</span>
+              <span
+                className="ui-badge"
+                style={SCRIPT_STEP_TYPE_STYLE[step.type]}
+              >
+                {step.type}
+              </span>
             </span>
             <span className="ui-code-item__body">
               {step.label ? <>{step.label} — </> : null}

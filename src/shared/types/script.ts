@@ -76,4 +76,5 @@ export type ScriptWaitStep = z.infer<typeof ScriptWaitStepSchema>;
 export type ScriptWaitForStep = z.infer<typeof ScriptWaitForStepSchema>;
 export type ScriptNavigateStep = z.infer<typeof ScriptNavigateStepSchema>;
 export type ScriptStep = z.infer<typeof ScriptStepSchema>;
+export type ScriptStepType = ScriptStep["type"];
 export type MacroScript = z.infer<typeof MacroScriptSchema>;

@@ -343,8 +343,6 @@ textarea.ui-input {
   border-radius: 999px;
   padding: 2px 8px;
   font: 500 11px / 1.45 var(--ui-font);
-  background: var(--ui-hover);
-  color: var(--ui-fg-secondary);
 }
 
 .ui-inline-actions {
