@@ -6,6 +6,7 @@ import {
   eventToShortcut,
   formatShortcutForDisplay,
 } from "@/shared/shortcut";
+import { Button } from "@/ui/components";
 
 type ShortcutEditorProps = {
   macro: Macro;
@@ -88,26 +89,25 @@ export function ShortcutEditor({ macro, onSaved, onError }: ShortcutEditorProps)
         ) : (
           <span className="ui-text-muted">None</span>
         )}
-        <button
-          type="button"
-          className="ui-btn ui-btn--sm"
+        <Button
+          size="sm"
           onClick={() => {
             onError(null);
             setListening(true);
           }}
         >
           {listening ? "Press keys… (Esc to cancel)" : macro.shortcut ? "Change" : "Set shortcut"}
-        </button>
+        </Button>
         {macro.shortcut ? (
-          <button
-            type="button"
-            className="ui-btn ui-btn--sm ui-btn--ghost"
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={() => {
               void clearShortcut();
             }}
           >
             Clear
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>

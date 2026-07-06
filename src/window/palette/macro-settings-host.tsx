@@ -2,6 +2,7 @@ import { StrictMode, useCallback, useRef } from "react";
 import { createRoot } from "react-dom/client";
 
 import type { Macro } from "@/shared/types/macro";
+import { isAnyDialogOpen } from "@/ui/components/dialog-open";
 import { MacroSettingsHost } from "@/window/palette/MacroSettingsHost";
 
 let dispatchOpen: ((macro: Macro) => void) | null = null;
@@ -27,7 +28,9 @@ export function initMacroSettingsHost(): void {
 
   createRoot(container).render(
     <StrictMode>
-      <HostBridge />
+      <div className="ui-root">
+        <HostBridge />
+      </div>
     </StrictMode>,
   );
 }
@@ -37,5 +40,5 @@ export function openMacroSettings(macro: Macro): void {
 }
 
 export function isMacroSettingsOpen(): boolean {
-  return document.querySelectorAll("dialog[open]").length > 0;
+  return isAnyDialogOpen();
 }

@@ -1,5 +1,6 @@
 import { formatMacroStep } from "@/shared/macro-step-format";
 import type { Macro } from "@/shared/types/macro";
+import { Button, Disclosure } from "@/ui/components";
 
 import { MacroDetailsEditor } from "@/ui/macro-settings/MacroDetailsEditor";
 import { MacroParamsEditor } from "@/ui/macro-settings/MacroParamsEditor";
@@ -50,11 +51,14 @@ export function MacroSettingsBody({
           onError={onError}
         />
 
-        <details className="ui-disclosure">
-          <summary className="ui-disclosure__summary">
-            {macro.steps.length} demo {macro.steps.length === 1 ? "step" : "steps"}{" "}
-            (recording reference)
-          </summary>
+        <Disclosure
+          summary={
+            <>
+              {macro.steps.length} demo {macro.steps.length === 1 ? "step" : "steps"}{" "}
+              (recording reference)
+            </>
+          }
+        >
           <ol className="ui-list--stack">
             {macro.steps.map((step, index) => (
               <li key={step.id} className="ui-code-item">
@@ -62,14 +66,14 @@ export function MacroSettingsBody({
               </li>
             ))}
           </ol>
-        </details>
+        </Disclosure>
       </div>
 
       {onDelete ? (
         <div className="ui-card__footer">
-          <button
-            type="button"
-            className="ui-btn ui-btn--icon ui-btn--danger"
+          <Button
+            variant="icon"
+            className="ui-btn--danger"
             aria-label={`Delete ${macro.name}`}
             onClick={onDelete}
           >
@@ -95,7 +99,7 @@ export function MacroSettingsBody({
                 strokeLinecap="round"
               />
             </svg>
-          </button>
+          </Button>
         </div>
       ) : null}
     </>

@@ -1,4 +1,9 @@
-import { useEffect, useRef } from "react";
+import {
+  Button,
+  Dialog,
+  DialogDescription,
+  DialogTitle,
+} from "@/ui/components";
 
 type ConfirmDialogProps = {
   open: boolean;
@@ -21,65 +26,29 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const titleId = "ui-dialog-title";
-
-  useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) {
-      return;
-    }
-
-    if (open && !dialog.open) {
-      dialog.showModal();
-      return;
-    }
-
-    if (!open && dialog.open) {
-      dialog.close();
-    }
-  }, [open]);
-
   return (
-    <dialog
-      ref={dialogRef}
-      className="ui-dialog"
-      aria-labelledby={titleId}
-      onClose={onCancel}
-      onCancel={(event) => {
-        event.preventDefault();
-        onCancel();
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) {
+          onCancel();
+        }
       }}
+      popupClassName="ui-dialog__panel"
     >
-      <form
-        className="ui-dialog__panel"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onConfirm();
-        }}
-      >
-        <h2 id={titleId} className="ui-dialog__title">
-          {title}
-        </h2>
-        <p className="ui-dialog__message">{message}</p>
-        <div className="ui-dialog__actions">
-          <button
-            type="button"
-            className="ui-btn"
-            onClick={() => {
-              onCancel();
-            }}
-          >
-            {cancelLabel}
-          </button>
-          <button
-            type="submit"
-            className={`ui-btn ${destructive ? "ui-btn--destructive" : "ui-btn--primary"}`}
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </form>
-    </dialog>
+      <DialogTitle>{title}</DialogTitle>
+      <DialogDescription>{message}</DialogDescription>
+      <div className="ui-dialog__actions">
+        <Button variant="ghost" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+        <Button
+          variant={destructive ? "destructive" : "primary"}
+          onClick={onConfirm}
+        >
+          {confirmLabel}
+        </Button>
+      </div>
+    </Dialog>
   );
 }

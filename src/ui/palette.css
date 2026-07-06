@@ -375,6 +375,21 @@ html.ol-prompt-only #macro-settings-root {
   gap: var(--ui-space-2);
 }
 
+.ui-bui-popup.ui-macro-settings {
+  width: min(100%, 440px);
+  max-width: calc(100vw - var(--ui-space-8));
+  max-height: min(80vh, 560px);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  color: var(--ui-fg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-lg);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
 .ui-macro-settings {
   width: min(100%, 440px);
   max-width: calc(100vw - var(--ui-space-8));

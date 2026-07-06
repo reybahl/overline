@@ -12,7 +12,9 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
-    <OptionsToaster />
+    <div className="ui-root">
+      <App />
+      <OptionsToaster />
+    </div>
   </StrictMode>,
 );
