@@ -1,7 +1,7 @@
 {
   "name": "overline",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Record and run browser macros with AI assistance",
   "scripts": {
@@ -10,7 +10,8 @@
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src",
-    "test": "bun test"
+    "test": "bun test",
+    "package:cws": "mkdir -p release/cws && bun run build && cd dist && zip -r -X ../release/cws/overline-cws.zip . -x '*.DS_Store'"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.0",
