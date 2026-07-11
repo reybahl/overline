@@ -63,7 +63,7 @@ export function formatShortcutForDisplay(shortcut: string): string {
     }
   });
 
-  return isMac ? parts.join("") : parts.join("+");
+  return isMac ? parts.join("\u2009") : parts.join("+");
 }
 
 export function isEditableTarget(target: EventTarget | null): boolean {
