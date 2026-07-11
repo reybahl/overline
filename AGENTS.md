@@ -103,3 +103,4 @@ Format: `type[optional scope]: description`
 
 Keep the subject line short. Optional body after a blank line. Breaking changes: `type!:` or footer `breaking change:`.
 
+
