@@ -1,7 +1,10 @@
 import type { ContentMessage, ContentResponse } from "@/shared/types/messages";
 import {
   PANEL_CLOSE_MESSAGE,
+  PANEL_MODAL_CLOSE_MESSAGE,
+  PANEL_MODAL_OPEN_MESSAGE,
   PANEL_RESIZE_MESSAGE,
+  UI_MODAL_MAX_HEIGHT,
   UI_SHELL_MAX_HEIGHT,
   UI_SHELL_WIDTH,
 } from "@/ui/tokens";
@@ -113,6 +116,7 @@ let panelElement: HTMLDivElement | null = null;
 let panelFrame: HTMLIFrameElement | null = null;
 let keydownHandler: ((event: KeyboardEvent) => void) | null = null;
 let previousBodyOverflow = "";
+let panelModalOpen = false;
 
 function ensureOverlayStyles(): void {
   if (document.getElementById(OVERLAY_STYLE_ID)) {
@@ -147,6 +151,23 @@ function clampPanelHeight(height: number): number {
   return Math.min(Math.max(height, 1), maxHeight);
 }
 
+function clampModalPanelHeight(): number {
+  return Math.min(UI_MODAL_MAX_HEIGHT, Math.floor(window.innerHeight * 0.85));
+}
+
+function setPanelModalMode(open: boolean): void {
+  panelModalOpen = open;
+  overlayHost?.classList.toggle("ui-overlay-host--modal", open);
+
+  if (!panelElement || !open) {
+    return;
+  }
+
+  const height = clampModalPanelHeight();
+  panelElement.style.height = `${height}px`;
+  panelFrame?.setAttribute("scrolling", "no");
+}
+
 function handlePanelMessage(event: MessageEvent): void {
   if (event.source !== panelFrame?.contentWindow) {
     return;
@@ -162,11 +183,24 @@ function handlePanelMessage(event: MessageEvent): void {
     return;
   }
 
+  if (event.data?.type === PANEL_MODAL_OPEN_MESSAGE) {
+    setPanelModalMode(true);
+    return;
+  }
+
+  if (event.data?.type === PANEL_MODAL_CLOSE_MESSAGE) {
+    setPanelModalMode(false);
+    return;
+  }
+
   if (event.data?.type !== PANEL_RESIZE_MESSAGE) {
     return;
   }
 
-  if (overlayHost?.classList.contains("ui-overlay-host--prompt-macro")) {
+  if (
+    panelModalOpen ||
+    overlayHost?.classList.contains("ui-overlay-host--prompt-macro")
+  ) {
     return;
   }
 
@@ -194,6 +228,7 @@ function closeOverlay(): void {
   overlayHost = null;
   panelElement = null;
   panelFrame = null;
+  panelModalOpen = false;
   window.removeEventListener("message", handlePanelMessage);
   document.body.style.overflow = previousBodyOverflow;
 }

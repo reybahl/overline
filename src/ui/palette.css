@@ -363,7 +363,7 @@ html.ol-prompt-only #macro-settings-root {
 .ui-bui-popup.ui-macro-settings {
   width: min(100%, 520px);
   max-width: calc(100vw - var(--ui-space-8));
-  max-height: min(85vh, 680px);
+  max-height: min(85vh, var(--ui-modal-max-height));
   border: 1px solid var(--ui-border);
   border-radius: var(--ui-radius);
   color: var(--ui-fg);
@@ -378,7 +378,7 @@ html.ol-prompt-only #macro-settings-root {
 .ui-macro-settings__form {
   display: flex;
   flex-direction: column;
-  max-height: min(85vh, 680px);
+  max-height: min(85vh, var(--ui-modal-max-height));
 }
 
 .ui-macro-settings__header {

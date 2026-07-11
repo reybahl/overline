@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { Macro } from "@/shared/types/macro";
 import { MacroSettingsDialog } from "@/ui/macro-settings/MacroSettingsDialog";
+import { setPanelModalOpen } from "@/window/palette/panel-host";
 
 type DialogState = {
   open: boolean;
@@ -20,6 +21,15 @@ export function MacroSettingsHost({ onRegisterOpen }: MacroSettingsHostProps) {
       setState({ open: true, macro });
     });
   }, [onRegisterOpen]);
+
+  useEffect(() => {
+    setPanelModalOpen(state.open);
+    return () => {
+      if (state.open) {
+        setPanelModalOpen(false);
+      }
+    };
+  }, [state.open]);
 
   if (!state.macro) {
     return null;

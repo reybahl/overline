@@ -48,6 +48,7 @@
   /* Shell */
   --ui-shell-width: 560px;
   --ui-shell-max-height: 480px;
+  --ui-modal-max-height: 680px;
 }
 
 @media (prefers-color-scheme: dark) {
