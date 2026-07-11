@@ -40,6 +40,7 @@ export function MacroSettingsHost({ onRegisterOpen }: MacroSettingsHostProps) {
       key={`${state.macro.id}-${state.macro.updatedAt}`}
       macro={state.macro}
       open={state.open}
+      surface="modal"
       onClose={() => {
         setState({ open: false, macro: null });
       }}

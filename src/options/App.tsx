@@ -146,6 +146,7 @@ export default function App() {
           key={`${editingMacro.id}-${editingMacro.updatedAt}`}
           macro={editingMacro}
           open
+          surface="page"
           onClose={() => {
             setEditingMacro(null);
           }}

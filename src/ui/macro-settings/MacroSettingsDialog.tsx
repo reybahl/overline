@@ -1,16 +1,20 @@
 import { X } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/options/ConfirmDialog";
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import type { Macro } from "@/shared/types/macro";
 import { Button, Dialog } from "@/ui/components";
 import { MacroSettingsBody } from "@/ui/macro-settings/MacroSettingsBody";
+import {
+  settingsToast,
+  type SettingsSurface,
+} from "@/ui/macro-settings/settings-surface";
 
 type MacroSettingsDialogProps = {
   macro: Macro;
   open: boolean;
+  surface: SettingsSurface;
   onClose: () => void;
   onSaved: (macros: Macro[]) => void;
 };
@@ -18,6 +22,7 @@ type MacroSettingsDialogProps = {
 export function MacroSettingsDialog({
   macro,
   open,
+  surface,
   onClose,
   onSaved,
 }: MacroSettingsDialogProps) {
@@ -49,11 +54,11 @@ export function MacroSettingsDialog({
     setDeletePending(false);
 
     if (!response.ok) {
-      toast.error(response.error);
+      settingsToast(surface, "error", response.error);
       return;
     }
 
-    toast.success(`Deleted "${editedMacro.name}"`);
+    settingsToast(surface, "success", `Deleted "${editedMacro.name}"`);
     onSaved(response.macros);
     onClose();
   }
@@ -87,6 +92,7 @@ export function MacroSettingsDialog({
             <div className="ui-macro-settings__content">
               <MacroSettingsBody
                 macro={editedMacro}
+                surface={surface}
                 onSaved={handleSaved}
                 onDirtyChange={setDirty}
                 onDelete={() => {

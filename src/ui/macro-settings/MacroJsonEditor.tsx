@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
-import { toast } from "sonner";
 
 import { sendBackgroundMessage } from "@/shared/clients/background-client";
 import {
@@ -12,9 +11,14 @@ import type { Macro } from "@/shared/types/macro";
 import { Button, FieldGroup, TextArea } from "@/ui/components";
 
 import { ShortcutCapture } from "@/ui/macro-settings/ShortcutCapture";
+import {
+  settingsToast,
+  type SettingsSurface,
+} from "@/ui/macro-settings/settings-surface";
 
 type MacroJsonEditorProps = {
   macro: Macro;
+  surface: SettingsSurface;
   onSaved: (macros: Macro[]) => void;
   onDirtyChange?: (dirty: boolean) => void;
   onDelete?: () => void;
@@ -23,6 +27,7 @@ type MacroJsonEditorProps = {
 
 export function MacroJsonEditor({
   macro,
+  surface,
   onSaved,
   onDirtyChange,
   onDelete,
@@ -38,7 +43,7 @@ export function MacroJsonEditor({
   const saveMacro = useCallback(async () => {
     const result = parseMacroEditJson(text, macro);
     if (!result.ok) {
-      toast.error(result.error);
+      settingsToast(surface, "error", result.error);
       return;
     }
 
@@ -48,14 +53,14 @@ export function MacroJsonEditor({
     });
 
     if (!response.ok) {
-      toast.error(response.error);
+      settingsToast(surface, "error", response.error);
       return;
     }
 
-    toast.success("Saved");
+    settingsToast(surface, "success", "Saved");
     onSaved(response.macros);
     setDirty(false);
-  }, [text, macro, onSaved]);
+  }, [text, macro, onSaved, surface]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -87,7 +92,12 @@ export function MacroJsonEditor({
 
   return (
     <div className="ui-macro-json-editor">
-      <ShortcutCapture macro={macro} text={text} onTextChange={updateText} />
+      <ShortcutCapture
+        macro={macro}
+        surface={surface}
+        text={text}
+        onTextChange={updateText}
+      />
 
       <FieldGroup label="Editable fields">
         <TextArea
