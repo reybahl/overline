@@ -52,7 +52,7 @@ Recording and compile use LLMs, but sanitize + playback stay deterministic. Runn
 
 ## Stack
 
-- TypeScript (strict)
+- TypeScript 7 (strict)
 - React 19 for options / settings UI
 - Vite + `vite-plugin-web-extension` (Manifest V3)
 - Bun for install, scripts, and tests
