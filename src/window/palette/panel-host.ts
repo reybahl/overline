@@ -1,5 +1,7 @@
 import {
   PANEL_CLOSE_MESSAGE,
+  PANEL_MODAL_CLOSE_MESSAGE,
+  PANEL_MODAL_OPEN_MESSAGE,
   PANEL_RESIZE_MESSAGE,
 } from "@/ui/tokens";
 
@@ -21,6 +23,21 @@ function reportPanelHeight(): void {
     { type: PANEL_RESIZE_MESSAGE, height },
     "*",
   );
+}
+
+/** Expand the host overlay so an in-iframe modal is not clipped to palette height. */
+export function setPanelModalOpen(open: boolean): void {
+  if (window.parent === window) {
+    return;
+  }
+
+  if (open) {
+    window.parent.postMessage({ type: PANEL_MODAL_OPEN_MESSAGE }, "*");
+    return;
+  }
+
+  window.parent.postMessage({ type: PANEL_MODAL_CLOSE_MESSAGE }, "*");
+  reportPanelHeight();
 }
 
 export function startPanelHeightObserver(): void {
