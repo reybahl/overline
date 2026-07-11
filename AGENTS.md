@@ -48,7 +48,7 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - **Query/tab hrefs** (`?tab=…`): `hrefPattern`, never `hrefFromPathSegment`.
 - Scoped paths: `hrefPattern` preserving segment count.
 - Never combine `hrefFromPathSegment` with `hrefPattern` or text fields.
-- **Navigate:** prefer `{ type: "navigate", href }` over click when demo click was pure link navigation with `recordedMatch.hrefSuffix`. Compare pageUrl to hrefSuffix segment by segment — shared segments → `{{segmentN}}`, static tail literal. `{{segmentN}}` is playback scope, not a user param. Never navigate for `#…` fragments, toggles (`pressed`), buttons without href, or ordinal intents (first/latest/top).
+- **Navigate:** prefer `{ type: "navigate", href }` over click when demo click was pure link navigation with `recordedMatch.hrefSuffix`. Compare pageUrl to hrefSuffix segment by segment — shared segments → `{{segmentN}}`, static tail literal. `{{segmentN}}` is playback scope, not a user param — **only in navigate `href`**, never in click match `hrefSuffix`/`hrefContains`/`hrefPattern` (those are literal). Never navigate for `#…` fragments, same-page/reload hrefs (hrefSuffix equals pageUrl path), toggles (`pressed`), buttons without href, or ordinal intents (first/latest/top). Same-page href → click with aria/text only, omit href fields.
 - Do not insert extra `waitFor` steps — playback owns timing between actions.
 - Description from compile with generalized roles ("the owner", "the current repository") — not raw intent, session URLs, or slugs.
 
@@ -59,6 +59,8 @@ Recording → compile → playback. Trust the LLM for recording and compile; enf
 - Strip unstable `id`.
 - Strip `text`/`textContains` when `hrefFromPathSegment` is set.
 - Strip `hrefFromPathSegment` when `hrefPattern` is set.
+- Strip click/fill match `hrefSuffix`/`hrefContains`/`hrefPattern` values that contain `{{segmentN}}` (unresolved at match time).
+- Strip all href match fields when demo `hrefSuffix` equals that step's `pageUrl` path (same-page/reload link).
 - Sync `waitFor` step match to the next click's match after the above.
 - **Navigate steps:** downgrade to click when demo step was not a navigable anchor click (`isNavigableClick`). Ground `href` to demo `hrefSuffix` when compile diverges.
 

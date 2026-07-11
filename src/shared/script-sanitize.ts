@@ -8,6 +8,9 @@ import type {
   ScriptNavigateStep,
 } from "@/shared/types/script";
 
+/** {{segmentN}} resolves only in navigate href — never in click match strings. */
+const SEGMENT_PLACEHOLDER_IN_VALUE_RE = /\{\{segment\d+\}\}/;
+
 /** Drop framework-generated ids that should not be replay targets. */
 function stripUnstableId(match: ElementMatch): ElementMatch {
   if (!match.id || isStableId(match.id)) {
@@ -35,6 +38,61 @@ function stripPathSegmentWithHrefPattern(match: ElementMatch): ElementMatch {
   }
 
   const { hrefFromPathSegment: _segment, ...rest } = match;
+  return rest;
+}
+
+/** Drop match href strings that embed unresolved {{segmentN}} placeholders. */
+function stripUnresolvedSegmentPlaceholders(match: ElementMatch): ElementMatch {
+  const next: ElementMatch = { ...match };
+
+  for (const key of ["hrefSuffix", "hrefContains", "hrefPattern"] as const) {
+    const value = next[key];
+    if (typeof value === "string" && SEGMENT_PLACEHOLDER_IN_VALUE_RE.test(value)) {
+      delete next[key];
+    }
+  }
+
+  return next;
+}
+
+/** True when hrefSuffix is the current page path (reload / same-page link). */
+export function isSamePageHref(
+  pageUrl: string | undefined,
+  hrefSuffix: string | undefined,
+): boolean {
+  if (!pageUrl || !hrefSuffix || hrefSuffix.startsWith("#")) {
+    return false;
+  }
+
+  try {
+    const page = new URL(pageUrl);
+    const path = page.pathname;
+    const pathWithSearch = `${page.pathname}${page.search}`;
+    return hrefSuffix === path || hrefSuffix === pathWithSearch;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Same-page hrefs are not discriminating targets — keep aria/text/tag only.
+ * Prevents overfitting reload links to the recording URL path.
+ */
+function stripSamePageHrefFields(
+  match: ElementMatch,
+  demo: DemoScriptStep | undefined,
+): ElementMatch {
+  if (!isSamePageHref(demo?.pageUrl, demo?.recordedMatch?.hrefSuffix)) {
+    return match;
+  }
+
+  const {
+    hrefSuffix: _suffix,
+    hrefContains: _contains,
+    hrefPattern: _pattern,
+    hrefFromPathSegment: _segment,
+    ...rest
+  } = match;
   return rest;
 }
 
@@ -95,11 +153,20 @@ function constrainMatchToDemo(
   return constrained;
 }
 
-function normalizeReplayMatch(demo: ElementMatch, match: ElementMatch): ElementMatch {
+function normalizeReplayMatch(
+  demo: ElementMatch,
+  match: ElementMatch,
+  demoStep?: DemoScriptStep,
+): ElementMatch {
   let normalized = normalizeElementMatch(match);
   normalized = constrainMatchToDemo(demo, normalized);
-  return stripPathSegmentWithHrefPattern(
-    stripTextWithPathSegment(stripUnstableId(normalized)),
+  return stripSamePageHrefFields(
+    stripUnresolvedSegmentPlaceholders(
+      stripPathSegmentWithHrefPattern(
+        stripTextWithPathSegment(stripUnstableId(normalized)),
+      ),
+    ),
+    demoStep,
   );
 }
 
@@ -141,6 +208,10 @@ export function isNavigableClick(demo: DemoScriptStep): boolean {
     return false;
   }
   if (match.tag === "button") {
+    return false;
+  }
+  // Same-page / reload links are in-page actions, not navigation hops.
+  if (isSamePageHref(demo.pageUrl, match.hrefSuffix)) {
     return false;
   }
 
@@ -193,7 +264,7 @@ function navigateToClick(
   return {
     type: "click",
     label: step.label,
-    match: normalizeReplayMatch(demoMatch, demoMatch),
+    match: normalizeReplayMatch(demoMatch, demoMatch, demo),
   };
 }
 
@@ -217,7 +288,7 @@ export function sanitizeCompiledScript(
       const demo = demoSteps?.[demoIndex++];
       if (!demo || !isNavigableClick(demo)) {
         if (demo?.recordedMatch) {
-          const match = normalizeReplayMatch(demo.recordedMatch, demo.recordedMatch);
+          const match = normalizeReplayMatch(demo.recordedMatch, demo.recordedMatch, demo);
           clickMatchByIndex.set(index, match);
           return navigateToClick(step, demo);
         }
@@ -240,8 +311,13 @@ export function sanitizeCompiledScript(
     if (demo?.recordedMatch) {
       match = constrainMatchToDemo(demo.recordedMatch, match);
     }
-    match = stripPathSegmentWithHrefPattern(
-      stripTextWithPathSegment(stripUnstableId(match)),
+    match = stripSamePageHrefFields(
+      stripUnresolvedSegmentPlaceholders(
+        stripPathSegmentWithHrefPattern(
+          stripTextWithPathSegment(stripUnstableId(match)),
+        ),
+      ),
+      demo,
     );
 
     if (step.type === "click") {
