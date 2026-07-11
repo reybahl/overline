@@ -32,11 +32,14 @@
 
 .ui-macro-table-toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ui-space-3);
 }
 
 .ui-macro-table-search {
   width: min(100%, 16rem);
+  margin-left: auto;
 }
 
 .ui-macro-table-wrap {
@@ -61,6 +64,28 @@
   font-weight: 500;
   color: var(--ui-fg-secondary);
   white-space: nowrap;
+}
+
+.ui-macro-table__select {
+  width: 2rem;
+  vertical-align: middle;
+}
+
+.ui-macro-table__checkbox {
+  display: block;
+  width: 0.9rem;
+  height: 0.9rem;
+  margin: 0;
+  accent-color: var(--ui-primary);
+  cursor: pointer;
+}
+
+.ui-macro-table__checkbox:disabled {
+  cursor: not-allowed;
+}
+
+.ui-macro-table tr[data-selected="true"] td {
+  background: var(--ui-hover);
 }
 
 .ui-macro-table__sort {

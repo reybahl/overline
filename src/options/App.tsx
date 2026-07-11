@@ -15,6 +15,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [editingMacro, setEditingMacro] = useState<Macro | null>(null);
   const [macroPendingDelete, setMacroPendingDelete] = useState<Macro | null>(null);
+  const [macrosPendingBulkDelete, setMacrosPendingBulkDelete] = useState<
+    Macro[] | null
+  >(null);
   const [clearAllPending, setClearAllPending] = useState(false);
   const [llmSettingsOpen, setLlmSettingsOpen] = useState(false);
 
@@ -77,6 +80,31 @@ export default function App() {
     }
   }
 
+  async function confirmBulkDelete(): Promise<void> {
+    if (!macrosPendingBulkDelete || macrosPendingBulkDelete.length === 0) {
+      return;
+    }
+
+    const selected = macrosPendingBulkDelete;
+    const ids = new Set(selected.map((macro) => macro.id));
+    setMacrosPendingBulkDelete(null);
+
+    try {
+      const next = macros.filter((macro) => !ids.has(macro.id));
+      await saveMacros(next);
+      setMacros(next);
+      toast.success(
+        `Deleted ${selected.length} macro${selected.length === 1 ? "" : "s"}`,
+      );
+    } catch (deleteError) {
+      const message =
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete macros";
+      toast.error(message);
+    }
+  }
+
   if (loading) {
     return (
       <main className="ui-page">
@@ -118,6 +146,7 @@ export default function App() {
               macros={macros}
               onEdit={setEditingMacro}
               onDelete={setMacroPendingDelete}
+              onDeleteSelected={setMacrosPendingBulkDelete}
             />
             <div className="ui-options-footer">
               <Button
@@ -168,6 +197,27 @@ export default function App() {
         }}
         onCancel={() => {
           setClearAllPending(false);
+        }}
+      />
+
+      <ConfirmDialog
+        open={macrosPendingBulkDelete !== null}
+        title="Delete selected macros?"
+        message={
+          macrosPendingBulkDelete
+            ? `${macrosPendingBulkDelete.length} selected macro${
+                macrosPendingBulkDelete.length === 1 ? "" : "s"
+              } will be permanently removed.`
+            : ""
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        destructive
+        onConfirm={() => {
+          void confirmBulkDelete();
+        }}
+        onCancel={() => {
+          setMacrosPendingBulkDelete(null);
         }}
       />
 

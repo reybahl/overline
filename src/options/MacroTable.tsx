@@ -5,10 +5,11 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   useReactTable,
+  type RowSelectionState,
   type SortingState,
 } from "@tanstack/react-table";
 import { Pencil, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { macroEditableDocumentFromMacro } from "@/shared/macro-edit";
 import { formatShortcutForDisplay } from "@/shared/shortcut";
@@ -19,6 +20,7 @@ type MacroTableProps = {
   macros: Macro[];
   onEdit: (macro: Macro) => void;
   onDelete: (macro: Macro) => void;
+  onDeleteSelected: (macros: Macro[]) => void;
 };
 
 const columnHelper = createColumnHelper<Macro>();
@@ -45,12 +47,80 @@ function runScopeSearchText(macro: Macro): string {
   return `${runScope.pattern} ${runScope.description}`;
 }
 
-export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
+function RowCheckbox({
+  checked,
+  indeterminate,
+  disabled,
+  ariaLabel,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  disabled?: boolean;
+  ariaLabel: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = Boolean(indeterminate);
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="ui-macro-table__checkbox"
+      checked={checked}
+      disabled={disabled}
+      aria-label={ariaLabel}
+      onChange={onChange}
+      onClick={(event) => {
+        event.stopPropagation();
+      }}
+    />
+  );
+}
+
+export function MacroTable({
+  macros,
+  onEdit,
+  onDelete,
+  onDeleteSelected,
+}: MacroTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+
+  useEffect(() => {
+    setRowSelection({});
+  }, [macros]);
 
   const columns = useMemo(
     () => [
+      columnHelper.display({
+        id: "select",
+        enableSorting: false,
+        enableGlobalFilter: false,
+        header: ({ table }) => (
+          <RowCheckbox
+            ariaLabel="Select all macros"
+            checked={table.getIsAllRowsSelected()}
+            indeterminate={table.getIsSomeRowsSelected()}
+            onChange={table.getToggleAllRowsSelectedHandler()}
+          />
+        ),
+        cell: ({ row }) => (
+          <RowCheckbox
+            ariaLabel={`Select ${row.original.name}`}
+            checked={row.getIsSelected()}
+            disabled={!row.getCanSelect()}
+            onChange={row.getToggleSelectedHandler()}
+          />
+        ),
+      }),
       columnHelper.accessor((macro) => macroEditableDocumentFromMacro(macro).name, {
         id: "name",
         header: "Name",
@@ -150,19 +220,39 @@ export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
   const table = useReactTable({
     data: macros,
     columns,
-    state: { sorting, globalFilter },
+    state: { sorting, globalFilter, rowSelection },
+    enableRowSelection: true,
+    getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
 
   const rows = table.getRowModel().rows;
+  const selectedMacros = table
+    .getSelectedRowModel()
+    .rows.map((row) => row.original);
+  const selectedCount = selectedMacros.length;
 
   return (
     <div className="ui-macro-table-section">
       <div className="ui-macro-table-toolbar">
+        {selectedCount > 0 ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => {
+              onDeleteSelected(selectedMacros);
+            }}
+          >
+            Delete selected ({selectedCount})
+          </Button>
+        ) : (
+          <span />
+        )}
         <TextInput
           type="search"
           className="ui-macro-table-search"
@@ -183,9 +273,14 @@ export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
                 {headerGroup.headers.map((header) => {
                   const canSort = header.column.getCanSort();
                   const sortDirection = header.column.getIsSorted();
+                  const isSelect = header.column.id === "select";
 
                   return (
-                    <th key={header.id} scope="col">
+                    <th
+                      key={header.id}
+                      scope="col"
+                      className={isSelect ? "ui-macro-table__select" : undefined}
+                    >
                       {header.isPlaceholder ? null : canSort ? (
                         <button
                           type="button"
@@ -219,9 +314,19 @@ export function MacroTable({ macros, onEdit, onDelete }: MacroTableProps) {
               </tr>
             ) : (
               rows.map((row) => (
-                <tr key={row.id}>
+                <tr
+                  key={row.id}
+                  data-selected={row.getIsSelected() ? "true" : undefined}
+                >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id}>
+                    <td
+                      key={cell.id}
+                      className={
+                        cell.column.id === "select"
+                          ? "ui-macro-table__select"
+                          : undefined
+                      }
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
