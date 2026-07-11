@@ -198,6 +198,35 @@ export async function runAgentLoop(
     lastError = undefined;
 
     if (turnResult.done) {
+      const finalStep = turnResult.step;
+      const isNewAction =
+        Boolean(finalStep.selector) &&
+        finalStep.type !== "navigate" &&
+        !isRepeatedStep(stepsTaken, finalStep) &&
+        !wouldOscillate(stepsTaken, finalStep);
+
+      // Allow done:true on the first turn when this step is the satisfying action.
+      if (isNewAction) {
+        const step = toRecordedStep(finalStep);
+        stepsTaken.push(step);
+        onProgress?.(describeRunningStep(stepsTaken.length, step));
+
+        const exec = await executeAndRecordStep(tabId, step);
+        if (!exec.ok) {
+          stepsTaken.pop();
+          lastError = exec.error;
+          consecutiveNoProgress += 1;
+          if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+            exitReason = "no progress after repeated failed proposals";
+            reasoning.push(
+              "Stopped recording: could not find a matching control for the intent after several attempts.",
+            );
+            break;
+          }
+          continue;
+        }
+      }
+
       if (stepsTaken.length === 0) {
         lastError =
           "You returned done: true but no steps have been recorded yet. " +
@@ -211,25 +240,6 @@ export async function runAgentLoop(
           break;
         }
         continue;
-      }
-
-      const finalStep = turnResult.step;
-      const isNewAction =
-        Boolean(finalStep.selector) &&
-        finalStep.type !== "navigate" &&
-        !isRepeatedStep(stepsTaken, finalStep) &&
-        !wouldOscillate(stepsTaken, finalStep);
-
-      if (isNewAction) {
-        const step = toRecordedStep(finalStep);
-        stepsTaken.push(step);
-        onProgress?.(describeRunningStep(stepsTaken.length, step));
-
-        const exec = await executeAndRecordStep(tabId, step);
-        if (!exec.ok) {
-          stepsTaken.pop();
-          lastError = exec.error;
-        }
       }
 
       exitReason = "model marked intent complete";
