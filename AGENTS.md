@@ -1,5 +1,3 @@
-
-sssss
 # Patch — do not regress
 
 Recording → compile → playback. Trust the LLM for recording and compile; enforce correctness with thin deterministic sanitize + playback timing. No site-specific hacks.
