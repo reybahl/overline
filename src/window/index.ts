@@ -18,6 +18,7 @@ import {
   getSelectableItemCount,
   handleRunMacro,
   handleRunSelectedMacro,
+  openSelectedMacroSettings,
   refreshMacros,
   renderMacroList,
   scrollSelectedIntoView,
@@ -88,6 +89,13 @@ searchInput.addEventListener("keydown", (event) => {
   if (event.key === "Enter") {
     event.preventDefault();
     void handleRunSelectedMacro();
+    return;
+  }
+
+  if (event.key === "Tab" && !event.shiftKey) {
+    if (openSelectedMacroSettings()) {
+      event.preventDefault();
+    }
   }
 });
 

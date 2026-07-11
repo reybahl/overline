@@ -314,3 +314,21 @@ export async function handleRunSelectedMacro(): Promise<void> {
 
   await handleRunMacro();
 }
+
+/** Open settings for the keyboard-highlighted macro. No-op for create-row / empty. */
+export function openSelectedMacroSettings(): boolean {
+  if (isCreateMacroOptionSelected()) {
+    return false;
+  }
+
+  const selected = paletteState.filteredMacros[paletteState.selectedIndex];
+  if (!selected) {
+    return false;
+  }
+
+  const target =
+    paletteState.savedMacros.find((entry) => entry.id === selected.id) ??
+    selected;
+  openMacroSettings(target);
+  return true;
+}
