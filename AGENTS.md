@@ -102,3 +102,4 @@ Format: `type[optional scope]: description`
 - `docs`, `refactor`, `perf`, `test`, `chore`, `ci`, `build` — when they fit better
 
 Keep the subject line short. Optional body after a blank line. Breaking changes: `type!:` or footer `breaking change:`.
+
