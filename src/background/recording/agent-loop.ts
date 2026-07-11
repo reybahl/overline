@@ -26,6 +26,9 @@ const DEFAULT_MAX_TURNS = 15;
 /** How many times the agent may re-propose the same step before we stop. */
 const MAX_CONSECUTIVE_REPEATS = 2;
 
+/** Stop if this many turns record no new successful step (fruitless searching). */
+const MAX_CONSECUTIVE_NO_PROGRESS = 3;
+
 export type AgentLoopOptions = {
   intent: string;
   tabId: number;
@@ -125,6 +128,7 @@ export async function runAgentLoop(
   let consecutiveRepeats = 0;
   let lastFailedSignature: string | undefined;
   let consecutiveFailedProposals = 0;
+  let consecutiveNoProgress = 0;
   let exitReason: string | undefined;
   let macroName: string | undefined;
 
@@ -133,6 +137,7 @@ export async function runAgentLoop(
 
     onProgress?.(`Thinking (step ${turn + 1})…`);
 
+    const stepsBeforeTurn = stepsTaken.length;
     const url = await getTabUrl(tabId);
     const elements = await captureDomInTab(tabId);
     let turnResult: AgentTurn;
@@ -156,6 +161,14 @@ export async function runAgentLoop(
     } catch (error) {
       if (error instanceof AgentTurnValidationError) {
         lastError = error.message;
+        consecutiveNoProgress += 1;
+        if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+          exitReason = "no progress after repeated failed proposals";
+          reasoning.push(
+            "Stopped recording: could not find a matching control for the intent after several attempts.",
+          );
+          break;
+        }
         continue;
       }
       throw error;
@@ -189,6 +202,14 @@ export async function runAgentLoop(
         lastError =
           "You returned done: true but no steps have been recorded yet. " +
           "The intent is not complete — return done: false and emit the next click step.";
+        consecutiveNoProgress += 1;
+        if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+          exitReason = "no progress after repeated failed proposals";
+          reasoning.push(
+            "Stopped recording: could not find a matching control for the intent after several attempts.",
+          );
+          break;
+        }
         continue;
       }
 
@@ -218,6 +239,11 @@ export async function runAgentLoop(
     if (turnResult.step.type === "navigate") {
       lastError =
         "Do not use navigate steps. Click the link or button instead.";
+      consecutiveNoProgress += 1;
+      if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+        exitReason = "no progress after repeated failed proposals";
+        break;
+      }
       continue;
     }
 
@@ -273,11 +299,33 @@ export async function runAgentLoop(
         break;
       }
 
+      consecutiveNoProgress += 1;
+      if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+        exitReason = "no progress after repeated failed proposals";
+        reasoning.push(
+          "Stopped recording: could not find a matching control for the intent after several attempts.",
+        );
+        break;
+      }
+
       continue;
     }
 
     lastFailedSignature = undefined;
     consecutiveFailedProposals = 0;
+
+    if (stepsTaken.length > stepsBeforeTurn) {
+      consecutiveNoProgress = 0;
+    } else {
+      consecutiveNoProgress += 1;
+      if (consecutiveNoProgress >= MAX_CONSECUTIVE_NO_PROGRESS) {
+        exitReason = "no progress after repeated failed proposals";
+        reasoning.push(
+          "Stopped recording: could not find a matching control for the intent after several attempts.",
+        );
+        break;
+      }
+    }
   }
 
   if (stepsTaken.length === 0) {
