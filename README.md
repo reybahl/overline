@@ -50,6 +50,31 @@ Pipeline: record → compile → sanitize → playback.
 
 Recording and compile use LLMs, but sanitize + playback stay deterministic. Running a macro after generation does not call any LLMs and therefore behaves consistently across runs.
 
+## How the agent works
+
+You give an intent (e.g. “open the owner’s profile”). Overline demonstrates that workflow once with the LLM, then compiles a reusable script.
+
+```mermaid
+flowchart TD
+  A[User intent] --> B[Record]
+  B --> C[Capture live DOM]
+  C --> D[LLM: next click / fill / wait / done]
+  D -->|not done| E[Execute action in page]
+  E --> C
+  D -->|done| F[Compile]
+  F --> G[LLM: generalize matches + run scope]
+  G --> H[Sanitize - deterministic cleanup grounded to the demo]
+  H --> I[Saved macro]
+```
+
+
+
+- **Record**: one LLM turn per step from the live DOM and intent. No separate planning pass.
+- **Compile**: one compiled step per demo step, same order; generalizes selectors and may rewrite clicks to navigate steps where reasonable.
+- **Sanitize**: deterministic only; drops hallucinated match fields.
+
+Playback is separate, with no LLM: match + perform action with timing waits.
+
 ## Stack
 
 - TypeScript 7 (strict)
@@ -58,4 +83,3 @@ Recording and compile use LLMs, but sanitize + playback stay deterministic. Runn
 - Bun for install, scripts, and tests
 - Vercel AI SDK (`ai` + provider packages) for BYOK LLM calls
 - Zod for schemas; Base UI + Lucide for UI
-
